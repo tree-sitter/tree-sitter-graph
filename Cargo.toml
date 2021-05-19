@@ -4,6 +4,7 @@ version = "0.0.1"
 description = "Construct graphs from parsed source code"
 homepage = "https://github.com/tree-sitter/tree-sitter-graph/"
 repository = "https://github.com/tree-sitter/tree-sitter-graph/"
+readme = "README.md"
 license = "MIT OR Apache-2.0"
 authors = [
   "Douglas Creager <dcreager@dcreager.net>"
