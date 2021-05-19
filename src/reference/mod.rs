@@ -208,3 +208,55 @@
 //!
 //! If this constraint isn't met, the attribute sets are **_in conflict_**, which is an error
 //! condition that aborts the execution of the graph DSL file.
+//!
+//! # Variables
+//!
+//! You can use variables to pass information between different stanzas and statements in a graph
+//! DSL file.  There are three kinds of variables:
+//!
+//!   - **_Global_** variables are provided externally by whatever process is executing the graph
+//!     DSL file.  You can use this, for instance, to pass in the path of the source file being
+//!     analyzed, to use as part of the graph structure that you create.
+//!
+//!   - **_Local_** variables are only visible within the current execution of the current stanza.
+//!     Once all of the statements in the stanza have been executed, all local variables disappear.
+//!
+//!   - **_Scoped_** variables "belong to" syntax nodes in the same way that graph nodes do.  Their
+//!     values carry over from stanza to stanza.  Scoped variables are referenced by using a syntax
+//!     node expression (typically a query capture) and a variable name, separated by a
+//!     double-colon: `@node::variable`.
+//!
+//! Local and scoped variables are created using `var` or `let` statements.  A `let` statement
+//! creates an **_immutable variable_**, whose value cannot be changed.  A `var` statement creates
+//! a **_mutable variable_**.  You use a `set` statement to change the value of a mutable variable.
+//!
+//! (All global variables are immutable, and cannot be created by any graph DSL statement; they are
+//! only provided by the external process that executes the graph DSL file.  If you need to create
+//! your own "global" variable from within the graph DSL, create a scoped variable on the root node
+//! of the syntax tree.)
+//!
+//! ``` tsg
+//! (identifier) @id
+//! {
+//!   let local_variable = "a string"
+//!   ; The following would be an error, since `let` variables are immutable:
+//!   ; set local_variable = "a new value"
+//!
+//!   ; The following is also an error, since you can't mutate a variable that
+//!   ; doesn't exist:
+//!   ; set missing_variable = 42
+//!
+//!   var mutable_variable = "first value"
+//!   attr @id.node "first_attribute" = mutable_variable
+//!
+//!   set mutable_variable = "second value"
+//!   attr @id.node "second_attribute" = mutable_variable
+//!
+//!   var @id::kind = "id"
+//! }
+//! ```
+//!
+//! Variables can be referenced anywhere that you can provide an expression.  It's an error if you
+//! try to reference a variable that hasn't been defined yet.  (Remember that stanzas are processed
+//! in the order they appear in the file, and each stanza's matches are processed in the order they
+//! appear in the syntax tree.)
