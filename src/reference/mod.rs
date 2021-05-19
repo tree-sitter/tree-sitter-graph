@@ -260,3 +260,68 @@
 //! try to reference a variable that hasn't been defined yet.  (Remember that stanzas are processed
 //! in the order they appear in the file, and each stanza's matches are processed in the order they
 //! appear in the syntax tree.)
+//!
+//! # Regular expressions
+//!
+//! You can use a `scan` statement to match the content of a string value against a set of regular
+//! expressions.
+//!
+//! Starting at the beginning of the string, we determine the first character where one of the
+//! regular expressions matches.  If more than one regular expression matches at this earliest
+//! character, we use the regular expression that appears first in the `scan` statement.  We then
+//! execute the statements in the "winning" regular expression's block.
+//!
+//! After executing the matching block, we try to match all of the regular expressions again,
+//! starting _after_ the text that was just matched.  We continue this process, applying the
+//! earliest matching regular expression in each iteration, until we have exhausted the entire
+//! string, or none of the regular expressions match.
+//!
+//! Within each regular expression's block, you can use `$0`, `$1`, etc., to refer to any capture
+//! groups in the regular expression.
+//!
+//! For example, if `filepath` is a global variable containing the path of a Python source file,
+//! you could use the following `scan` statement to construct graph nodes for the name of the
+//! module defined in the file:
+//!
+//! ``` tsg
+//! (module) @mod
+//! {
+//!   var current = @mod.root
+//!
+//!   scan filepath {
+//!     "([^/]+)/"
+//!     {
+//!       ; This arm will match any directory component of the file path.  In
+//!       ; Python, this gives you the sequence of packages that the module
+//!       ; lives in.
+//!
+//!       ; Note that we keep appending additional tag names to the `current`
+//!       ; graph node to create an arbitrary number of graph nodes linked to
+//!       ; the @mod syntax node.
+//!       set current = current.package
+//!       attr current "name" = $1
+//!     }
+//!
+//!     "__init__\\.py$"
+//!     {
+//!       ; This arm will match a trailing __init__.py, indicating that the
+//!       ; module's name comes from the last directory component.
+//!
+//!       ; Expose the graph node that we created for that component as a
+//!       ; scoped variable that later stanzas can see.
+//!       let @mod::root = current
+//!     }
+//!
+//!     "([^/]+)\\.py$"
+//!     {
+//!       ; This arm will match any other trailing module name.  Note that
+//!       ; __init__.py also matches this regular expression, but since it
+//!       ; appears later, the __init__.py clause will take precedence.
+//!
+//!       set current = current.package
+//!       attr current "name" = $1
+//!       let @mod::root = current
+//!     }
+//!   }
+//! }
+//! ```
