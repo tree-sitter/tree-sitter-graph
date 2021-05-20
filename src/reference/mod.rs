@@ -325,3 +325,29 @@
 //!   }
 //! }
 //! ```
+//!
+//! # Functions
+//!
+//! The process executing a graph DSL file can provide **_functions_** that can be called from
+//! within graph DSL stanzas.
+//!
+//! Function calls use a Lisp-like syntax, where the name of the function being called is _inside_
+//! of the parentheses.  The parameters to a function call are arbitrary expressions.  For
+//! instance, if the executing process provides a function named `+`, you could call it as:
+//!
+//! ``` tsg
+//! (identifier) @id
+//! {
+//!    let x = 4
+//!    attr @id.node "nine" = (+ x 5)
+//! }
+//! ```
+//!
+//! Note that it's the process executing the graph DSL file that decides which functions are
+//! available.  We do define a [standard library][], and most of the time those are the functions
+//! that are available, but you should double-check the documentation of whatever graph DSL tool
+//! you're using to make sure.
+//!
+//! [standard library]: functions/index.html
+
+pub mod functions;
