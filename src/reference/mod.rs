@@ -349,5 +349,19 @@
 //! you're using to make sure.
 //!
 //! [standard library]: functions/index.html
+//!
+//! # Debugging
+//!
+//! To support members of the Ancient and Harmonious Order of Printf Debuggers, you can use `print`
+//! statements to print out the content of any expressions during the execution of a graph DSL
+//! file:
+//!
+//! ``` tsg
+//! (identifier) @id
+//! {
+//!    let x = 4
+//!    print "Hi! x = ", x
+//! }
+//! ```
 
 pub mod functions;
