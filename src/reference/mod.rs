@@ -54,20 +54,29 @@
 //!
 //! There are many interesting use cases where you want to use this parsed syntax tree to create
 //! some _other_ graph-like structure.  This library lets you do that, using a declarative DSL to
-//! identify patterns in the parsed syntax tree, along with rules for which nodes and edges to
-//! create for the syntax nodes that match those patterns.
+//! identify patterns in the parsed syntax tree, along with rules for which graph nodes and edges
+//! to create for the syntax nodes that match those patterns.
+//!
+//! # Terminology
+//!
+//! One confusing aspect of the graph DSL is that we have to talk about two different kinds of
+//! "node": the nodes of the concrete syntax tree that is our input when executing a graph DSL
+//! file, and the nodes of the graph that we produce as an output.  We will be careful to always
+//! use "syntax node" and "graph node" in this documentation to make it clear which kind of node we
+//! mean.
 //!
 //! # Limitations
 //!
-//! You can create any graph structure, as long as each node "belongs to" or "is associated with"
-//! exactly one node in the concrete syntax tree.  There are no limitations on how you use edges to
-//! connect the nodes in the graph: you are not limited to creating a tree, and in particular, you
-//! are not limited to creating a tree that "lines" up with the parsed syntax tree.
+//! You can create any graph structure, as long as each graph node "belongs to" or "is associated
+//! with" exactly one syntax node in the concrete syntax tree.  There are no limitations on how you
+//! use edges to connect the graph nodes: you are not limited to creating a tree, and in
+//! particular, you are not limited to creating a tree that "lines" up with the parsed syntax tree.
 //!
-//! You can annotate each node and edge with an arbitrary set of attributes.  As we will see below,
-//! many stanzas in the graph DSL can contribute to the set of attributes for a particular node or
-//! edge.  Each stanza must define attributes in a "consistent" way — you cannot have multiple
-//! stanzas provide conflicting values for a particular attribute for a particular node or edge.
+//! You can annotate each graph node and edge with an arbitrary set of attributes.  As we will see
+//! below, many stanzas in the graph DSL can contribute to the set of attributes for a particular
+//! graph node or edge.  Each stanza must define attributes in a "consistent" way — you cannot have
+//! multiple stanzas provide conflicting values for a particular attribute for a particular graph
+//! node or edge.
 //!
 //! # High-level structure
 //!
@@ -91,9 +100,10 @@
 //!
 //! To execute a graph DSL file against a concrete syntax tree, we execute each stanza in the graph
 //! DSL file _in order_.  For each stanza, we identify each place where the concrete syntax tree
-//! matches the query pattern.  For each of these places, we end up with a different set of nodes
-//! assigned to the query pattern's captures.  We execute the block of statements for each of these
-//! capture assignments, creating any nodes, edges, or attributes mentioned in the block.
+//! matches the query pattern.  For each of these places, we end up with a different set of syntax
+//! nodes assigned to the query pattern's captures.  We execute the block of statements for each of
+//! these capture assignments, creating any graph nodes, edges, or attributes mentioned in the
+//! block.
 //!
 //! For instance, the following stanza would match all of the identifiers in our example syntax
 //! tree:
@@ -103,7 +113,7 @@
 //! {
 //!   ; Some statements that will be executed for each identifier in the
 //!   ; source file.  You can use @id to refer to the matched identifier
-//!   ; node.
+//!   ; syntax node.
 //! }
 //! ```
 //!
@@ -162,8 +172,8 @@
 //! # Syntax nodes
 //!
 //! Syntax nodes are identified by tree-sitter query captures (`@name`).  For instance, in our
-//! example stanza, whose query is `(identifier) @id`, `@id` would refer to the `identifier` node
-//! that the stanza matched against.
+//! example stanza, whose query is `(identifier) @id`, `@id` would refer to the `identifier` syntax
+//! node that the stanza matched against.
 //!
 //! # Graph nodes
 //!
@@ -201,17 +211,18 @@
 //! }
 //! ```
 //!
-//! There can be at most one edge connecting any particular source and sink node in the graph.  If
-//! multiple stanzas create edges between the same nodes, those are "collapsed" into a single edge.
+//! There can be at most one edge connecting any particular source and sink graph node in the
+//! graph.  If multiple stanzas create edges between the same graph nodes, those are "collapsed"
+//! into a single edge.
 //!
 //! # Attributes
 //!
 //! Graph nodes and edges have an associated set of **_attributes_**.  Each attribute has a string
 //! name, and a value.
 //!
-//! You add attributes to a node using an `attr` statement, which takes in a graph node expression,
-//! a string expression for the name of the attribute, and an expression of any type for the value
-//! of the attribute:
+//! You add attributes to a graph node using an `attr` statement, which takes in a graph node
+//! expression, a string expression for the name of the attribute, and an expression of any type
+//! for the value of the attribute:
 //!
 //! ``` tsg
 //! (import_statement name: (_) @name)
@@ -263,8 +274,8 @@
 //!
 //! (All global variables are immutable, and cannot be created by any graph DSL statement; they are
 //! only provided by the external process that executes the graph DSL file.  If you need to create
-//! your own "global" variable from within the graph DSL, create a scoped variable on the root node
-//! of the syntax tree.)
+//! your own "global" variable from within the graph DSL, create a scoped variable on the root
+//! syntax node.)
 //!
 //! ``` tsg
 //! (identifier) @id
