@@ -278,36 +278,19 @@
 //! Graph nodes and edges have an associated set of **_attributes_**.  Each attribute has a string
 //! name, and a value.
 //!
-//! You add attributes to a graph node using an `attr` statement, which takes in a graph node
-//! expression, a string expression for the name of the attribute, and an expression of any type
-//! for the value of the attribute:
+//! You add attributes to a graph node or edge using an `attr` statement:
 //!
 //! ``` tsg
 //! (import_statement name: (_) @name)
 //! {
-//!   attr @name.definition "kind" = "module"
+//!   attr (@name.definition) kind = "module"
+//!   attr (@name.definition -> @name.reference) precedence = 10
 //! }
 //! ```
 //!
-//! You add attributes to an edge by using the optional attributes clause of an `edge` statement:
-//!
-//! ``` tsg
-//! (import_statement name: (_) @name)
-//! {
-//!   edge @name.definition -> @name.reference, "precedence" = 10
-//! }
-//! ```
-//!
-//! Multiple stanzas can add attributes to the same graph node or edge.  Any attributes defined in
-//! those stanzas are **_combined_** into a single set of attributes by taking the union of their
-//! contents.  If both stanzas define an attribute with a particular name, then the corresponding
-//! values must either be:
-//!
-//!   - both sets, in which case the values are unioned together
-//!   - anything else, in which case the values must be equal
-//!
-//! If this constraint isn't met, the attribute sets are **_in conflict_**, which is an error
-//! condition that aborts the execution of the graph DSL file.
+//! Note that you have to have already created the graph node or edge using a `node` or `edge`
+//! statement (not necessarily in the same stanza), and the graph node or edge must not already
+//! have an attribute with the same name.
 //!
 //! # Variables
 //!
@@ -347,10 +330,10 @@
 //!   ; set missing_variable = 42
 //!
 //!   var mutable_variable = "first value"
-//!   attr @id.node "first_attribute" = mutable_variable
+//!   attr @id.node first_attribute = mutable_variable
 //!
 //!   set mutable_variable = "second value"
-//!   attr @id.node "second_attribute" = mutable_variable
+//!   attr @id.node second_attribute = mutable_variable
 //!
 //!   var @id::kind = "id"
 //! }
@@ -401,7 +384,7 @@
 //!       ; the @mod syntax node.
 //!       set current = current.package
 //!       node current
-//!       attr current "name" = $1
+//!       attr current name = $1
 //!     }
 //!
 //!     "__init__\\.py$"
@@ -421,7 +404,7 @@
 //!       ; appears later, the __init__.py clause will take precedence.
 //!
 //!       set current = current.package
-//!       attr current "name" = $1
+//!       attr current name = $1
 //!       let @mod::root = current
 //!     }
 //!   }
@@ -441,7 +424,7 @@
 //! (identifier) @id
 //! {
 //!    let x = 4
-//!    attr @id.node "nine" = (+ x 5)
+//!    attr @id.node nine = (+ x 5)
 //! }
 //! ```
 //!
