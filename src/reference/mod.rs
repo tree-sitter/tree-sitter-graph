@@ -177,26 +177,84 @@
 //!
 //! # Graph nodes
 //!
-//! Each node in the output graph is identified by a syntax node and a list of **_tag names_**.
-//! Graph nodes are automatically created when they are referenced.  Graph node expressions have
-//! one of the following formats:
+//! You use `node` statements to create graph nodes.
 //!
-//!   - `[syntax node].[tag name]`
-//!   - `[graph node].[tag name]`
+//! As mentioned [above](#limitations), each graph node that you create "belongs to" or "is
+//! associated with" exactly one syntax node.  There can be more than one graph node associated
+//! with each syntax node, and so we need a way to distinguish them.  We do that using a **_tag
+//! name_**, which is a sequence of one or more identifiers separated by periods.  You will
+//! typically use the tag name to describe the "meaning" or "role" of the graph node that you are
+//! creating.  For instance, if you've determined that a particular syntax node represents a
+//! definition, you might create a graph node for that syntax node whose tag name is `definition` —
+//! or even `definition.class.method` if you want to provide more detail.
 //!
-//! For instance, all of the following are valid graph node expressions in our example stanza:
+//! Together, that means that to refer to a graph node, you need to specify the syntax node that it
+//! belongs to, and its tag name, separated by a period.  Since syntax nodes are typically
+//! identified by query captures, a full graph node reference will typically look like
+//! `@id.definition.class.method`.  That expression refers to the graph node that belongs to the
+//! `@id` syntax node, and whose tag name is `definition.class.method`.
 //!
-//!   - `@id.node`
-//!   - `@id.node.another`
+//! ``` tsg
+//! (identifier) @id
+//! {
+//!   node @id.definition.class.method
+//! }
+//! ```
 //!
-//! For both expressions, the graph node's syntax node would be whichever node was captured by
-//! `@id` in the stanza's query.  They would have `node` and `node.another`, respectively, as their
-//! tag names.
+//! There are other ways to refer to syntax nodes (such as variables, as we will see
+//! [below](#variables)).  In general, you can use the `.tag.name` syntax to transform _any_ syntax
+//! node reference into a graph node reference:
 //!
-//! There can be at most one graph node for any combination of syntax node and tag names.  (The
-//! name of the capture used to identify the syntax node does not matter, what counts is which
-//! syntax node the capture refers to.)  If multiple stanzas refer to graph nodes with the same
-//! syntax node and tag names, those are "collapsed" into a single graph node.
+//! ``` tsg
+//! (identifier) @id
+//! {
+//!   ; We will learn more about this variable syntax below
+//!   let variable = @id
+//!
+//!   ; but having defined that variable, the following two expressions
+//!   ; refer to the same graph node:
+//!   ;   variable.definition.class.method
+//!   ;   @id.definition.class.method
+//! }
+//! ```
+//!
+//! You can also use the `.tag.name` syntax to construct a graph node reference from _another graph
+//! node reference_:
+//!
+//! ``` tsg
+//! (identifier) @id
+//! {
+//!   ; Now `variable` refers to a graph node, not a syntax node
+//!   let variable = @id.definition
+//!
+//!   ; but the following two expressions still refer to the same
+//!   ; graph node:
+//!   ;   variable.class.method
+//!   ;   @id.definition.class.method
+//! }
+//! ```
+//!
+//! Graph nodes are attached to the syntax node itself, and don't depend on how you identify the
+//! syntax node.  For instance, you can refer to graph nodes from multiple stanzas:
+//!
+//! ``` tsg
+//! (identifier) @id
+//! {
+//!   node @id.name
+//! }
+//!
+//! (dotted_name (identifier) @dotted_element)
+//! {
+//!   ; We will learn more about the attr statement below
+//!   attr @dotted_element.name kind = "dotted"
+//! }
+//! ```
+//!
+//! In this example, _every_ `identifier` syntax node will have a graph node whose tag name is
+//! `name`.  But only the graph nodes of those identifiers that appear inside of a `dotted_name`
+//! will have a `kind` attribute.  And even though we used different capture names, inside of
+//! different queries, to find those `identifier` nodes, the graph node references in both stanzas
+//! refer to the same graph nodes.
 //!
 //! # Edges
 //!
@@ -329,6 +387,7 @@
 //! (module) @mod
 //! {
 //!   var current = @mod.root
+//!   node current
 //!
 //!   scan filepath {
 //!     "([^/]+)/"
@@ -341,6 +400,7 @@
 //!       ; graph node to create an arbitrary number of graph nodes linked to
 //!       ; the @mod syntax node.
 //!       set current = current.package
+//!       node current
 //!       attr current "name" = $1
 //!     }
 //!
