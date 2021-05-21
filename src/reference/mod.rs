@@ -134,6 +134,31 @@
 //!   - `10`
 //!   - `42`
 //!
+//! Lists consist of zero or more expressions, separated by commas, enclosed in square brackets.
+//! The elements of a list do not have to have the same type:
+//!
+//! ``` tsg
+//! [0, "string", 0, #true, @id]
+//! ```
+//!
+//! Sets have the same format, but are enclosed in curly braces instead of square brackets:
+//!
+//! ``` tsg
+//! {0, "string", #true, @id}
+//! ```
+//!
+//! Both lists and sets both allow trailing commas after the final element, if you prefer that
+//! style to play more nicely with source control diffs:
+//!
+//! ``` tsg
+//! [
+//!   0,
+//!   "string",
+//!   #true,
+//!   @id,
+//! ]
+//! ```
+//!
 //! # Syntax nodes
 //!
 //! Syntax nodes are identified by tree-sitter query captures (`@name`).  For instance, in our
