@@ -83,6 +83,12 @@
 //!
 //! Comments start with a semicolon, and extend to the end of the line.
 //!
+//! Identifiers start with either an ASCII letter or underscore, and all remaining characters are
+//! ASCII letters, numbers, underscores, or hyphens.  (More precisely, they satisfy the regular
+//! expression `/[a-zA-Z_][a-zA-Z0-9_-]*/`.)  Identifiers are used as the names of
+//! [attributes](#attributes), [functions](#functions), and [variables](#variables), and as the tag
+//! names of [graph nodes](#graph-nodes).
+//!
 //! To execute a graph DSL file against a concrete syntax tree, we execute each stanza in the graph
 //! DSL file _in order_.  For each stanza, we identify each place where the concrete syntax tree
 //! matches the query pattern.  For each of these places, we end up with a different set of nodes
