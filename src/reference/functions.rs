@@ -12,6 +12,15 @@
 //! There might be additional functions available, and in rare cases, there might be a completely
 //! different set of functions available!
 //!
+//! # Graph manipulation functions
+//!
+//! ## `node`
+//!
+//! Creates a new graph node.
+//!
+//!   - Input parameters: none
+//!   - Output: a reference to the new graph node
+//!
 //! # Mathematical functions
 //!
 //! ## `+`

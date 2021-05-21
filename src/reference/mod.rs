@@ -65,19 +65,6 @@
 //! use "syntax node" and "graph node" in this documentation to make it clear which kind of node we
 //! mean.
 //!
-//! # Limitations
-//!
-//! You can create any graph structure, as long as each graph node "belongs to" or "is associated
-//! with" exactly one syntax node in the concrete syntax tree.  There are no limitations on how you
-//! use edges to connect the graph nodes: you are not limited to creating a tree, and in
-//! particular, you are not limited to creating a tree that "lines" up with the parsed syntax tree.
-//!
-//! You can annotate each graph node and edge with an arbitrary set of attributes.  As we will see
-//! below, many stanzas in the graph DSL can contribute to the set of attributes for a particular
-//! graph node or edge.  Each stanza must define attributes in a "consistent" way — you cannot have
-//! multiple stanzas provide conflicting values for a particular attribute for a particular graph
-//! node or edge.
-//!
 //! # High-level structure
 //!
 //! A graph DSL file consists of one or more **_stanzas_**.  Each stanza starts with a tree-sitter
@@ -95,8 +82,7 @@
 //! Identifiers start with either an ASCII letter or underscore, and all remaining characters are
 //! ASCII letters, numbers, underscores, or hyphens.  (More precisely, they satisfy the regular
 //! expression `/[a-zA-Z_][a-zA-Z0-9_-]*/`.)  Identifiers are used as the names of
-//! [attributes](#attributes), [functions](#functions), and [variables](#variables), and as the tag
-//! names of [graph nodes](#graph-nodes).
+//! [attributes](#attributes), [functions](#functions), and [variables](#variables).
 //!
 //! To execute a graph DSL file against a concrete syntax tree, we execute each stanza in the graph
 //! DSL file _in order_.  For each stanza, we identify each place where the concrete syntax tree
@@ -121,6 +107,7 @@
 //!
 //! The value of an expression in the graph DSL can be any of the following:
 //!
+//!   - null
 //!   - a boolean
 //!   - a string
 //!   - an integer (unsigned, 32 bits)
@@ -128,6 +115,8 @@
 //!   - a reference to a graph node
 //!   - an ordered list of values
 //!   - an unordered set of values
+//!
+//! The null value is spelled `#null`.
 //!
 //! The boolean literals are spelled `#true` and `#false`.
 //!
@@ -175,123 +164,6 @@
 //! example stanza, whose query is `(identifier) @id`, `@id` would refer to the `identifier` syntax
 //! node that the stanza matched against.
 //!
-//! # Graph nodes
-//!
-//! You use `node` statements to create graph nodes.
-//!
-//! As mentioned [above](#limitations), each graph node that you create "belongs to" or "is
-//! associated with" exactly one syntax node.  There can be more than one graph node associated
-//! with each syntax node, and so we need a way to distinguish them.  We do that using a **_tag
-//! name_**, which is a sequence of one or more identifiers separated by periods.  You will
-//! typically use the tag name to describe the "meaning" or "role" of the graph node that you are
-//! creating.  For instance, if you've determined that a particular syntax node represents a
-//! definition, you might create a graph node for that syntax node whose tag name is `definition` —
-//! or even `definition.class.method` if you want to provide more detail.
-//!
-//! Together, that means that to refer to a graph node, you need to specify the syntax node that it
-//! belongs to, and its tag name, separated by a period.  Since syntax nodes are typically
-//! identified by query captures, a full graph node reference will typically look like
-//! `@id.definition.class.method`.  That expression refers to the graph node that belongs to the
-//! `@id` syntax node, and whose tag name is `definition.class.method`.
-//!
-//! ``` tsg
-//! (identifier) @id
-//! {
-//!   node @id.definition.class.method
-//! }
-//! ```
-//!
-//! There are other ways to refer to syntax nodes (such as variables, as we will see
-//! [below](#variables)).  In general, you can use the `.tag.name` syntax to transform _any_ syntax
-//! node reference into a graph node reference:
-//!
-//! ``` tsg
-//! (identifier) @id
-//! {
-//!   ; We will learn more about this variable syntax below
-//!   let variable = @id
-//!
-//!   ; but having defined that variable, the following two expressions
-//!   ; refer to the same graph node:
-//!   ;   variable.definition.class.method
-//!   ;   @id.definition.class.method
-//! }
-//! ```
-//!
-//! You can also use the `.tag.name` syntax to construct a graph node reference from _another graph
-//! node reference_:
-//!
-//! ``` tsg
-//! (identifier) @id
-//! {
-//!   ; Now `variable` refers to a graph node, not a syntax node
-//!   let variable = @id.definition
-//!
-//!   ; but the following two expressions still refer to the same
-//!   ; graph node:
-//!   ;   variable.class.method
-//!   ;   @id.definition.class.method
-//! }
-//! ```
-//!
-//! Graph nodes are attached to the syntax node itself, and don't depend on how you identify the
-//! syntax node.  For instance, you can refer to graph nodes from multiple stanzas:
-//!
-//! ``` tsg
-//! (identifier) @id
-//! {
-//!   node @id.name
-//! }
-//!
-//! (dotted_name (identifier) @dotted_element)
-//! {
-//!   ; We will learn more about the attr statement below
-//!   attr @dotted_element.name kind = "dotted"
-//! }
-//! ```
-//!
-//! In this example, _every_ `identifier` syntax node will have a graph node whose tag name is
-//! `name`.  But only the graph nodes of those identifiers that appear inside of a `dotted_name`
-//! will have a `kind` attribute.  And even though we used different capture names, inside of
-//! different queries, to find those `identifier` nodes, the graph node references in both stanzas
-//! refer to the same graph nodes.
-//!
-//! # Edges
-//!
-//! Edges are created via an `edge` statement, which specifies the two graph nodes that should be
-//! connected.  Edges are directed, and the `->` arrow in the `edge` statement indicates the
-//! direction of the edge.
-//!
-//! ``` tsg
-//! (import_statement name: (_) @name)
-//! {
-//!   edge @name.definition -> @name.reference
-//! }
-//! ```
-//!
-//! There can be at most one edge connecting any particular source and sink graph node in the
-//! graph.  If multiple stanzas create edges between the same graph nodes, those are "collapsed"
-//! into a single edge.
-//!
-//! # Attributes
-//!
-//! Graph nodes and edges have an associated set of **_attributes_**.  Each attribute has a string
-//! name, and a value.
-//!
-//! You add attributes to a graph node or edge using an `attr` statement:
-//!
-//! ``` tsg
-//! (import_statement name: (_) @name)
-//! {
-//!   attr (@name.definition) kind = "module"
-//!   attr (@name.definition -> @name.reference) precedence = 10
-//! }
-//! ```
-//!
-//! Note that you have to have already created the graph node or edge using a `node` or `edge`
-//! statement (not necessarily in the same stanza), and the graph node or edge must not already
-//! have an attribute with the same name.
-//!
 //! # Variables
 //!
 //! You can use variables to pass information between different stanzas and statements in a graph
@@ -304,10 +176,9 @@
 //!   - **_Local_** variables are only visible within the current execution of the current stanza.
 //!     Once all of the statements in the stanza have been executed, all local variables disappear.
 //!
-//!   - **_Scoped_** variables "belong to" syntax nodes in the same way that graph nodes do.  Their
-//!     values carry over from stanza to stanza.  Scoped variables are referenced by using a syntax
-//!     node expression (typically a query capture) and a variable name, separated by a
-//!     double-colon: `@node::variable`.
+//!   - **_Scoped_** variables are "attached to" syntax nodes.  Their values carry over from stanza
+//!     to stanza.  Scoped variables are referenced by using a syntax node expression (typically a
+//!     query capture) and a variable name, separated by a double-colon: `@node::variable`.
 //!
 //! Local and scoped variables are created using `var` or `let` statements.  A `let` statement
 //! creates an **_immutable variable_**, whose value cannot be changed.  A `var` statement creates
@@ -330,10 +201,7 @@
 //!   ; set missing_variable = 42
 //!
 //!   var mutable_variable = "first value"
-//!   attr @id.node first_attribute = mutable_variable
-//!
 //!   set mutable_variable = "second value"
-//!   attr @id.node second_attribute = mutable_variable
 //!
 //!   var @id::kind = "id"
 //! }
@@ -343,6 +211,112 @@
 //! try to reference a variable that hasn't been defined yet.  (Remember that stanzas are processed
 //! in the order they appear in the file, and each stanza's matches are processed in the order they
 //! appear in the syntax tree.)
+//!
+//! # Functions
+//!
+//! The process executing a graph DSL file can provide **_functions_** that can be called from
+//! within graph DSL stanzas.
+//!
+//! Function calls use a Lisp-like syntax, where the name of the function being called is _inside_
+//! of the parentheses.  The parameters to a function call are arbitrary expressions.  For
+//! instance, if the executing process provides a function named `+`, you could call it as:
+//!
+//! ``` tsg
+//! (identifier) @id
+//! {
+//!    let x = 4
+//!    let @id::nine = (+ x 5)
+//! }
+//! ```
+//!
+//! Note that it's the process executing the graph DSL file that decides which functions are
+//! available.  We do define a [standard library][], and most of the time those are the functions
+//! that are available, but you should double-check the documentation of whatever graph DSL tool
+//! you're using to make sure.
+//!
+//! [standard library]: functions/index.html
+//!
+//! # Graph nodes
+//!
+//! You can use this graph DSL to create any graph structure that you want.  There are no
+//! limitations on which graph nodes you create, nor on how you use edges to connect the graph
+//! nodes.  You are not limited to creating a tree, and in particular, you are not limited to
+//! creating a tree that "lines" up with the parsed syntax tree.
+//!
+//! You use the [`node`][] function to create a new graph node.  The function returns a reference
+//! to the new node.  You will almost always assign that result to a variable so that you can then
+//! do interesting things with the node:
+//!
+//! [`node`]: functions/index.html#node
+//!
+//! ``` tsg
+//! (identifier) @id
+//! {
+//!   let new_node = (node)
+//! }
+//! ```
+//!
+//! Graph nodes are usually attached to syntax nodes using [scoped variables](#variables), so that
+//! you can refer to them from multiple stanzas:
+//!
+//! ``` tsg
+//! (identifier) @id
+//! {
+//!   let @id::node = (node)
+//! }
+//!
+//! (dotted_name (identifier) @dotted_element)
+//! {
+//!   ; We will learn more about the attr statement below
+//!   attr (@dotted_element::node) kind = "dotted"
+//! }
+//! ```
+//!
+//! In this example, we will create a graph node for _every_ `identifier` syntax node.  Each of
+//! those syntax nodes will have a `node` scoped variable, containing a reference to its graph
+//! node.  But only the graph nodes of those identifiers that appear inside of a `dotted_name` will
+//! have a `kind` attribute.  And even though we used different capture names, inside of different
+//! queries, to find those `identifier` nodes, the graph node references in both stanzas refer to
+//! the same graph nodes.
+//!
+//! # Edges
+//!
+//! Edges are created via an `edge` statement, which specifies the two graph nodes that should be
+//! connected.  Edges are directed, and the `->` arrow in the `edge` statement indicates the
+//! direction of the edge.
+//!
+//! ``` tsg
+//! (import_statement name: (_) @name)
+//! {
+//!   let @name::source = (node)
+//!   let @name::sink = (node)
+//!   edge @name::source -> @name::sink
+//! }
+//! ```
+//!
+//! There can be at most one edge connecting any particular source and sink graph node in the
+//! graph.  If multiple stanzas create edges between the same graph nodes, those are "collapsed"
+//! into a single edge.
+//!
+//! # Attributes
+//!
+//! Graph nodes and edges have an associated set of **_attributes_**.  Each attribute has a name
+//! (which is an identifier), and a value.
+//!
+//! You add attributes to a graph node or edge using an `attr` statement:
+//!
+//! ``` tsg
+//! (import_statement name: (_) @name)
+//! {
+//!   let @name::source = (node)
+//!   let @name::sink = (node)
+//!   attr (@name::sink) kind = "module"
+//!   attr (@name::source -> @name::sink) precedence = 10
+//! }
+//! ```
+//!
+//! Note that you have to have already created the graph node or edge, and the graph node or edge
+//! must not already have an attribute with the same name.
 //!
 //! # Regular expressions
 //!
@@ -369,8 +343,8 @@
 //! ``` tsg
 //! (module) @mod
 //! {
-//!   var current = @mod.root
-//!   node current
+//!   var new_node = #null
+//!   var current_node = (node)
 //!
 //!   scan filepath {
 //!     "([^/]+)/"
@@ -382,9 +356,10 @@
 //!       ; Note that we keep appending additional tag names to the `current`
 //!       ; graph node to create an arbitrary number of graph nodes linked to
 //!       ; the @mod syntax node.
-//!       set current = current.package
-//!       node current
-//!       attr current name = $1
+//!       set new_node = (node)
+//!       attr (new_node) name = $1
+//!       edge current_node -> new_node
+//!       set current_node = new_node
 //!     }
 //!
 //!     "__init__\\.py$"
@@ -394,7 +369,7 @@
 //!
 //!       ; Expose the graph node that we created for that component as a
 //!       ; scoped variable that later stanzas can see.
-//!       let @mod::root = current
+//!       let @mod::root = current_node
 //!     }
 //!
 //!     "([^/]+)\\.py$"
@@ -403,37 +378,14 @@
 //!       ; __init__.py also matches this regular expression, but since it
 //!       ; appears later, the __init__.py clause will take precedence.
 //!
-//!       set current = current.package
-//!       attr current name = $1
-//!       let @mod::root = current
+//!       set new_node = (node)
+//!       attr (new_node) name = $1
+//!       edge current_node -> new_node
+//!       let @mod::root = new_node
 //!     }
 //!   }
 //! }
 //! ```
-//!
-//! # Functions
-//!
-//! The process executing a graph DSL file can provide **_functions_** that can be called from
-//! within graph DSL stanzas.
-//!
-//! Function calls use a Lisp-like syntax, where the name of the function being called is _inside_
-//! of the parentheses.  The parameters to a function call are arbitrary expressions.  For
-//! instance, if the executing process provides a function named `+`, you could call it as:
-//!
-//! ``` tsg
-//! (identifier) @id
-//! {
-//!    let x = 4
-//!    attr @id.node nine = (+ x 5)
-//! }
-//! ```
-//!
-//! Note that it's the process executing the graph DSL file that decides which functions are
-//! available.  We do define a [standard library][], and most of the time those are the functions
-//! that are available, but you should double-check the documentation of whatever graph DSL tool
-//! you're using to make sure.
-//!
-//! [standard library]: functions/index.html
 //!
 //! # Debugging
 //!
