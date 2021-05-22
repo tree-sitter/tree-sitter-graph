@@ -21,10 +21,9 @@
 //! create for the syntax nodes that match those patterns.  You can also annotate each node and
 //! edge with an arbitrary set of attributes.
 //!
-//! You can create any graph structure, as long as each node "belongs to" or "is associated with"
-//! exactly one node in the concrete syntax tree.  There are no limitations on how you use edges to
-//! connect the nodes in the graph: you are not limited to creating a tree, and in particular, you
-//! are not limited to creating a tree that "lines" up with the parsed syntax tree.
+//! There are no limitations on what graph structure you create: you are not limited to creating a
+//! tree, and in particular, you are not limited to creating a tree that "lines" up with the parsed
+//! syntax tree.
 
 #[cfg(doc)]
 pub mod reference;
