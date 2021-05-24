@@ -178,7 +178,7 @@
 //!
 //!   - **_Scoped_** variables are "attached to" syntax nodes.  Their values carry over from stanza
 //!     to stanza.  Scoped variables are referenced by using a syntax node expression (typically a
-//!     query capture) and a variable name, separated by a double-colon: `@node::variable`.
+//!     query capture) and a variable name, separated by a period: `@node.variable`.
 //!
 //! Local and scoped variables are created using `var` or `let` statements.  A `let` statement
 //! creates an **_immutable variable_**, whose value cannot be changed.  A `var` statement creates
@@ -203,7 +203,7 @@
 //!   var mutable_variable = "first value"
 //!   set mutable_variable = "second value"
 //!
-//!   var @id::kind = "id"
+//!   var @id.kind = "id"
 //! }
 //! ```
 //!
@@ -225,7 +225,7 @@
 //! (identifier) @id
 //! {
 //!    let x = 4
-//!    let @id::nine = (+ x 5)
+//!    let @id.nine = (+ x 5)
 //! }
 //! ```
 //!
@@ -262,13 +262,13 @@
 //! ``` tsg
 //! (identifier) @id
 //! {
-//!   let @id::node = (node)
+//!   let @id.node = (node)
 //! }
 //!
 //! (dotted_name (identifier) @dotted_element)
 //! {
 //!   ; We will learn more about the attr statement below
-//!   attr (@dotted_element::node) kind = "dotted"
+//!   attr (@dotted_element.node) kind = "dotted"
 //! }
 //! ```
 //!
@@ -288,9 +288,9 @@
 //! ``` tsg
 //! (import_statement name: (_) @name)
 //! {
-//!   let @name::source = (node)
-//!   let @name::sink = (node)
-//!   edge @name::source -> @name::sink
+//!   let @name.source = (node)
+//!   let @name.sink = (node)
+//!   edge @name.source -> @name.sink
 //! }
 //! ```
 //!
@@ -308,10 +308,10 @@
 //! ``` tsg
 //! (import_statement name: (_) @name)
 //! {
-//!   let @name::source = (node)
-//!   let @name::sink = (node)
-//!   attr (@name::sink) kind = "module"
-//!   attr (@name::source -> @name::sink) precedence = 10
+//!   let @name.source = (node)
+//!   let @name.sink = (node)
+//!   attr (@name.sink) kind = "module"
+//!   attr (@name.source -> @name.sink) precedence = 10
 //! }
 //! ```
 //!
@@ -369,7 +369,7 @@
 //!
 //!       ; Expose the graph node that we created for that component as a
 //!       ; scoped variable that later stanzas can see.
-//!       let @mod::root = current_node
+//!       let @mod.root = current_node
 //!     }
 //!
 //!     "([^/]+)\\.py$"
@@ -381,7 +381,7 @@
 //!       set new_node = (node)
 //!       attr (new_node) name = $1
 //!       edge current_node -> new_node
-//!       let @mod::root = new_node
+//!       let @mod.root = new_node
 //!     }
 //!   }
 //! }
