@@ -19,10 +19,26 @@ jobs:
         uses: hecrj/setup-rust-action@v1
         with:
           rust-version: ${{ matrix.rust }}
+      - name: Install node environment
+        uses: actions/setup-node@v2
+        with:
+          node-version: 14
+
       - name: Checkout code
         uses: actions/checkout@v2
+
       - name: Check formatting
         run: cargo fmt --all -- --check
+
+      - name: Install grammar dependencies
+        run: |
+          cd grammar
+          npm install
+      - name: Test TSG grammar
+        run: |
+          cd grammar
+          npm test
+
       - name: Cache dependencies
         uses: actions/cache@v2
         with:
