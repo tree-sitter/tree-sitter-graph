@@ -243,26 +243,44 @@
 //! nodes.  You are not limited to creating a tree, and in particular, you are not limited to
 //! creating a tree that "lines" up with the parsed syntax tree.
 //!
-//! You use the [`node`][] function to create a new graph node.  The function returns a reference
-//! to the new node.  You will almost always assign that result to a variable so that you can then
-//! do interesting things with the node:
+//! There are two ways to create a new graph node.  The first, and most common, is to use a `node`
+//! statement:
+//!
+//! ``` tsg
+//! (identifier) @id
+//! {
+//!   node @id.node
+//! }
+//! ```
+//!
+//! This creates a graph node, and assigns a reference to the new node to a new immutable variable
+//! named `new_node`.
+//!
+//! The second way to create a graph node is to call the [`node`][] function:
 //!
 //! [`node`]: functions/index.html#node
 //!
 //! ``` tsg
 //! (identifier) @id
 //! {
-//!   let new_node = (node)
+//!   let @id.node = (node)
 //! }
 //! ```
 //!
-//! Graph nodes are usually attached to syntax nodes using [scoped variables](#variables), so that
-//! you can refer to them from multiple stanzas:
+//! Note that these two examples do exactly the same thing!  In fact, the `node` statement in the
+//! first example is just syntactic sugar for the `let` statement in the second example.  Since the
+//! most common pattern is to create a graph node and immediately assign it to an immutable scoped
+//! variable, we provide the `node` statement as a convenient shorthand.  If you need to do
+//! anything more complex, such as assigning the graph node reference to a _mutable_ variable, you
+//! can call the [`node`][] function directly.
+//!
+//! By attaching a graph node to a syntax node using a [scoped variable](#variables), you can refer
+//! to them from multiple stanzas:
 //!
 //! ``` tsg
 //! (identifier) @id
 //! {
-//!   let @id.node = (node)
+//!   node @id.node
 //! }
 //!
 //! (dotted_name (identifier) @dotted_element)
@@ -288,8 +306,8 @@
 //! ``` tsg
 //! (import_statement name: (_) @name)
 //! {
-//!   let @name.source = (node)
-//!   let @name.sink = (node)
+//!   node @name.source
+//!   node @name.sink
 //!   edge @name.source -> @name.sink
 //! }
 //! ```
@@ -308,8 +326,8 @@
 //! ``` tsg
 //! (import_statement name: (_) @name)
 //! {
-//!   let @name.source = (node)
-//!   let @name.sink = (node)
+//!   node @name.source
+//!   node @name.sink
 //!   attr (@name.sink) kind = "module"
 //!   attr (@name.source -> @name.sink) precedence = 10
 //! }
