@@ -336,6 +336,12 @@
 //! Note that you have to have already created the graph node or edge, and the graph node or edge
 //! must not already have an attribute with the same name.
 //!
+//! (Attributes might seem similar to scoped variables, but they are quite different.  Attributes
+//! are attached to graph nodes and edges, while scoped variables are attached to syntax nodes.
+//! More importantly, scoped variables only exist while executing the graph DSL file.  Once the
+//! execution has completed, the variables disappear.  Attributes, on the other hand, are part of
+//! the output produced by the graph DSL file, and live on after execution has finished.)
+//!
 //! # Regular expressions
 //!
 //! You can use a `scan` statement to match the content of a string value against a set of regular
