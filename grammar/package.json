@@ -1,0 +1,32 @@
+{
+  "name": "tree-sitter-tsg",
+  "version": "0.1.0",
+  "description": "tree-sitter grammar for the tree-sitter graph DSL",
+  "main": "bindings/node",
+  "keywords": [
+    "parser",
+    "tree-sitter"
+  ],
+  "dependencies": {
+    "nan": "^2.14.2"
+  },
+  "devDependencies": {
+    "tree-sitter-cli": "^0.19.5"
+  },
+  "scripts": {
+    "build": "tree-sitter generate && node-gyp build",
+    "test": "tree-sitter test"
+  },
+  "author": "Douglas Creager <dcreager@dcreager.net>",
+  "license": "MIT",
+  "repository": "https://github.com/tree-sitter/tree-sitter-graph.git",
+  "homepage": "https://github.com/tree-sitter/tree-sitter-graph#readme",
+  "tree-sitter": [
+    {
+      "scope": "scope.tsg",
+      "file-types": [
+        "tsg"
+      ]
+    }
+  ]
+}
