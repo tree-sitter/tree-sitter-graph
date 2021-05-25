@@ -1,4 +1,4 @@
-module.exports = grammar({
+module.exports = grammar(require('tree-sitter-tsq/grammar'), {
   name: 'tsg',
 
   rules: {
