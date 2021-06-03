@@ -23,7 +23,7 @@
 //!
 //! # Mathematical functions
 //!
-//! ## `+`
+//! ## `plus`
 //!
 //! Adds integers together.
 //!
@@ -63,3 +63,12 @@
 //!
 //! Note that `node` must not refer to the source file's root node, and it must be a _named_ child
 //! of its parent (i.e., it can't be an anonymous leaf node).
+//!
+//! ## `source-text`
+//!
+//! Returns the source text represented by a syntax node.
+//!
+//!   - Input parameters:
+//!     - `node`: A syntax node
+//!   - Output parameter:
+//!     - A string containing the source text represented by `node`

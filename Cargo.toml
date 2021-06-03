@@ -16,6 +16,7 @@ edition = "2018"
 test = false
 
 [dependencies]
+anyhow = "1.0"
 regex = "1"
 smallvec = { version="1.6", features=["union"] }
 thiserror = "1.0"

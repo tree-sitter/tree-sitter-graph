@@ -29,9 +29,13 @@
 pub mod reference;
 
 pub mod ast;
+mod execution;
+pub mod functions;
 pub mod graph;
 mod parser;
 
+pub use execution::ExecutionError;
+pub use execution::Variables;
 pub use parser::Location;
 pub use parser::ParseError;
 
