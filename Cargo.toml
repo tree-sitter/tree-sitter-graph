@@ -30,3 +30,24 @@ features = ["std", "inline-more", "backends"]
 [dev-dependencies]
 indoc = "1.0"
 tree-sitter-python = "0.19.1"
+
+# cli-only dependencies below
+
+[[bin]]
+name = "tree-sitter-graph"
+required-features = ["cli"]
+
+[features]
+cli = ["clap", "tree-sitter-config", "tree-sitter-loader"]
+
+[dependencies.clap]
+optional = true
+version = "2.32"
+
+[dependencies.tree-sitter-config]
+optional = true
+version = "0.19"
+
+[dependencies.tree-sitter-loader]
+optional = true
+version = "0.19"

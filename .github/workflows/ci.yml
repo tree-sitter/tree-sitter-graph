@@ -35,5 +35,7 @@ jobs:
             ${{ runner.OS }}-cargo-
       - name: Build library
         run: cargo build
+      - name: Build program
+        run: cargo build --bin tree-sitter-graph --features=cli
       - name: Run test suite
         run: cargo test
