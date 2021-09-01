@@ -72,3 +72,39 @@
 //!     - `node`: A syntax node
 //!   - Output parameter:
 //!     - A string containing the source text represented by `node`
+//!
+//! ## `start-column`
+//!
+//! Returns the zero-based start column of a syntax node.
+//!
+//!   - Input parameters:
+//!     - `node`: A syntax node
+//!   - Output parameter:
+//!     - The zero-based start column of `node`
+//!
+//! ## `start-row`
+//!
+//! Returns the zero-based start row of a syntax node.
+//!
+//!   - Input parameters:
+//!     - `node`: A syntax node
+//!   - Output parameter:
+//!     - The zero-based start row of `node`
+//!
+//! ## `end-column`
+//!
+//! Returns the zero-based end column of a syntax node.
+//!
+//!   - Input parameters:
+//!     - `node`: A syntax node
+//!   - Output parameter:
+//!     - The zero-based end column of `node`
+//!
+//! ## `end-row`
+//!
+//! Returns the zero-based end row of a syntax node.
+//!
+//!   - Input parameters:
+//!     - `node`: A syntax node
+//!   - Output parameter:
+//!     - The zero-based end row of `node`

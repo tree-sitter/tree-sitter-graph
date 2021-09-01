@@ -96,6 +96,10 @@ impl Functions {
         functions.add(ctx.add_identifier("plus"), stdlib::Plus);
         functions.add(ctx.add_identifier("replace"), stdlib::Replace);
         functions.add(ctx.add_identifier("source-text"), stdlib::SourceText);
+        functions.add(ctx.add_identifier("start-row"), stdlib::StartRow);
+        functions.add(ctx.add_identifier("start-column"), stdlib::StartColumn);
+        functions.add(ctx.add_identifier("end-row"), stdlib::EndRow);
+        functions.add(ctx.add_identifier("end-column"), stdlib::EndColumn);
         functions
     }
 
@@ -230,6 +234,75 @@ pub mod stdlib {
             let node = parameters.param()?.into_syntax_node(graph)?;
             parameters.finish()?;
             Ok(Value::String(source[node.byte_range()].to_string()))
+        }
+    }
+
+    // The implementation of the standard [`start-row`][`crate::reference::functions#start-row`]
+    // function.
+    pub struct StartRow;
+
+    impl Function for StartRow {
+        fn call(
+            &mut self,
+            graph: &mut Graph,
+            _source: &str,
+            parameters: &mut dyn Parameters,
+        ) -> Result<Value, ExecutionError> {
+            let node = parameters.param()?.into_syntax_node(graph)?;
+            parameters.finish()?;
+            Ok(Value::String(node.start_position().row.to_string()))
+        }
+    }
+
+    // The implementation of the standard
+    // [`start-column`][`crate::reference::functions#start-column`]
+    // function.
+    pub struct StartColumn;
+
+    impl Function for StartColumn {
+        fn call(
+            &mut self,
+            graph: &mut Graph,
+            _source: &str,
+            parameters: &mut dyn Parameters,
+        ) -> Result<Value, ExecutionError> {
+            let node = parameters.param()?.into_syntax_node(graph)?;
+            parameters.finish()?;
+            Ok(Value::String(node.start_position().column.to_string()))
+        }
+    }
+
+    // The implementation of the standard [`end-row`][`crate::reference::functions#end-row`]
+    // function.
+    pub struct EndRow;
+
+    impl Function for EndRow {
+        fn call(
+            &mut self,
+            graph: &mut Graph,
+            _source: &str,
+            parameters: &mut dyn Parameters,
+        ) -> Result<Value, ExecutionError> {
+            let node = parameters.param()?.into_syntax_node(graph)?;
+            parameters.finish()?;
+            Ok(Value::String(node.end_position().row.to_string()))
+        }
+    }
+
+    // The implementation of the standard [`end-column`][`crate::reference::functions#end-column`]
+    // function.
+    pub struct EndColumn;
+
+    impl Function for EndColumn {
+        fn call(
+            &mut self,
+            graph: &mut Graph,
+            _source: &str,
+            parameters: &mut dyn Parameters,
+        ) -> Result<Value, ExecutionError> {
+            let node = parameters.param()?.into_syntax_node(graph)?;
+            parameters.finish()?;
+            Ok(Value::String(node.end_position().column.to_string()))
         }
     }
 }
