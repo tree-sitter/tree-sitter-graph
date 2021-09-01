@@ -14,3 +14,16 @@ edition = "2018"
 [lib]
 # All of our tests are in the tests/it "integration" test executable.
 test = false
+
+[dependencies]
+regex = "1"
+thiserror = "1.0"
+tree-sitter = "0.19"
+
+[dependencies.string-interner]
+version = "0.12"
+default-features = false
+features = ["std", "inline-more", "backends"]
+
+[dev-dependencies]
+tree-sitter-python = "0.19"

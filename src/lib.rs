@@ -27,3 +27,46 @@
 
 #[cfg(doc)]
 pub mod reference;
+
+pub mod ast;
+mod parser;
+
+pub use parser::Location;
+pub use parser::ParseError;
+
+use string_interner::symbol::SymbolU32;
+use string_interner::StringInterner;
+
+/// An identifier that appears in a graph DSL file or in the graph that is produced as an output.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct Identifier(SymbolU32);
+
+/// A context in which graph DSL files are executed.
+#[derive(Default)]
+pub struct Context {
+    identifiers: StringInterner,
+}
+
+impl Context {
+    /// Creates a new, empty execution context.
+    pub fn new() -> Context {
+        Context::default()
+    }
+
+    /// Adds an identifier to the context.
+    #[inline(always)]
+    pub fn add_identifier<T: AsRef<str>>(&mut self, identifier: T) -> Identifier {
+        Identifier(self.identifiers.get_or_intern(identifier))
+    }
+
+    /// Returns the [`Identifier`][] instance for an identifier, if it has already been added to
+    /// the context.  Returns `None` otherwise.
+    #[inline(always)]
+    pub fn get_identifier<T: AsRef<str>>(&self, identifier: T) -> Option<Identifier> {
+        self.identifiers.get(identifier).map(Identifier)
+    }
+
+    pub fn resolve(&self, identifier: Identifier) -> &str {
+        self.identifiers.resolve(identifier.0).unwrap()
+    }
+}
