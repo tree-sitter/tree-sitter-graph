@@ -100,6 +100,11 @@ impl Functions {
         functions.add(ctx.add_identifier("start-column"), stdlib::StartColumn);
         functions.add(ctx.add_identifier("end-row"), stdlib::EndRow);
         functions.add(ctx.add_identifier("end-column"), stdlib::EndColumn);
+        functions.add(ctx.add_identifier("node-type"), stdlib::NodeType);
+        functions.add(
+            ctx.add_identifier("named-child-count"),
+            stdlib::NamedChildCount,
+        );
         functions
     }
 
@@ -303,6 +308,41 @@ pub mod stdlib {
             let node = parameters.param()?.into_syntax_node(graph)?;
             parameters.finish()?;
             Ok(Value::Integer(node.end_position().column as u32))
+        }
+    }
+
+    // The implementation of the standard [`node-type`][`crate::reference::functions#node-type`]
+    // function.
+    pub struct NodeType;
+
+    impl Function for NodeType {
+        fn call(
+            &mut self,
+            graph: &mut Graph,
+            _source: &str,
+            parameters: &mut dyn Parameters,
+        ) -> Result<Value, ExecutionError> {
+            let node = parameters.param()?.into_syntax_node(graph)?;
+            parameters.finish()?;
+            Ok(Value::String(node.kind().to_string()))
+        }
+    }
+
+    // The implementation of the standard
+    // [`named-child-count`][`crate::reference::functions#named-child-count`] function.
+
+    pub struct NamedChildCount;
+
+    impl Function for NamedChildCount {
+        fn call(
+            &mut self,
+            graph: &mut Graph,
+            _source: &str,
+            parameters: &mut dyn Parameters,
+        ) -> Result<Value, ExecutionError> {
+            let node = parameters.param()?.into_syntax_node(graph)?;
+            parameters.finish()?;
+            Ok(Value::Integer(node.named_child_count() as u32))
         }
     }
 }
