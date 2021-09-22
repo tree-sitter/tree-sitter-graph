@@ -250,7 +250,7 @@ pub mod stdlib {
         ) -> Result<Value, ExecutionError> {
             let node = parameters.param()?.into_syntax_node(graph)?;
             parameters.finish()?;
-            Ok(Value::String(node.start_position().row.to_string()))
+            Ok(Value::Integer(node.start_position().row as u32))
         }
     }
 
@@ -268,7 +268,7 @@ pub mod stdlib {
         ) -> Result<Value, ExecutionError> {
             let node = parameters.param()?.into_syntax_node(graph)?;
             parameters.finish()?;
-            Ok(Value::String(node.start_position().column.to_string()))
+            Ok(Value::Integer(node.start_position().column as u32))
         }
     }
 
@@ -285,7 +285,7 @@ pub mod stdlib {
         ) -> Result<Value, ExecutionError> {
             let node = parameters.param()?.into_syntax_node(graph)?;
             parameters.finish()?;
-            Ok(Value::String(node.end_position().row.to_string()))
+            Ok(Value::Integer(node.end_position().row as u32))
         }
     }
 
@@ -302,7 +302,7 @@ pub mod stdlib {
         ) -> Result<Value, ExecutionError> {
             let node = parameters.param()?.into_syntax_node(graph)?;
             parameters.finish()?;
-            Ok(Value::String(node.end_position().column.to_string()))
+            Ok(Value::Integer(node.end_position().column as u32))
         }
     }
 }
