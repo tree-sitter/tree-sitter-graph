@@ -20,7 +20,7 @@ anyhow = "1.0"
 regex = "1"
 smallvec = { version="1.6", features=["union"] }
 thiserror = "1.0"
-tree-sitter = "0.19"
+tree-sitter = "0.20"
 
 [dependencies.string-interner]
 version = "0.12"
@@ -29,4 +29,4 @@ features = ["std", "inline-more", "backends"]
 
 [dev-dependencies]
 indoc = "1.0"
-tree-sitter-python = "0.19"
+tree-sitter-python = "0.19.1"
