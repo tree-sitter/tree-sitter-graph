@@ -133,7 +133,7 @@ struct ExecutionContext<'a, 'tree> {
     scoped: &'a mut ScopedVariables,
     current_regex_matches: &'a mut Vec<String>,
     function_parameters: &'a mut Vec<Value>,
-    mat: &'a QueryMatch<'tree>,
+    mat: &'a QueryMatch<'a, 'tree>,
 }
 
 /// An environment of named variables
@@ -231,7 +231,7 @@ impl Stanza {
         function_parameters: &mut Vec<Value>,
         cursor: &mut QueryCursor,
     ) -> Result<(), ExecutionError> {
-        let matches = cursor.matches(&self.query, tree.root_node(), |n| &source[n.byte_range()]);
+        let matches = cursor.matches(&self.query, tree.root_node(), source.as_bytes());
         for mat in matches {
             locals.clear();
             let mut exec = ExecutionContext {
