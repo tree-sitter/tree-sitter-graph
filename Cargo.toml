@@ -17,6 +17,7 @@ test = false
 
 [dependencies]
 regex = "1"
+smallvec = { version="1.6", features=["union"] }
 thiserror = "1.0"
 tree-sitter = "0.19"
 
@@ -26,4 +27,5 @@ default-features = false
 features = ["std", "inline-more", "backends"]
 
 [dev-dependencies]
+indoc = "1.0"
 tree-sitter-python = "0.19"
