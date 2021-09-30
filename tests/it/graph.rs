@@ -65,17 +65,17 @@ fn can_display_graph() {
         .unwrap();
     assert_eq!(
         graph.display_with(&ctx).to_string(),
-        indoc! {"
+        indoc! {r#"
           node 0
-            name: node0
+            name: "node0"
             source: [syntax node module (0, 0)]
           edge 0 -> 1
             precedence: 14
           node 1
-            name: node1
+            name: "node1"
           node 2
-            name: node2
+            name: "node2"
             parent: [graph node 1]
-        "}
+        "#}
     );
 }

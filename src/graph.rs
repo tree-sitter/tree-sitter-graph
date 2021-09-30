@@ -267,7 +267,7 @@ impl Value {
                         }
                     }
                     Value::Integer(value) => write!(f, "{}", value),
-                    Value::String(value) => write!(f, "{}", value),
+                    Value::String(value) => write!(f, "{:?}", value),
                     Value::List(value) => {
                         write!(f, "[")?;
                         let mut first = true;
