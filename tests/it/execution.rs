@@ -44,18 +44,18 @@ fn can_build_simple_graph() {
             attr (node2) name = "node2", parent = node1
           }
         "#},
-        indoc! {"
+        indoc! {r#"
           node 0
-            name: node0
+            name: "node0"
             source: [syntax node module (0, 0)]
           edge 0 -> 1
             precedence: 14
           node 1
-            name: node1
+            name: "node1"
           node 2
-            name: node2
+            name: "node2"
             parent: [graph node 1]
-        "},
+        "#},
     );
 }
 
@@ -87,21 +87,21 @@ fn can_scan_strings() {
             }
           }
         "#},
-        indoc! {"
+        indoc! {r#"
           node 0
           edge 0 -> 1
           node 1
-            name: alpha
+            name: "alpha"
           edge 1 -> 2
           node 2
-            name: beta
+            name: "beta"
           edge 2 -> 3
           node 3
-            name: gamma
+            name: "gamma"
           edge 3 -> 4
           node 4
-            name: delta
-        "},
+            name: "delta"
+        "#},
     );
 }
 
@@ -124,22 +124,22 @@ fn scoped_variables_carry_across_stanzas() {
             attr (@id.node) name = (source-text @id)
           }
         "#},
-        indoc! {"
+        indoc! {r#"
           node 0
-            name: a
+            name: "a"
           node 1
-            name: b
+            name: "b"
           node 2
-            name: c
+            name: "c"
           node 3
-            name: print
+            name: "print"
           node 4
-            name: a
+            name: "a"
           node 5
-            name: d
+            name: "d"
           node 6
-            name: f
-        "},
+            name: "f"
+        "#},
     );
 }
 
@@ -158,21 +158,21 @@ fn can_match_stanza_multiple_times() {
             attr (new_node) name = (source-text @id)
           }
         "#},
-        indoc! {"
+        indoc! {r#"
           node 0
-            name: a
+            name: "a"
           node 1
-            name: b
+            name: "b"
           node 2
-            name: c
+            name: "c"
           node 3
-            name: print
+            name: "print"
           node 4
-            name: a
+            name: "a"
           node 5
-            name: d
+            name: "d"
           node 6
-            name: f
-        "},
+            name: "f"
+        "#},
     );
 }

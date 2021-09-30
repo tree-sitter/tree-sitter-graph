@@ -8,7 +8,20 @@
 use indoc::indoc;
 use tree_sitter::Parser;
 use tree_sitter_graph::graph::Graph;
+use tree_sitter_graph::graph::Value;
 use tree_sitter_graph::Context;
+
+#[test]
+fn can_overwrite_attributes() {
+    let mut ctx = Context::new();
+    let mut graph = Graph::new();
+    let node = graph.add_graph_node();
+    let attrs = &mut graph[node].attributes;
+    let name = ctx.add_identifier("name");
+    attrs.add(name, "node0").unwrap();
+    attrs.add(name, "overwritten").unwrap_err();
+    assert_eq!(*attrs.get(name).unwrap(), Value::from("overwritten"));
+}
 
 #[test]
 fn can_display_graph() {
@@ -52,17 +65,17 @@ fn can_display_graph() {
         .unwrap();
     assert_eq!(
         graph.display_with(&ctx).to_string(),
-        indoc! {"
+        indoc! {r#"
           node 0
-            name: node0
+            name: "node0"
             source: [syntax node module (0, 0)]
           edge 0 -> 1
             precedence: 14
           node 1
-            name: node1
+            name: "node1"
           node 2
-            name: node2
+            name: "node2"
             parent: [graph node 1]
-        "}
+        "#}
     );
 }
