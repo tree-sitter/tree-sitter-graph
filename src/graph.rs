@@ -16,6 +16,7 @@ use std::ops::IndexMut;
 use smallvec::SmallVec;
 use tree_sitter::Node;
 
+use crate::execution::ExecutionError;
 use crate::Context;
 use crate::Identifier;
 
@@ -250,6 +251,34 @@ pub enum Value {
 }
 
 impl Value {
+    /// Coerces this value into an integer, returning an error if it's some other type of value.
+    pub fn into_integer(self) -> Result<u32, ExecutionError> {
+        match self {
+            Value::Integer(value) => Ok(value),
+            _ => Err(ExecutionError::ExpectedInteger),
+        }
+    }
+
+    /// Coerces this value into a string, returning an error if it's some other type of value.
+    pub fn into_string(self) -> Result<String, ExecutionError> {
+        match self {
+            Value::String(value) => Ok(value),
+            _ => Err(ExecutionError::ExpectedString),
+        }
+    }
+
+    /// Coerces this value into a syntax node reference, returning an error if it's some other type
+    /// of value.
+    pub fn into_syntax_node<'a, 'tree>(
+        self,
+        graph: &'a Graph<'tree>,
+    ) -> Result<&'a Node<'tree>, ExecutionError> {
+        match self {
+            Value::SyntaxNode(node) => Ok(&graph[node]),
+            _ => Err(ExecutionError::ExpectedSyntaxNode),
+        }
+    }
+
     /// Displays this value.
     pub fn display_with<'a, 'tree>(&'a self, graph: &'a Graph<'tree>) -> impl Display + 'a {
         struct DisplayValue<'a, 'tree>(&'a Value, &'a Graph<'tree>);

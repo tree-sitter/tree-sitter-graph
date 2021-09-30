@@ -1,0 +1,593 @@
+// -*- coding: utf-8 -*-
+// ------------------------------------------------------------------------------------------------
+// Copyright © 2021, tree-sitter authors.
+// Licensed under either of Apache License, Version 2.0, or MIT license, at your option.
+// Please see the LICENSE-APACHE or LICENSE-MIT files in this distribution for license details.
+// ------------------------------------------------------------------------------------------------
+
+use std::collections::HashMap;
+
+use thiserror::Error;
+use tree_sitter::QueryCursor;
+use tree_sitter::QueryMatch;
+use tree_sitter::Tree;
+
+use crate::ast::AddEdgeAttribute;
+use crate::ast::AddGraphNodeAttribute;
+use crate::ast::Assign;
+use crate::ast::Call;
+use crate::ast::Capture;
+use crate::ast::CreateEdge;
+use crate::ast::CreateGraphNode;
+use crate::ast::DeclareImmutable;
+use crate::ast::DeclareMutable;
+use crate::ast::Expression;
+use crate::ast::File;
+use crate::ast::IntegerConstant;
+use crate::ast::ListComprehension;
+use crate::ast::Print;
+use crate::ast::RegexCapture;
+use crate::ast::Scan;
+use crate::ast::ScopedVariable;
+use crate::ast::SetComprehension;
+use crate::ast::Stanza;
+use crate::ast::Statement;
+use crate::ast::StringConstant;
+use crate::ast::UnscopedVariable;
+use crate::ast::Variable;
+use crate::functions::Functions;
+use crate::graph::Graph;
+use crate::graph::GraphNodeRef;
+use crate::graph::SyntaxNodeRef;
+use crate::graph::Value;
+use crate::Identifier;
+
+impl File {
+    /// Executes this graph DSL file against a source file.  You must provide the parsed syntax
+    /// tree (`tree`) as well as the source text that it was parsed from (`source`).  You also
+    /// provide the set of functions and global variables that are available during execution.
+    pub fn execute<'tree>(
+        &self,
+        tree: &'tree Tree,
+        source: &'tree str,
+        functions: &mut Functions,
+        globals: &mut Variables,
+    ) -> Result<Graph<'tree>, ExecutionError> {
+        let mut graph = Graph::new();
+        let mut locals = Variables::new();
+        let mut scoped = ScopedVariables::new();
+        let mut current_regex_matches = Vec::new();
+        let mut function_parameters = Vec::new();
+        let mut cursor = QueryCursor::new();
+        for stanza in &self.stanzas {
+            stanza.execute(
+                tree,
+                source,
+                &mut graph,
+                functions,
+                globals,
+                &mut locals,
+                &mut scoped,
+                &mut current_regex_matches,
+                &mut function_parameters,
+                &mut cursor,
+            )?;
+        }
+        Ok(graph)
+    }
+}
+
+/// An error that can occur while executing a graph DSL file
+#[derive(Debug, Error)]
+pub enum ExecutionError {
+    #[error("Cannot assign mutable variable")]
+    CannotAssignMutableVariable,
+    #[error("Duplicate attribute")]
+    DuplicateAttribute,
+    #[error("Duplicate edge")]
+    DuplicateEdge,
+    #[error("Duplicate variable")]
+    DuplicateVariable,
+    #[error("Expected a graph node reference")]
+    ExpectedGraphNode,
+    #[error("Expected an integer")]
+    ExpectedInteger,
+    #[error("Expected a string")]
+    ExpectedString,
+    #[error("Expected a syntax node")]
+    ExpectedSyntaxNode,
+    #[error("Invalid parameters")]
+    InvalidParameters,
+    #[error("Scoped variables can only be attached to syntax nodes")]
+    InvalidVariableScope,
+    #[error("Undefined capture")]
+    UndefinedCapture,
+    #[error("Undefined function")]
+    UndefinedFunction,
+    #[error("Undefined regex capture")]
+    UndefinedRegexCapture,
+    #[error("Undefined edge")]
+    UndefinedEdge,
+    #[error("Undefined variable")]
+    UndefinedVariable,
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
+}
+
+impl ExecutionError {
+    /// Wraps an existing [`std::error::Error`][] as an execution error
+    pub fn other<E>(err: E) -> ExecutionError
+    where
+        E: Into<anyhow::Error>,
+    {
+        ExecutionError::Other(err.into())
+    }
+}
+
+struct ExecutionContext<'a, 'tree> {
+    source: &'tree str,
+    graph: &'a mut Graph<'tree>,
+    functions: &'a mut Functions,
+    globals: &'a mut Variables,
+    locals: &'a mut Variables,
+    scoped: &'a mut ScopedVariables,
+    current_regex_matches: &'a mut Vec<String>,
+    function_parameters: &'a mut Vec<Value>,
+    mat: &'a QueryMatch<'tree>,
+}
+
+/// An environment of named variables
+#[derive(Default)]
+pub struct Variables {
+    values: Vec<NamedVariable>,
+}
+
+struct NamedVariable {
+    name: Identifier,
+    value: Value,
+    mutable: bool,
+}
+
+impl Variables {
+    /// Creates a new, empty environment of variables.
+    pub fn new() -> Variables {
+        Variables::default()
+    }
+
+    /// Adds a new mutable variable to an environment, returning an error if the variable already
+    /// exists.
+    pub fn add_mutable(&mut self, name: Identifier, value: Value) -> Result<(), ()> {
+        self.add(name, value, true)
+    }
+
+    /// Adds a new immutable variable to an environment, returning an error if the variable already
+    /// exists.
+    pub fn add_immutable(&mut self, name: Identifier, value: Value) -> Result<(), ()> {
+        self.add(name, value, false)
+    }
+
+    fn add(&mut self, name: Identifier, value: Value, mutable: bool) -> Result<(), ()> {
+        match self.values.binary_search_by_key(&name, |v| v.name) {
+            Ok(_) => Err(()),
+            Err(index) => {
+                let variable = NamedVariable {
+                    name,
+                    value,
+                    mutable,
+                };
+                self.values.insert(index, variable);
+                Ok(())
+            }
+        }
+    }
+
+    /// Returns the value of a variable, if it exists in this environment.
+    pub fn get(&self, name: Identifier) -> Option<&Value> {
+        self.values
+            .binary_search_by_key(&name, |v| v.name)
+            .ok()
+            .map(|index| &self.values[index].value)
+    }
+
+    fn resolve(&mut self, name: Identifier) -> Option<&mut NamedVariable> {
+        self.values
+            .binary_search_by_key(&name, |v| v.name)
+            .ok()
+            .map(move |index| &mut self.values[index])
+    }
+
+    /// Clears this list of variables.
+    pub fn clear(&mut self) {
+        self.values.clear();
+    }
+}
+
+#[derive(Default)]
+struct ScopedVariables {
+    scopes: HashMap<SyntaxNodeRef, Variables>,
+}
+
+impl ScopedVariables {
+    fn new() -> ScopedVariables {
+        ScopedVariables::default()
+    }
+
+    fn get(&mut self, scope: SyntaxNodeRef) -> &mut Variables {
+        self.scopes.entry(scope).or_default()
+    }
+}
+
+impl Stanza {
+    fn execute<'tree>(
+        &self,
+        tree: &'tree Tree,
+        source: &'tree str,
+        graph: &mut Graph<'tree>,
+        functions: &mut Functions,
+        globals: &mut Variables,
+        locals: &mut Variables,
+        scoped: &mut ScopedVariables,
+        current_regex_matches: &mut Vec<String>,
+        function_parameters: &mut Vec<Value>,
+        cursor: &mut QueryCursor,
+    ) -> Result<(), ExecutionError> {
+        let matches = cursor.matches(&self.query, tree.root_node(), |n| &source[n.byte_range()]);
+        for mat in matches {
+            locals.clear();
+            let mut exec = ExecutionContext {
+                source,
+                graph,
+                functions,
+                globals,
+                locals,
+                scoped,
+                current_regex_matches,
+                function_parameters,
+                mat: &mat,
+            };
+            for statement in &self.statements {
+                statement.execute(&mut exec)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Statement {
+    fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        match self {
+            Statement::DeclareImmutable(statement) => statement.execute(exec),
+            Statement::DeclareMutable(statement) => statement.execute(exec),
+            Statement::Assign(statement) => statement.execute(exec),
+            Statement::CreateGraphNode(statement) => statement.execute(exec),
+            Statement::AddGraphNodeAttribute(statement) => statement.execute(exec),
+            Statement::CreateEdge(statement) => statement.execute(exec),
+            Statement::AddEdgeAttribute(statement) => statement.execute(exec),
+            Statement::Scan(statement) => statement.execute(exec),
+            Statement::Print(statement) => statement.execute(exec),
+        }
+    }
+}
+
+impl DeclareImmutable {
+    fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        let value = self.value.evaluate(exec)?;
+        self.variable.add(exec, value, false)
+    }
+}
+
+impl DeclareMutable {
+    fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        let value = self.value.evaluate(exec)?;
+        self.variable.add(exec, value, true)
+    }
+}
+
+impl Assign {
+    fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        let value = self.value.evaluate(exec)?;
+        let variable = self.variable.resolve(exec)?;
+        if !variable.mutable {
+            return Err(ExecutionError::CannotAssignMutableVariable);
+        }
+        variable.value = value;
+        Ok(())
+    }
+}
+
+impl CreateGraphNode {
+    fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        let graph_node = exec.graph.add_graph_node();
+        let value = Value::GraphNode(graph_node);
+        self.node.add(exec, value, false)
+    }
+}
+
+impl AddGraphNodeAttribute {
+    fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        let node = self.node.evaluate_as_node(exec)?;
+        for attribute in &self.attributes {
+            let value = attribute.value.evaluate(exec)?;
+            exec.graph[node]
+                .attributes
+                .add(attribute.name, value)
+                .map_err(|_| ExecutionError::DuplicateAttribute)?;
+        }
+        Ok(())
+    }
+}
+
+impl CreateEdge {
+    fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        let source = self.source.evaluate_as_node(exec)?;
+        let sink = self.sink.evaluate_as_node(exec)?;
+        exec.graph[source]
+            .add_edge(sink)
+            .map_err(|_| ExecutionError::DuplicateEdge)?;
+        Ok(())
+    }
+}
+
+impl AddEdgeAttribute {
+    fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        let source = self.source.evaluate_as_node(exec)?;
+        let sink = self.sink.evaluate_as_node(exec)?;
+        for attribute in &self.attributes {
+            let value = attribute.value.evaluate(exec)?;
+            let edge = exec.graph[source]
+                .get_edge_mut(sink)
+                .ok_or(ExecutionError::UndefinedEdge)?;
+            edge.attributes
+                .add(attribute.name, value)
+                .map_err(|_| ExecutionError::DuplicateAttribute)?;
+        }
+        Ok(())
+    }
+}
+
+impl Scan {
+    fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        let match_string = self.value.evaluate(exec)?.into_string()?;
+
+        let mut i = 0;
+        let mut matches = Vec::new();
+        while i < match_string.len() {
+            matches.clear();
+            for (index, arm) in self.arms.iter().enumerate() {
+                let captures = arm.regex.captures(&match_string[i..]);
+                if let Some(captures) = captures {
+                    matches.push((captures, index));
+                }
+            }
+
+            if matches.is_empty() {
+                return Ok(());
+            }
+
+            matches.sort_by_key(|(captures, index)| {
+                let range = captures.get(0).unwrap().range();
+                (range.start, *index)
+            });
+
+            let (regex_captures, block_index) = &matches[0];
+            for statement in &self.arms[*block_index].statements {
+                exec.current_regex_matches.clear();
+                for regex_capture in regex_captures.iter() {
+                    exec.current_regex_matches
+                        .push(regex_capture.map(|m| m.as_str()).unwrap_or("").to_string());
+                }
+                statement.execute(exec)?;
+            }
+
+            i += regex_captures.get(0).unwrap().range().end;
+        }
+
+        Ok(())
+    }
+}
+
+impl Print {
+    fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        for value in &self.values {
+            let value = value.evaluate(exec)?;
+            print!("{}", value.display_with(exec.graph));
+        }
+        println!("");
+        Ok(())
+    }
+}
+
+impl Expression {
+    fn evaluate(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+        match self {
+            Expression::FalseLiteral => Ok(Value::Boolean(false)),
+            Expression::NullLiteral => Ok(Value::Null),
+            Expression::TrueLiteral => Ok(Value::Boolean(true)),
+            Expression::IntegerConstant(expr) => expr.evaluate(exec),
+            Expression::StringConstant(expr) => expr.evaluate(exec),
+            Expression::List(expr) => expr.evaluate(exec),
+            Expression::Set(expr) => expr.evaluate(exec),
+            Expression::Capture(expr) => expr.evaluate(exec),
+            Expression::Variable(expr) => expr.evaluate(exec),
+            Expression::Call(expr) => expr.evaluate(exec),
+            Expression::RegexCapture(expr) => expr.evaluate(exec),
+        }
+    }
+
+    fn evaluate_as_node(
+        &self,
+        exec: &mut ExecutionContext,
+    ) -> Result<GraphNodeRef, ExecutionError> {
+        let node = self.evaluate(exec)?;
+        match node {
+            Value::GraphNode(node) => Ok(node),
+            _ => Err(ExecutionError::ExpectedGraphNode),
+        }
+    }
+}
+
+impl IntegerConstant {
+    fn evaluate(&self, _exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+        Ok(Value::Integer(self.value))
+    }
+}
+
+impl StringConstant {
+    fn evaluate(&self, _exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+        Ok(Value::String(self.value.clone()))
+    }
+}
+
+impl ListComprehension {
+    fn evaluate(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+        let elements = self
+            .elements
+            .iter()
+            .map(|e| e.evaluate(exec))
+            .collect::<Result<_, _>>()?;
+        Ok(Value::List(elements))
+    }
+}
+
+impl SetComprehension {
+    fn evaluate(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+        let elements = self
+            .elements
+            .iter()
+            .map(|e| e.evaluate(exec))
+            .collect::<Result<_, _>>()?;
+        Ok(Value::Set(elements))
+    }
+}
+
+impl Capture {
+    fn evaluate(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+        for capture in exec.mat.captures {
+            if capture.index as usize == self.index {
+                let syntax_node = exec.graph.add_syntax_node(capture.node);
+                return Ok(Value::SyntaxNode(syntax_node));
+            }
+        }
+        Err(ExecutionError::UndefinedCapture)
+    }
+}
+
+impl Call {
+    fn evaluate(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+        exec.function_parameters.clear();
+        for parameter in &self.parameters {
+            let parameter = parameter.evaluate(exec)?;
+            exec.function_parameters.push(parameter);
+        }
+        exec.functions.call(
+            self.function,
+            exec.graph,
+            exec.source,
+            &mut exec.function_parameters.drain(..),
+        )
+    }
+}
+
+impl RegexCapture {
+    fn evaluate(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+        let capture = exec
+            .current_regex_matches
+            .get(self.match_index)
+            .ok_or(ExecutionError::UndefinedRegexCapture)?;
+        Ok(Value::String(capture.clone()))
+    }
+}
+
+impl Variable {
+    fn evaluate(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+        let variable = self.resolve(exec)?;
+        Ok(variable.value.clone())
+    }
+}
+
+impl Variable {
+    fn resolve<'a>(
+        &self,
+        exec: &'a mut ExecutionContext,
+    ) -> Result<&'a mut NamedVariable, ExecutionError> {
+        match self {
+            Variable::Scoped(variable) => variable.resolve(exec),
+            Variable::Unscoped(variable) => variable.resolve(exec),
+        }
+    }
+
+    fn add(
+        &self,
+        exec: &mut ExecutionContext,
+        value: Value,
+        mutable: bool,
+    ) -> Result<(), ExecutionError> {
+        match self {
+            Variable::Scoped(variable) => variable.add(exec, value, mutable),
+            Variable::Unscoped(variable) => variable.add(exec, value, mutable),
+        }
+    }
+}
+
+impl ScopedVariable {
+    fn resolve<'a>(
+        &self,
+        exec: &'a mut ExecutionContext,
+    ) -> Result<&'a mut NamedVariable, ExecutionError> {
+        let scope = self.scope.evaluate(exec)?;
+        let scope = match scope {
+            Value::SyntaxNode(scope) => scope,
+            _ => return Err(ExecutionError::InvalidVariableScope),
+        };
+        let variables = exec.scoped.get(scope);
+        variables
+            .resolve(self.name)
+            .ok_or(ExecutionError::UndefinedVariable)
+    }
+
+    fn add(
+        &self,
+        exec: &mut ExecutionContext,
+        value: Value,
+        mutable: bool,
+    ) -> Result<(), ExecutionError> {
+        let scope = self.scope.evaluate(exec)?;
+        let scope = match scope {
+            Value::SyntaxNode(scope) => scope,
+            _ => return Err(ExecutionError::InvalidVariableScope),
+        };
+        let variables = exec.scoped.get(scope);
+        variables
+            .add(self.name, value, mutable)
+            .map_err(|_| ExecutionError::DuplicateVariable)
+    }
+}
+
+impl UnscopedVariable {
+    fn resolve<'a>(
+        &self,
+        exec: &'a mut ExecutionContext,
+    ) -> Result<&'a mut NamedVariable, ExecutionError> {
+        if let Some(variable) = exec.globals.resolve(self.name) {
+            return Ok(variable);
+        }
+        if let Some(variable) = exec.locals.resolve(self.name) {
+            return Ok(variable);
+        }
+        Err(ExecutionError::UndefinedVariable)
+    }
+
+    fn add(
+        &self,
+        exec: &mut ExecutionContext,
+        value: Value,
+        mutable: bool,
+    ) -> Result<(), ExecutionError> {
+        if exec.globals.get(self.name).is_some() {
+            return Err(ExecutionError::DuplicateVariable);
+        }
+        exec.locals
+            .add(self.name, value, mutable)
+            .map_err(|_| ExecutionError::DuplicateVariable)
+    }
+}

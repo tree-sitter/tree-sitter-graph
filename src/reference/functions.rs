@@ -23,7 +23,7 @@
 //!
 //! # Mathematical functions
 //!
-//! ## `+`
+//! ## `plus`
 //!
 //! Adds integers together.
 //!
@@ -61,5 +61,66 @@
 //!     - The index of `node` within its parent's list of _named_ children (i.e., the index that
 //!       would cause `ts_node_named_child` to return `node`)
 //!
-//! Note that `node` must not refer to the source file's root node, and it must be a _named_ child
-//! of its parent (i.e., it can't be an anonymous leaf node).
+//! ## `named-child-count`
+//!
+//! Returns the number of "named children" of a syntax node.
+//!
+//!   - Input parameters:
+//!     - `node`: A syntax node
+//!   - Output parameter:
+//!     - The number of _named_ children in `node`
+//!
+//! ## `source-text`
+//!
+//! Returns the source text represented by a syntax node.
+//!
+//!   - Input parameters:
+//!     - `node`: A syntax node
+//!   - Output parameter:
+//!     - A string containing the source text represented by `node`
+//!
+//! ## `node-type`
+//!
+//! Returns a syntax node's type as a string.  (The type is the name of the node's grammar rule in
+//! the underlying tree-sitter grammar.)
+//!
+//!   - Input parameters:
+//!     - `node`: A syntax node
+//!   - Output parameter:
+//!     - A string containing the type of `node`
+//!
+//! ## `start-column`
+//!
+//! Returns the zero-based start column of a syntax node.
+//!
+//!   - Input parameters:
+//!     - `node`: A syntax node
+//!   - Output parameter:
+//!     - The zero-based start column of `node`
+//!
+//! ## `start-row`
+//!
+//! Returns the zero-based start row of a syntax node.
+//!
+//!   - Input parameters:
+//!     - `node`: A syntax node
+//!   - Output parameter:
+//!     - The zero-based start row of `node`
+//!
+//! ## `end-column`
+//!
+//! Returns the zero-based end column of a syntax node.
+//!
+//!   - Input parameters:
+//!     - `node`: A syntax node
+//!   - Output parameter:
+//!     - The zero-based end column of `node`
+//!
+//! ## `end-row`
+//!
+//! Returns the zero-based end row of a syntax node.
+//!
+//!   - Input parameters:
+//!     - `node`: A syntax node
+//!   - Output parameter:
+//!     - The zero-based end row of `node`
