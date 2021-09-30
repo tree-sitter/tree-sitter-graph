@@ -189,7 +189,10 @@ impl Attributes {
     /// name, replaces its value and returns `Err`.
     pub fn add<V: Into<Value>>(&mut self, name: Identifier, value: V) -> Result<(), ()> {
         match self.values.binary_search_by_key(&name, |(name, _)| *name) {
-            Ok(_) => Err(()),
+            Ok(index) => {
+                self.values[index].1 = value.into();
+                Err(())
+            }
             Err(index) => {
                 self.values.insert(index, (name, value.into()));
                 Ok(())
