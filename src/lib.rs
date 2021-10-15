@@ -92,15 +92,15 @@ where
     fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result;
 
     fn display_with<'a>(&'a self, ctx: &'a Context) -> Box<dyn fmt::Display + 'a> {
-        struct ContextDisplayImpl<'a, T: DisplayWithContext>(&'a T, &'a Context);
+        struct Impl<'a, T: DisplayWithContext>(&'a T, &'a Context);
 
-        impl<'a, T: DisplayWithContext> fmt::Display for ContextDisplayImpl<'a, T> {
+        impl<'a, T: DisplayWithContext> fmt::Display for Impl<'a, T> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 self.0.fmt(f, self.1)
             }
         }
 
-        Box::new(ContextDisplayImpl(self, ctx))
+        Box::new(Impl(self, ctx))
     }
 }
 

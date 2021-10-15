@@ -36,6 +36,7 @@ use crate::ast::StringConstant;
 use crate::ast::UnscopedVariable;
 use crate::ast::Variable;
 use crate::functions::Functions;
+use crate::graph::DisplayWithGraph;
 use crate::graph::Graph;
 use crate::graph::GraphNodeRef;
 use crate::graph::SyntaxNodeRef;
@@ -326,7 +327,7 @@ impl AddGraphNodeAttribute {
                     ExecutionError::DuplicateAttribute(format!(
                         " {} on graph node ({}) in {}",
                         attribute.name.display_with(exec.ctx),
-                        node,
+                        node.display_with(exec.graph),
                         self.display_with(exec.ctx),
                     ))
                 })?;
@@ -343,8 +344,8 @@ impl CreateEdge {
         exec.graph[source].add_edge(sink).map_err(|_| {
             ExecutionError::DuplicateEdge(format!(
                 "({} -> {}) in {}",
-                source,
-                sink,
+                source, // cannot display_with(exec.graph) because of borrow
+                sink, // cannot display_with(exec.graph) because of borrow
                 self.display_with(ctx)
             ))
         })?;
@@ -358,15 +359,21 @@ impl AddEdgeAttribute {
         let sink = self.sink.evaluate_as_node(exec)?;
         for attribute in &self.attributes {
             let value = attribute.value.evaluate(exec)?;
-            let edge = exec.graph[source]
-                .get_edge_mut(sink)
-                .ok_or(ExecutionError::UndefinedEdge(format!("({} -> {}) in {}", source, sink, self.display_with(exec.ctx))))?;
+            let edge =
+                exec.graph[source]
+                    .get_edge_mut(sink)
+                    .ok_or(ExecutionError::UndefinedEdge(format!(
+                        "({} -> {}) in {}",
+                        source, // cannot display_with(exec.graph) because of borrow
+                        sink, // cannot display_with(exec.graph) because of borrow
+                        self.display_with(exec.ctx)
+                    )))?;
             edge.attributes.add(attribute.name, value).map_err(|_| {
                 ExecutionError::DuplicateAttribute(format!(
                     " {} on edge ({} -> {}) in {}",
                     attribute.name.display_with(exec.ctx),
-                    source,
-                    sink,
+                    source.display_with(exec.graph),
+                    sink.display_with(exec.graph),
                     self.display_with(exec.ctx),
                 ))
             })?;
@@ -451,7 +458,11 @@ impl Expression {
         let node = self.evaluate(exec)?;
         match node {
             Value::GraphNode(node) => Ok(node),
-            _ => Err(ExecutionError::ExpectedGraphNode(format!(" {}, got {}", self.display_with(exec.ctx), node))),
+            _ => Err(ExecutionError::ExpectedGraphNode(format!(
+                " {}, got {}",
+                self.display_with(exec.ctx),
+                node.display_with(exec.graph)
+            ))),
         }
     }
 }
@@ -498,7 +509,10 @@ impl Capture {
                 return Ok(Value::SyntaxNode(syntax_node));
             }
         }
-        Err(ExecutionError::UndefinedCapture(format!("{}", self.display_with(exec.ctx))))
+        Err(ExecutionError::UndefinedCapture(format!(
+            "{}",
+            self.display_with(exec.ctx)
+        )))
     }
 }
 
@@ -521,10 +535,9 @@ impl Call {
 
 impl RegexCapture {
     fn evaluate(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
-        let capture = exec
-            .current_regex_matches
-            .get(self.match_index)
-            .ok_or(ExecutionError::UndefinedRegexCapture(format!("{}", self.display_with(exec.ctx))))?;
+        let capture = exec.current_regex_matches.get(self.match_index).ok_or(
+            ExecutionError::UndefinedRegexCapture(format!("{}", self.display_with(exec.ctx))),
+        )?;
         Ok(Value::String(capture.clone()))
     }
 }
@@ -568,12 +581,21 @@ impl ScopedVariable {
         let scope = self.scope.evaluate(exec)?;
         let scope = match scope {
             Value::SyntaxNode(scope) => scope,
-            _ => return Err(ExecutionError::InvalidVariableScope(format!(" got {}", scope))),
+            _ => {
+                return Err(ExecutionError::InvalidVariableScope(format!(
+                    " got {}",
+                    scope.display_with(exec.graph)
+                )))
+            }
         };
         let variables = exec.scoped.get(scope);
         variables
             .resolve(self.name)
-            .ok_or(ExecutionError::UndefinedVariable(format!("{} on node {}", self.display_with(exec.ctx), scope)))
+            .ok_or(ExecutionError::UndefinedVariable(format!(
+                "{} on node {}",
+                self.display_with(exec.ctx),
+                scope.display_with(exec.graph)
+            )))
     }
 
     fn add(
@@ -585,7 +607,12 @@ impl ScopedVariable {
         let scope = self.scope.evaluate(exec)?;
         let scope = match scope {
             Value::SyntaxNode(scope) => scope,
-            _ => return Err(ExecutionError::InvalidVariableScope(format!(" got {}", scope))),
+            _ => {
+                return Err(ExecutionError::InvalidVariableScope(format!(
+                    " got {}",
+                    scope.display_with(exec.graph)
+                )))
+            }
         };
         let variables = exec.scoped.get(scope);
         variables.add(self.name, value, mutable).map_err(|_| {
@@ -605,7 +632,10 @@ impl UnscopedVariable {
         if let Some(variable) = exec.locals.resolve(self.name) {
             return Ok(variable);
         }
-        Err(ExecutionError::UndefinedVariable(format!("{}", self.display_with(exec.ctx))))
+        Err(ExecutionError::UndefinedVariable(format!(
+            "{}",
+            self.display_with(exec.ctx)
+        )))
     }
 
     fn add(

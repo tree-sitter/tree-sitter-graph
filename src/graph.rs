@@ -282,62 +282,6 @@ impl Value {
             _ => Err(ExecutionError::ExpectedSyntaxNode(format!("got {}", self))),
         }
     }
-
-    /// fmt::Displays this value.
-    pub fn display_with<'a, 'tree>(&'a self, graph: &'a Graph<'tree>) -> impl fmt::Display + 'a {
-        struct DisplayValue<'a, 'tree>(&'a Value, &'a Graph<'tree>);
-
-        impl<'a, 'tree> fmt::Display for DisplayValue<'a, 'tree> {
-            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                let graph = self.1;
-                match self.0 {
-                    Value::Null => write!(f, "#null"),
-                    Value::Boolean(value) => {
-                        if *value {
-                            write!(f, "#true")
-                        } else {
-                            write!(f, "#false")
-                        }
-                    }
-                    Value::Integer(value) => write!(f, "{}", value),
-                    Value::String(value) => write!(f, "{:?}", value),
-                    Value::List(value) => {
-                        write!(f, "[")?;
-                        let mut first = true;
-                        for element in value {
-                            if first {
-                                write!(f, "{}", element.display_with(graph))?;
-                                first = false;
-                            } else {
-                                write!(f, ", {}", element.display_with(graph))?;
-                            }
-                        }
-                        write!(f, "]")
-                    }
-                    Value::Set(value) => {
-                        write!(f, "{{")?;
-                        let mut first = true;
-                        for element in value {
-                            if first {
-                                write!(f, "{}", element.display_with(graph))?;
-                                first = false;
-                            } else {
-                                write!(f, ", {}", element.display_with(graph))?;
-                            }
-                        }
-                        write!(f, "}}")
-                    }
-                    Value::SyntaxNode(node) => {
-                        let node = graph[*node];
-                        write!(f, "[syntax node {} {}]", node.kind(), node.start_position())
-                    }
-                    Value::GraphNode(node) => write!(f, "[graph node {}]", node.0),
-                }
-            }
-        }
-
-        DisplayValue(self, graph)
-    }
 }
 
 impl From<u32> for Value {
@@ -379,8 +323,53 @@ impl fmt::Display for Value {
                 }
                 write!(f, "}}")
             }
-            Value::SyntaxNode(value) => value.fmt(f),
-            Value::GraphNode(value) => value.fmt(f),
+            Value::SyntaxNode(value) => <dyn fmt::Display>::fmt(value, f),
+            Value::GraphNode(value) => <dyn fmt::Display>::fmt(value, f),
+        }
+    }
+}
+
+impl DisplayWithGraph for Value {
+    fn fmt(&self, f: &mut fmt::Formatter, graph: &Graph) -> fmt::Result {
+        match self {
+            Value::Null => write!(f, "#null"),
+            Value::Boolean(value) => {
+                if *value {
+                    write!(f, "#true")
+                } else {
+                    write!(f, "#false")
+                }
+            }
+            Value::Integer(value) => write!(f, "{}", value),
+            Value::String(value) => write!(f, "{:?}", value),
+            Value::List(value) => {
+                write!(f, "[")?;
+                let mut first = true;
+                for element in value {
+                    if first {
+                        write!(f, "{}", element.display_with(graph))?;
+                        first = false;
+                    } else {
+                        write!(f, ", {}", element.display_with(graph))?;
+                    }
+                }
+                write!(f, "]")
+            }
+            Value::Set(value) => {
+                write!(f, "{{")?;
+                let mut first = true;
+                for element in value {
+                    if first {
+                        write!(f, "{}", element.display_with(graph))?;
+                        first = false;
+                    } else {
+                        write!(f, ", {}", element.display_with(graph))?;
+                    }
+                }
+                write!(f, "}}")
+            }
+            Value::SyntaxNode(node) => node.fmt(f, graph),
+            Value::GraphNode(node) => node.fmt(f, graph),
         }
     }
 }
@@ -389,15 +378,22 @@ impl fmt::Display for Value {
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct SyntaxNodeRef(SyntaxNodeID);
 
-impl fmt::Display for SyntaxNodeRef {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
 impl From<SyntaxNodeRef> for Value {
     fn from(value: SyntaxNodeRef) -> Value {
         Value::SyntaxNode(value)
+    }
+}
+
+impl fmt::Display for SyntaxNodeRef {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "[syntax node {}]", self.0)
+    }
+}
+
+impl DisplayWithGraph for SyntaxNodeRef {
+    fn fmt(&self, f: &mut fmt::Formatter, graph: &Graph) -> fmt::Result {
+        let node = graph[*self];
+        write!(f, "[syntax node {} {}]", node.kind(), node.start_position())
     }
 }
 
@@ -413,6 +409,32 @@ impl From<GraphNodeRef> for Value {
 
 impl fmt::Display for GraphNodeRef {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "[graph node {}]", self.0)
+    }
+}
+
+impl DisplayWithGraph for GraphNodeRef {
+    fn fmt(&self, f: &mut fmt::Formatter, _graph: &Graph) -> fmt::Result {
+        write!(f, "[graph node {}]", self.0)
+    }
+}
+
+/// Trait to Display with a given Context
+pub trait DisplayWithGraph
+where
+    Self: Sized,
+{
+    fn fmt<'tree>(&self, f: &mut fmt::Formatter, graph: &Graph<'tree>) -> fmt::Result;
+
+    fn display_with<'a, 'tree>(&'a self, graph: &'a Graph<'tree>) -> Box<dyn fmt::Display + 'a> {
+        struct Impl<'a, 'tree, T: DisplayWithGraph>(&'a T, &'a Graph<'tree>);
+
+        impl<'a, 'tree, T: DisplayWithGraph> fmt::Display for Impl<'a, 'tree, T> {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                self.0.fmt(f, self.1)
+            }
+        }
+
+        Box::new(Impl(self, graph))
     }
 }

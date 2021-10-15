@@ -64,14 +64,21 @@ where
     I: Iterator<Item = Value>,
 {
     fn param(&mut self) -> Result<Value, ExecutionError> {
-        let value = self.next().ok_or(ExecutionError::InvalidParameters(format!("expected more parameters")))?;
+        let value = self
+            .next()
+            .ok_or(ExecutionError::InvalidParameters(format!(
+                "expected more parameters"
+            )))?;
         Ok(value)
     }
 
     fn finish(&mut self) -> Result<(), ExecutionError> {
         let value = self.next();
         if value.is_some() {
-            return Err(ExecutionError::InvalidParameters(format!("unexpected extra parameter {}", value.unwrap())));
+            return Err(ExecutionError::InvalidParameters(format!(
+                "unexpected extra parameter {}",
+                value.unwrap()
+            )));
         }
         Ok(())
     }
@@ -130,7 +137,10 @@ impl Functions {
         let function = self
             .functions
             .get_mut(&name)
-            .ok_or(ExecutionError::UndefinedFunction(format!("{}", name.display_with(ctx))))?;
+            .ok_or(ExecutionError::UndefinedFunction(format!(
+                "{}",
+                name.display_with(ctx)
+            )))?;
         function.call(graph, source, parameters)
     }
 }
