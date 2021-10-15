@@ -586,7 +586,7 @@ impl From<StringConstant> for Expression {
 
 impl DisplayWithContext for StringConstant {
     fn fmt(&self, f: &mut fmt::Formatter, _ctx: &Context) -> fmt::Result {
-        write!(f, "{}", self.value)
+        write!(f, "{:?}", self.value)
     }
 }
 
