@@ -13,6 +13,7 @@ use crate::execution::ExecutionError;
 use crate::graph::Graph;
 use crate::graph::Value;
 use crate::Context;
+use crate::DisplayWithContext;
 use crate::Identifier;
 
 /// The implementation of a function that can be called from the graph DSL.
@@ -63,13 +64,14 @@ where
     I: Iterator<Item = Value>,
 {
     fn param(&mut self) -> Result<Value, ExecutionError> {
-        let value = self.next().ok_or(ExecutionError::InvalidParameters)?;
+        let value = self.next().ok_or(ExecutionError::InvalidParameters(format!("expected more parameters")))?;
         Ok(value)
     }
 
     fn finish(&mut self) -> Result<(), ExecutionError> {
-        if self.next().is_some() {
-            return Err(ExecutionError::InvalidParameters);
+        let value = self.next();
+        if value.is_some() {
+            return Err(ExecutionError::InvalidParameters(format!("unexpected extra parameter {}", value.unwrap())));
         }
         Ok(())
     }
@@ -119,6 +121,7 @@ impl Functions {
     /// Calls a named function, returning an error if there is no function with that name.
     pub fn call(
         &mut self,
+        ctx: &Context,
         name: Identifier,
         graph: &mut Graph,
         source: &str,
@@ -127,7 +130,7 @@ impl Functions {
         let function = self
             .functions
             .get_mut(&name)
-            .ok_or(ExecutionError::UndefinedFunction)?;
+            .ok_or(ExecutionError::UndefinedFunction(format!("{}", name.display_with(ctx))))?;
         function.call(graph, source, parameters)
     }
 }

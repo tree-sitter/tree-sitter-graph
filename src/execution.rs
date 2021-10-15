@@ -40,6 +40,8 @@ use crate::graph::Graph;
 use crate::graph::GraphNodeRef;
 use crate::graph::SyntaxNodeRef;
 use crate::graph::Value;
+use crate::Context;
+use crate::DisplayWithContext;
 use crate::Identifier;
 
 impl File {
@@ -48,6 +50,7 @@ impl File {
     /// provide the set of functions and global variables that are available during execution.
     pub fn execute<'tree>(
         &self,
+        ctx: &Context,
         tree: &'tree Tree,
         source: &'tree str,
         functions: &mut Functions,
@@ -61,6 +64,7 @@ impl File {
         let mut cursor = QueryCursor::new();
         for stanza in &self.stanzas {
             stanza.execute(
+                ctx,
                 tree,
                 source,
                 &mut graph,
@@ -80,36 +84,36 @@ impl File {
 /// An error that can occur while executing a graph DSL file
 #[derive(Debug, Error)]
 pub enum ExecutionError {
-    #[error("Cannot assign mutable variable")]
-    CannotAssignMutableVariable,
-    #[error("Duplicate attribute")]
-    DuplicateAttribute,
-    #[error("Duplicate edge")]
-    DuplicateEdge,
-    #[error("Duplicate variable")]
-    DuplicateVariable,
-    #[error("Expected a graph node reference")]
-    ExpectedGraphNode,
-    #[error("Expected an integer")]
-    ExpectedInteger,
-    #[error("Expected a string")]
-    ExpectedString,
-    #[error("Expected a syntax node")]
-    ExpectedSyntaxNode,
-    #[error("Invalid parameters")]
-    InvalidParameters,
-    #[error("Scoped variables can only be attached to syntax nodes")]
-    InvalidVariableScope,
-    #[error("Undefined capture")]
-    UndefinedCapture,
-    #[error("Undefined function")]
-    UndefinedFunction,
-    #[error("Undefined regex capture")]
-    UndefinedRegexCapture,
-    #[error("Undefined edge")]
-    UndefinedEdge,
-    #[error("Undefined variable")]
-    UndefinedVariable,
+    #[error("Cannot assign immutable variable {0}")]
+    CannotAssignImmutableVariable(String),
+    #[error("Duplicate attribute {0}")]
+    DuplicateAttribute(String),
+    #[error("Duplicate edge {0}")]
+    DuplicateEdge(String),
+    #[error("Duplicate variable {0}")]
+    DuplicateVariable(String),
+    #[error("Expected a graph node reference {0}")]
+    ExpectedGraphNode(String),
+    #[error("Expected an integer {0}")]
+    ExpectedInteger(String),
+    #[error("Expected a string {0}")]
+    ExpectedString(String),
+    #[error("Expected a syntax node {0}")]
+    ExpectedSyntaxNode(String),
+    #[error("Invalid parameters {0}")]
+    InvalidParameters(String),
+    #[error("Scoped variables can only be attached to syntax nodes {0}")]
+    InvalidVariableScope(String),
+    #[error("Undefined capture {0}")]
+    UndefinedCapture(String),
+    #[error("Undefined function {0}")]
+    UndefinedFunction(String),
+    #[error("Undefined regex capture {0}")]
+    UndefinedRegexCapture(String),
+    #[error("Undefined edge {0}")]
+    UndefinedEdge(String),
+    #[error("Undefined variable {0}")]
+    UndefinedVariable(String),
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
@@ -125,6 +129,7 @@ impl ExecutionError {
 }
 
 struct ExecutionContext<'a, 'tree> {
+    ctx: &'a Context,
     source: &'tree str,
     graph: &'a mut Graph<'tree>,
     functions: &'a mut Functions,
@@ -220,6 +225,7 @@ impl ScopedVariables {
 impl Stanza {
     fn execute<'tree>(
         &self,
+        ctx: &Context,
         tree: &'tree Tree,
         source: &'tree str,
         graph: &mut Graph<'tree>,
@@ -235,6 +241,7 @@ impl Stanza {
         for mat in matches {
             locals.clear();
             let mut exec = ExecutionContext {
+                ctx,
                 source,
                 graph,
                 functions,
@@ -288,7 +295,11 @@ impl Assign {
         let value = self.value.evaluate(exec)?;
         let variable = self.variable.resolve(exec)?;
         if !variable.mutable {
-            return Err(ExecutionError::CannotAssignMutableVariable);
+            return Err(ExecutionError::CannotAssignImmutableVariable(format!(
+                " {} in {}",
+                self.variable.display_with(exec.ctx),
+                self.display_with(exec.ctx)
+            )));
         }
         variable.value = value;
         Ok(())
@@ -311,7 +322,14 @@ impl AddGraphNodeAttribute {
             exec.graph[node]
                 .attributes
                 .add(attribute.name, value)
-                .map_err(|_| ExecutionError::DuplicateAttribute)?;
+                .map_err(|_| {
+                    ExecutionError::DuplicateAttribute(format!(
+                        " {} on graph node ({}) in {}",
+                        attribute.name.display_with(exec.ctx),
+                        node,
+                        self.display_with(exec.ctx),
+                    ))
+                })?;
         }
         Ok(())
     }
@@ -321,9 +339,15 @@ impl CreateEdge {
     fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
         let source = self.source.evaluate_as_node(exec)?;
         let sink = self.sink.evaluate_as_node(exec)?;
-        exec.graph[source]
-            .add_edge(sink)
-            .map_err(|_| ExecutionError::DuplicateEdge)?;
+        let ctx = exec.ctx;
+        exec.graph[source].add_edge(sink).map_err(|_| {
+            ExecutionError::DuplicateEdge(format!(
+                "({} -> {}) in {}",
+                source,
+                sink,
+                self.display_with(ctx)
+            ))
+        })?;
         Ok(())
     }
 }
@@ -336,10 +360,16 @@ impl AddEdgeAttribute {
             let value = attribute.value.evaluate(exec)?;
             let edge = exec.graph[source]
                 .get_edge_mut(sink)
-                .ok_or(ExecutionError::UndefinedEdge)?;
-            edge.attributes
-                .add(attribute.name, value)
-                .map_err(|_| ExecutionError::DuplicateAttribute)?;
+                .ok_or(ExecutionError::UndefinedEdge(format!("({} -> {}) in {}", source, sink, self.display_with(exec.ctx))))?;
+            edge.attributes.add(attribute.name, value).map_err(|_| {
+                ExecutionError::DuplicateAttribute(format!(
+                    " {} on edge ({} -> {}) in {}",
+                    attribute.name.display_with(exec.ctx),
+                    source,
+                    sink,
+                    self.display_with(exec.ctx),
+                ))
+            })?;
         }
         Ok(())
     }
@@ -421,7 +451,7 @@ impl Expression {
         let node = self.evaluate(exec)?;
         match node {
             Value::GraphNode(node) => Ok(node),
-            _ => Err(ExecutionError::ExpectedGraphNode),
+            _ => Err(ExecutionError::ExpectedGraphNode(format!(" {}, got {}", self.display_with(exec.ctx), node))),
         }
     }
 }
@@ -468,7 +498,7 @@ impl Capture {
                 return Ok(Value::SyntaxNode(syntax_node));
             }
         }
-        Err(ExecutionError::UndefinedCapture)
+        Err(ExecutionError::UndefinedCapture(format!("{}", self.display_with(exec.ctx))))
     }
 }
 
@@ -480,6 +510,7 @@ impl Call {
             exec.function_parameters.push(parameter);
         }
         exec.functions.call(
+            exec.ctx,
             self.function,
             exec.graph,
             exec.source,
@@ -493,7 +524,7 @@ impl RegexCapture {
         let capture = exec
             .current_regex_matches
             .get(self.match_index)
-            .ok_or(ExecutionError::UndefinedRegexCapture)?;
+            .ok_or(ExecutionError::UndefinedRegexCapture(format!("{}", self.display_with(exec.ctx))))?;
         Ok(Value::String(capture.clone()))
     }
 }
@@ -537,12 +568,12 @@ impl ScopedVariable {
         let scope = self.scope.evaluate(exec)?;
         let scope = match scope {
             Value::SyntaxNode(scope) => scope,
-            _ => return Err(ExecutionError::InvalidVariableScope),
+            _ => return Err(ExecutionError::InvalidVariableScope(format!(" got {}", scope))),
         };
         let variables = exec.scoped.get(scope);
         variables
             .resolve(self.name)
-            .ok_or(ExecutionError::UndefinedVariable)
+            .ok_or(ExecutionError::UndefinedVariable(format!("{} on node {}", self.display_with(exec.ctx), scope)))
     }
 
     fn add(
@@ -554,12 +585,12 @@ impl ScopedVariable {
         let scope = self.scope.evaluate(exec)?;
         let scope = match scope {
             Value::SyntaxNode(scope) => scope,
-            _ => return Err(ExecutionError::InvalidVariableScope),
+            _ => return Err(ExecutionError::InvalidVariableScope(format!(" got {}", scope))),
         };
         let variables = exec.scoped.get(scope);
-        variables
-            .add(self.name, value, mutable)
-            .map_err(|_| ExecutionError::DuplicateVariable)
+        variables.add(self.name, value, mutable).map_err(|_| {
+            ExecutionError::DuplicateVariable(format!(" {}", self.display_with(exec.ctx)))
+        })
     }
 }
 
@@ -574,7 +605,7 @@ impl UnscopedVariable {
         if let Some(variable) = exec.locals.resolve(self.name) {
             return Ok(variable);
         }
-        Err(ExecutionError::UndefinedVariable)
+        Err(ExecutionError::UndefinedVariable(format!("{}", self.display_with(exec.ctx))))
     }
 
     fn add(
@@ -584,10 +615,13 @@ impl UnscopedVariable {
         mutable: bool,
     ) -> Result<(), ExecutionError> {
         if exec.globals.get(self.name).is_some() {
-            return Err(ExecutionError::DuplicateVariable);
+            return Err(ExecutionError::DuplicateVariable(format!(
+                " global {}",
+                self.display_with(exec.ctx)
+            )));
         }
-        exec.locals
-            .add(self.name, value, mutable)
-            .map_err(|_| ExecutionError::DuplicateVariable)
+        exec.locals.add(self.name, value, mutable).map_err(|_| {
+            ExecutionError::DuplicateVariable(format!(" local {}", self.display_with(exec.ctx)))
+        })
     }
 }

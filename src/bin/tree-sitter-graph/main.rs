@@ -58,7 +58,7 @@ fn main() -> Result<()> {
     let mut functions = Functions::stdlib(&mut ctx);
     let mut globals = Variables::new();
     let graph = file
-        .execute(&tree, &source, &mut functions, &mut globals)
+        .execute(&ctx, &tree, &source, &mut functions, &mut globals)
         .with_context(|| format!("Could not execute TSG file {}", tsg_path.display()))?;
     print!("{}", graph.display_with(&ctx));
     Ok(())

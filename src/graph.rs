@@ -9,7 +9,7 @@
 
 use std::collections::BTreeSet;
 use std::collections::HashMap;
-use std::fmt::Display;
+use std::fmt;
 use std::ops::Index;
 use std::ops::IndexMut;
 
@@ -55,11 +55,11 @@ impl<'tree> Graph<'tree> {
         GraphNodeRef(index)
     }
 
-    /// Displays the contents of this graph.
-    pub fn display_with<'a>(&'a self, ctx: &'a Context) -> impl Display + 'a {
+    /// fmt::Displays the contents of this graph.
+    pub fn display_with<'a>(&'a self, ctx: &'a Context) -> impl fmt::Display + 'a {
         struct DisplayGraph<'a, 'tree>(&'a Graph<'tree>, &'a Context);
 
-        impl<'a, 'tree> Display for DisplayGraph<'a, 'tree> {
+        impl<'a, 'tree> fmt::Display for DisplayGraph<'a, 'tree> {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 let graph = self.0;
                 let ctx = self.1;
@@ -209,11 +209,15 @@ impl Attributes {
             .map(|index| &self.values[index].1)
     }
 
-    /// Displays the contents of this attribute set.
-    pub fn display_with<'a>(&'a self, ctx: &'a Context, graph: &'a Graph) -> impl Display + 'a {
+    /// fmt::Displays the contents of this attribute set.
+    pub fn display_with<'a>(
+        &'a self,
+        ctx: &'a Context,
+        graph: &'a Graph,
+    ) -> impl fmt::Display + 'a {
         struct DisplayAttributes<'a, 'tree>(&'a Attributes, &'a Context, &'a Graph<'tree>);
 
-        impl<'a, 'tree> Display for DisplayAttributes<'a, 'tree> {
+        impl<'a, 'tree> fmt::Display for DisplayAttributes<'a, 'tree> {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 let attributes = self.0;
                 let ctx = self.1;
@@ -255,7 +259,7 @@ impl Value {
     pub fn into_integer(self) -> Result<u32, ExecutionError> {
         match self {
             Value::Integer(value) => Ok(value),
-            _ => Err(ExecutionError::ExpectedInteger),
+            _ => Err(ExecutionError::ExpectedInteger(format!("got {}", self))),
         }
     }
 
@@ -263,7 +267,7 @@ impl Value {
     pub fn into_string(self) -> Result<String, ExecutionError> {
         match self {
             Value::String(value) => Ok(value),
-            _ => Err(ExecutionError::ExpectedString),
+            _ => Err(ExecutionError::ExpectedString(format!("got {}", self))),
         }
     }
 
@@ -275,15 +279,15 @@ impl Value {
     ) -> Result<&'a Node<'tree>, ExecutionError> {
         match self {
             Value::SyntaxNode(node) => Ok(&graph[node]),
-            _ => Err(ExecutionError::ExpectedSyntaxNode),
+            _ => Err(ExecutionError::ExpectedSyntaxNode(format!("got {}", self))),
         }
     }
 
-    /// Displays this value.
-    pub fn display_with<'a, 'tree>(&'a self, graph: &'a Graph<'tree>) -> impl Display + 'a {
+    /// fmt::Displays this value.
+    pub fn display_with<'a, 'tree>(&'a self, graph: &'a Graph<'tree>) -> impl fmt::Display + 'a {
         struct DisplayValue<'a, 'tree>(&'a Value, &'a Graph<'tree>);
 
-        impl<'a, 'tree> Display for DisplayValue<'a, 'tree> {
+        impl<'a, 'tree> fmt::Display for DisplayValue<'a, 'tree> {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 let graph = self.1;
                 match self.0 {
@@ -354,9 +358,42 @@ impl From<String> for Value {
     }
 }
 
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Value::Null => write!(f, "#null"),
+            Value::Boolean(value) => write!(f, "{}", value),
+            Value::Integer(value) => write!(f, "{}", value),
+            Value::String(value) => write!(f, "\"{}\"", value),
+            Value::List(values) => {
+                write!(f, "[")?;
+                for elem in values {
+                    write!(f, "{},", elem)?;
+                }
+                write!(f, "]")
+            }
+            Value::Set(values) => {
+                write!(f, "{{")?;
+                for elem in values {
+                    write!(f, "{},", elem)?;
+                }
+                write!(f, "}}")
+            }
+            Value::SyntaxNode(value) => value.fmt(f),
+            Value::GraphNode(value) => value.fmt(f),
+        }
+    }
+}
+
 /// A reference to a syntax node in a graph
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct SyntaxNodeRef(SyntaxNodeID);
+
+impl fmt::Display for SyntaxNodeRef {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 impl From<SyntaxNodeRef> for Value {
     fn from(value: SyntaxNodeRef) -> Value {
@@ -371,5 +408,11 @@ pub struct GraphNodeRef(GraphNodeID);
 impl From<GraphNodeRef> for Value {
     fn from(value: GraphNodeRef) -> Value {
         Value::GraphNode(value)
+    }
+}
+
+impl fmt::Display for GraphNodeRef {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
