@@ -323,8 +323,8 @@ impl fmt::Display for Value {
                 }
                 write!(f, "}}")
             }
-            Value::SyntaxNode(value) => <dyn fmt::Display>::fmt(value, f),
-            Value::GraphNode(value) => <dyn fmt::Display>::fmt(value, f),
+            Value::SyntaxNode(value) => fmt::Display::fmt(value, f),
+            Value::GraphNode(value) => fmt::Display::fmt(value, f),
         }
     }
 }
