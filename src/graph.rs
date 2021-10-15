@@ -311,15 +311,27 @@ impl fmt::Display for Value {
             Value::String(value) => write!(f, "{:?}", value),
             Value::List(values) => {
                 write!(f, "[")?;
+                let mut first = true;
                 for elem in values {
-                    write!(f, "{},", elem)?;
+                    if first {
+                        write!(f, "{}", elem)?;
+                        first = false;
+                    } else {
+                        write!(f, ", {}", elem)?;
+                    }
                 }
                 write!(f, "]")
             }
             Value::Set(values) => {
                 write!(f, "{{")?;
+                let mut first = true;
                 for elem in values {
-                    write!(f, "{},", elem)?;
+                    if first {
+                        write!(f, "{}", elem)?;
+                        first = false;
+                    } else {
+                        write!(f, ", {}", elem)?;
+                    }
                 }
                 write!(f, "}}")
             }

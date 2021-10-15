@@ -513,8 +513,14 @@ impl From<ListComprehension> for Expression {
 impl DisplayWithContext for ListComprehension {
     fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
         write!(f, "[")?;
+        let mut first = true;
         for elem in &self.elements {
-            write!(f, "{},", elem.display_with(ctx))?;
+            if first {
+                write!(f, "{}", elem.display_with(ctx))?;
+                first = false;
+            } else {
+                write!(f, ", {}", elem.display_with(ctx))?;
+            }
         }
         write!(f, "]")
     }
@@ -553,8 +559,14 @@ impl From<SetComprehension> for Expression {
 impl DisplayWithContext for SetComprehension {
     fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
         write!(f, "{{")?;
+        let mut first = true;
         for elem in &self.elements {
-            write!(f, "{},", elem.display_with(ctx))?;
+            if first {
+                write!(f, "{}", elem.display_with(ctx))?;
+                first = false;
+            } else {
+                write!(f, ", {}", elem.display_with(ctx))?;
+            }
         }
         write!(f, "}}")
     }
