@@ -76,8 +76,7 @@ where
         let value = self.next();
         if value.is_some() {
             return Err(ExecutionError::InvalidParameters(format!(
-                "unexpected extra parameter {}",
-                value.unwrap()
+                "unexpected extra parameter"
             )));
         }
         Ok(())
@@ -205,13 +204,13 @@ pub mod stdlib {
     impl Function for Plus {
         fn call(
             &mut self,
-            _graph: &mut Graph,
+            graph: &mut Graph,
             _source: &str,
             parameters: &mut dyn Parameters,
         ) -> Result<Value, ExecutionError> {
             let mut result = 0;
             while let Ok(parameter) = parameters.param() {
-                result += parameter.into_integer()?;
+                result += parameter.into_integer(graph)?;
             }
             Ok(Value::Integer(result))
         }
@@ -223,14 +222,14 @@ pub mod stdlib {
     impl Function for Replace {
         fn call(
             &mut self,
-            _graph: &mut Graph,
+            graph: &mut Graph,
             _source: &str,
             parameters: &mut dyn Parameters,
         ) -> Result<Value, ExecutionError> {
-            let text = parameters.param()?.into_string()?;
-            let pattern = parameters.param()?.into_string()?;
+            let text = parameters.param()?.into_string(graph)?;
+            let pattern = parameters.param()?.into_string(graph)?;
             let pattern = Regex::new(&pattern).map_err(ExecutionError::other)?;
-            let replacement = parameters.param()?.into_string()?;
+            let replacement = parameters.param()?.into_string(graph)?;
             parameters.finish()?;
             Ok(Value::String(
                 pattern.replace_all(&text, replacement).to_string(),

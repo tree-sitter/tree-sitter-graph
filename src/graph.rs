@@ -256,18 +256,24 @@ pub enum Value {
 
 impl Value {
     /// Coerces this value into an integer, returning an error if it's some other type of value.
-    pub fn into_integer(self) -> Result<u32, ExecutionError> {
+    pub fn into_integer(self, graph: &Graph) -> Result<u32, ExecutionError> {
         match self {
             Value::Integer(value) => Ok(value),
-            _ => Err(ExecutionError::ExpectedInteger(format!("got {}", self))),
+            _ => Err(ExecutionError::ExpectedInteger(format!(
+                "got {}",
+                self.display_with(graph)
+            ))),
         }
     }
 
     /// Coerces this value into a string, returning an error if it's some other type of value.
-    pub fn into_string(self) -> Result<String, ExecutionError> {
+    pub fn into_string(self, graph: &Graph) -> Result<String, ExecutionError> {
         match self {
             Value::String(value) => Ok(value),
-            _ => Err(ExecutionError::ExpectedString(format!("got {}", self))),
+            _ => Err(ExecutionError::ExpectedString(format!(
+                "got {}",
+                self.display_with(graph)
+            ))),
         }
     }
 
@@ -279,7 +285,10 @@ impl Value {
     ) -> Result<&'a Node<'tree>, ExecutionError> {
         match self {
             Value::SyntaxNode(node) => Ok(&graph[node]),
-            _ => Err(ExecutionError::ExpectedSyntaxNode(format!("got {}", self))),
+            _ => Err(ExecutionError::ExpectedSyntaxNode(format!(
+                "got {}",
+                self.display_with(graph)
+            ))),
         }
     }
 }
@@ -299,45 +308,6 @@ impl From<&str> for Value {
 impl From<String> for Value {
     fn from(value: String) -> Value {
         Value::String(value)
-    }
-}
-
-impl fmt::Display for Value {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Value::Null => write!(f, "#null"),
-            Value::Boolean(value) => write!(f, "{}", value),
-            Value::Integer(value) => write!(f, "{}", value),
-            Value::String(value) => write!(f, "{:?}", value),
-            Value::List(values) => {
-                write!(f, "[")?;
-                let mut first = true;
-                for elem in values {
-                    if first {
-                        write!(f, "{}", elem)?;
-                        first = false;
-                    } else {
-                        write!(f, ", {}", elem)?;
-                    }
-                }
-                write!(f, "]")
-            }
-            Value::Set(values) => {
-                write!(f, "{{")?;
-                let mut first = true;
-                for elem in values {
-                    if first {
-                        write!(f, "{}", elem)?;
-                        first = false;
-                    } else {
-                        write!(f, ", {}", elem)?;
-                    }
-                }
-                write!(f, "}}")
-            }
-            Value::SyntaxNode(value) => fmt::Display::fmt(value, f),
-            Value::GraphNode(value) => fmt::Display::fmt(value, f),
-        }
     }
 }
 
@@ -396,12 +366,6 @@ impl From<SyntaxNodeRef> for Value {
     }
 }
 
-impl fmt::Display for SyntaxNodeRef {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "[syntax node {}]", self.0)
-    }
-}
-
 impl DisplayWithGraph for SyntaxNodeRef {
     fn fmt(&self, f: &mut fmt::Formatter, graph: &Graph) -> fmt::Result {
         let node = graph[*self];
@@ -416,12 +380,6 @@ pub struct GraphNodeRef(GraphNodeID);
 impl From<GraphNodeRef> for Value {
     fn from(value: GraphNodeRef) -> Value {
         Value::GraphNode(value)
-    }
-}
-
-impl fmt::Display for GraphNodeRef {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "[graph node {}]", self.0)
     }
 }
 

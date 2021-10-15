@@ -387,7 +387,7 @@ impl AddEdgeAttribute {
 
 impl Scan {
     fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
-        let match_string = self.value.evaluate(exec)?.into_string()?;
+        let match_string = self.value.evaluate(exec)?.into_string(exec.graph)?;
 
         let mut i = 0;
         let mut matches = Vec::new();
