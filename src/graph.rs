@@ -308,7 +308,7 @@ impl fmt::Display for Value {
             Value::Null => write!(f, "#null"),
             Value::Boolean(value) => write!(f, "{}", value),
             Value::Integer(value) => write!(f, "{}", value),
-            Value::String(value) => write!(f, "\"{}\"", value),
+            Value::String(value) => write!(f, "{:?}", value),
             Value::List(values) => {
                 write!(f, "[")?;
                 for elem in values {
