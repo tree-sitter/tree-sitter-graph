@@ -300,9 +300,9 @@ impl DisplayWithContext for Scan {
     fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
         write!(f, "scan {} {{", self.value.display_with(ctx))?;
         for arm in &self.arms {
-            write!(f, "{}", arm.display_with(ctx))?;
+                write!(f, " {}", arm.display_with(ctx))?;
         }
-        write!(f, "}}")
+        write!(f, " }}")
     }
 }
 
@@ -323,11 +323,11 @@ impl PartialEq for ScanArm {
 
 impl DisplayWithContext for ScanArm {
     fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
-        write!(f, "scan {} {{", self.regex)?;
+        write!(f, "\"{}\" {{", self.regex)?;
         for stmt in &self.statements {
-            write!(f, "{}", stmt.display_with(ctx))?;
+            write!(f, " {}", stmt.display_with(ctx))?;
         }
-        write!(f, "}}")
+        write!(f, " }}")
     }
 }
 
