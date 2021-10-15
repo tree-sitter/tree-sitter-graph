@@ -297,8 +297,12 @@ impl From<Scan> for Statement {
 }
 
 impl DisplayWithContext for Scan {
-    fn fmt(&self, f: &mut fmt::Formatter, _ctx: &Context) -> fmt::Result {
-        write!(f, "scan ...")
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        write!(f, "scan {} {{", self.value.display_with(ctx))?;
+        for arm in &self.arms {
+            write!(f, "{}", arm.display_with(ctx))?;
+        }
+        write!(f, "}}")
     }
 }
 
@@ -314,6 +318,16 @@ impl Eq for ScanArm {}
 impl PartialEq for ScanArm {
     fn eq(&self, other: &ScanArm) -> bool {
         self.regex.as_str() == other.regex.as_str() && self.statements == other.statements
+    }
+}
+
+impl DisplayWithContext for ScanArm {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        write!(f, "scan {} {{", self.regex)?;
+        for stmt in &self.statements {
+            write!(f, "{}", stmt.display_with(ctx))?;
+        }
+        write!(f, "}}")
     }
 }
 
