@@ -345,7 +345,7 @@ impl CreateEdge {
             ExecutionError::DuplicateEdge(format!(
                 "({} -> {}) in {}",
                 source, // cannot display_with(exec.graph) because of borrow
-                sink, // cannot display_with(exec.graph) because of borrow
+                sink,   // cannot display_with(exec.graph) because of borrow
                 self.display_with(ctx)
             ))
         })?;
@@ -365,7 +365,7 @@ impl AddEdgeAttribute {
                     .ok_or(ExecutionError::UndefinedEdge(format!(
                         "({} -> {}) in {}",
                         source, // cannot display_with(exec.graph) because of borrow
-                        sink, // cannot display_with(exec.graph) because of borrow
+                        sink,   // cannot display_with(exec.graph) because of borrow
                         self.display_with(exec.ctx)
                     )))?;
             edge.attributes.add(attribute.name, value).map_err(|_| {
