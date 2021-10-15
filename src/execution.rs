@@ -344,14 +344,14 @@ impl CreateEdge {
         let source = self.source.evaluate_as_node(exec)?;
         let sink = self.sink.evaluate_as_node(exec)?;
         let ctx = exec.ctx;
-        exec.graph[source].add_edge(sink).map_err(|_| {
-            ExecutionError::DuplicateEdge(format!(
+        if let Err(_) = exec.graph[source].add_edge(sink) {
+            Err(ExecutionError::DuplicateEdge(format!(
                 "({} -> {}) in {}",
-                source, // cannot display_with(exec.graph) because of borrow
-                sink,   // cannot display_with(exec.graph) because of borrow
+                source.display_with(exec.graph),
+                sink.display_with(exec.graph),
                 self.display_with(ctx)
-            ))
-        })?;
+            )))?;
+        }
         Ok(())
     }
 }
@@ -362,15 +362,15 @@ impl AddEdgeAttribute {
         let sink = self.sink.evaluate_as_node(exec)?;
         for attribute in &self.attributes {
             let value = attribute.value.evaluate(exec)?;
-            let edge =
-                exec.graph[source]
-                    .get_edge_mut(sink)
-                    .ok_or(ExecutionError::UndefinedEdge(format!(
-                        "({} -> {}) in {}",
-                        source, // cannot display_with(exec.graph) because of borrow
-                        sink,   // cannot display_with(exec.graph) because of borrow
-                        self.display_with(exec.ctx)
-                    )))?;
+            let edge = match exec.graph[source].get_edge_mut(sink) {
+                Some(edge) => Ok(edge),
+                None => Err(ExecutionError::UndefinedEdge(format!(
+                    "({} -> {}) in {}",
+                    source.display_with(exec.graph),
+                    sink.display_with(exec.graph),
+                    self.display_with(exec.ctx)
+                ))),
+            }?;
             edge.attributes.add(attribute.name, value).map_err(|_| {
                 ExecutionError::DuplicateAttribute(format!(
                     " {} on edge ({} -> {}) in {}",
