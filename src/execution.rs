@@ -7,6 +7,7 @@
 
 use std::collections::HashMap;
 
+use anyhow::Context as ErrorContext;
 use thiserror::Error;
 use tree_sitter::QueryCursor;
 use tree_sitter::QueryMatch;
@@ -254,7 +255,9 @@ impl Stanza {
                 mat: &mat,
             };
             for statement in &self.statements {
-                statement.execute(&mut exec)?;
+                statement
+                    .execute(&mut exec)
+                    .with_context(|| format!("Executing {}", statement.display_with(exec.ctx)))?;
             }
         }
         Ok(())
@@ -407,13 +410,17 @@ impl Scan {
             });
 
             let (regex_captures, block_index) = &matches[0];
-            for statement in &self.arms[*block_index].statements {
+            let arm = &self.arms[*block_index];
+            for statement in &arm.statements {
                 exec.current_regex_matches.clear();
                 for regex_capture in regex_captures.iter() {
                     exec.current_regex_matches
                         .push(regex_capture.map(|m| m.as_str()).unwrap_or("").to_string());
                 }
-                statement.execute(exec)?;
+                statement
+                    .execute(exec)
+                    .with_context(|| format!("Executing {}", statement.display_with(exec.ctx)))
+                    .with_context(|| format!("Matching {} in arm {}", match_string, arm.regex,))?;
             }
 
             i += regex_captures.get(0).unwrap().range().end;
