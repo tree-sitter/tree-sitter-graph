@@ -15,6 +15,7 @@ use tree_sitter::Query;
 use crate::Context;
 use crate::DisplayWithContext;
 use crate::Identifier;
+use crate::Location;
 
 /// A graph DSL file
 #[derive(Debug)]
@@ -40,6 +41,7 @@ pub struct Stanza {
     pub query: Query,
     /// The list of statements in the stanza
     pub statements: Vec<Statement>,
+    pub location: Location,
 }
 
 /// A statement that can appear in a graph DSL stanza
@@ -83,6 +85,7 @@ pub struct AddEdgeAttribute {
     pub source: Expression,
     pub sink: Expression,
     pub attributes: Vec<Attribute>,
+    pub location: Location,
 }
 
 impl From<AddEdgeAttribute> for Statement {
@@ -111,6 +114,7 @@ impl DisplayWithContext for AddEdgeAttribute {
 pub struct AddGraphNodeAttribute {
     pub node: Expression,
     pub attributes: Vec<Attribute>,
+    pub location: Location,
 }
 
 impl From<AddGraphNodeAttribute> for Statement {
@@ -134,6 +138,7 @@ impl DisplayWithContext for AddGraphNodeAttribute {
 pub struct Assign {
     pub variable: Variable,
     pub value: Expression,
+    pub location: Location,
 }
 
 impl From<Assign> for Statement {
@@ -176,6 +181,7 @@ impl DisplayWithContext for Attribute {
 pub struct CreateEdge {
     pub source: Expression,
     pub sink: Expression,
+    pub location: Location,
 }
 
 impl From<CreateEdge> for Statement {
@@ -199,6 +205,7 @@ impl DisplayWithContext for CreateEdge {
 #[derive(Debug, Eq, PartialEq)]
 pub struct CreateGraphNode {
     pub node: Variable,
+    pub location: Location,
 }
 
 impl From<CreateGraphNode> for Statement {
@@ -218,6 +225,7 @@ impl DisplayWithContext for CreateGraphNode {
 pub struct DeclareImmutable {
     pub variable: Variable,
     pub value: Expression,
+    pub location: Location,
 }
 
 impl From<DeclareImmutable> for Statement {
@@ -242,6 +250,7 @@ impl DisplayWithContext for DeclareImmutable {
 pub struct DeclareMutable {
     pub variable: Variable,
     pub value: Expression,
+    pub location: Location,
 }
 
 impl From<DeclareMutable> for Statement {
@@ -265,6 +274,7 @@ impl DisplayWithContext for DeclareMutable {
 #[derive(Debug, Eq, PartialEq)]
 pub struct Print {
     pub values: Vec<Expression>,
+    pub location: Location,
 }
 
 impl From<Print> for Statement {
@@ -288,6 +298,7 @@ impl DisplayWithContext for Print {
 pub struct Scan {
     pub value: Expression,
     pub arms: Vec<ScanArm>,
+    pub location: Location,
 }
 
 impl From<Scan> for Statement {
@@ -311,6 +322,7 @@ impl DisplayWithContext for Scan {
 pub struct ScanArm {
     pub regex: Regex,
     pub statements: Vec<Statement>,
+    pub location: Location,
 }
 
 impl Eq for ScanArm {}

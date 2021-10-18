@@ -54,7 +54,7 @@ pub enum ParseError {
 }
 
 /// The location of a graph DSL entity within its file
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct Location {
     pub row: usize,
     pub column: usize,
@@ -223,10 +223,15 @@ impl Parser<'_> {
     }
 
     fn parse_stanza(&mut self, language: Language) -> Result<ast::Stanza, ParseError> {
+        let location = self.location;
         let query = self.parse_query(language)?;
         self.consume_whitespace();
         let statements = self.parse_statements(&query)?;
-        Ok(ast::Stanza { query, statements })
+        Ok(ast::Stanza {
+            query,
+            statements,
+            location,
+        })
     }
 
     fn parse_query(&mut self, language: Language) -> Result<Query, ParseError> {
@@ -304,31 +309,55 @@ impl Parser<'_> {
             self.consume_token("=")?;
             self.consume_whitespace();
             let value = self.parse_expression(current_query)?;
-            Ok(ast::DeclareImmutable { variable, value }.into())
+            Ok(ast::DeclareImmutable {
+                variable,
+                value,
+                location: keyword_location,
+            }
+            .into())
         } else if keyword == self.var_keyword {
             let variable = self.parse_variable(current_query)?;
             self.consume_whitespace();
             self.consume_token("=")?;
             self.consume_whitespace();
             let value = self.parse_expression(current_query)?;
-            Ok(ast::DeclareMutable { variable, value }.into())
+            Ok(ast::DeclareMutable {
+                variable,
+                value,
+                location: keyword_location,
+            }
+            .into())
         } else if keyword == self.set_keyword {
             let variable = self.parse_variable(current_query)?;
             self.consume_whitespace();
             self.consume_token("=")?;
             self.consume_whitespace();
             let value = self.parse_expression(current_query)?;
-            Ok(ast::Assign { variable, value }.into())
+            Ok(ast::Assign {
+                variable,
+                value,
+                location: keyword_location,
+            }
+            .into())
         } else if keyword == self.node_keyword {
             let node = self.parse_variable(current_query)?;
-            Ok(ast::CreateGraphNode { node }.into())
+            Ok(ast::CreateGraphNode {
+                node,
+                location: keyword_location,
+            }
+            .into())
         } else if keyword == self.edge_keyword {
             let source = self.parse_expression(current_query)?;
             self.consume_whitespace();
             self.consume_token("->")?;
             self.consume_whitespace();
             let sink = self.parse_expression(current_query)?;
-            Ok(ast::CreateEdge { source, sink }.into())
+            Ok(ast::CreateEdge {
+                source,
+                sink,
+                location: keyword_location,
+            }
+            .into())
         } else if keyword == self.attr_keyword {
             self.consume_token("(")?;
             self.consume_whitespace();
@@ -348,6 +377,7 @@ impl Parser<'_> {
                     source,
                     sink,
                     attributes,
+                    location: keyword_location,
                 }
                 .into())
             } else {
@@ -356,7 +386,12 @@ impl Parser<'_> {
                 self.consume_token(")")?;
                 self.consume_whitespace();
                 let attributes = self.parse_attributes(current_query)?;
-                Ok(ast::AddGraphNodeAttribute { node, attributes }.into())
+                Ok(ast::AddGraphNodeAttribute {
+                    node,
+                    attributes,
+                    location: keyword_location,
+                }
+                .into())
             }
         } else if keyword == self.print_keyword {
             let mut values = vec![self.parse_expression(current_query)?];
@@ -365,7 +400,11 @@ impl Parser<'_> {
                 values.push(self.parse_expression(current_query)?);
                 self.consume_whitespace();
             }
-            Ok(ast::Print { values }.into())
+            Ok(ast::Print {
+                values,
+                location: keyword_location,
+            }
+            .into())
         } else if keyword == self.scan_keyword {
             let value = self.parse_expression(current_query)?;
             self.consume_whitespace();
@@ -383,11 +422,20 @@ impl Parser<'_> {
                 };
                 self.consume_whitespace();
                 let statements = self.parse_statements(current_query)?;
-                arms.push(ast::ScanArm { regex, statements });
+                arms.push(ast::ScanArm {
+                    regex,
+                    statements,
+                    location: keyword_location,
+                });
                 self.consume_whitespace();
             }
             self.consume_token("}")?;
-            Ok(ast::Scan { value, arms }.into())
+            Ok(ast::Scan {
+                value,
+                arms,
+                location: keyword_location,
+            }
+            .into())
         } else {
             Err(ParseError::UnexpectedKeyword(
                 self.ctx.resolve(keyword).into(),
