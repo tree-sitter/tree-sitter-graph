@@ -318,7 +318,7 @@ impl PartialEq for ScanArm {
 }
 
 impl DisplayWithContext for ScanArm {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter, _ctx: &Context) -> fmt::Result {
         write!(f, "\"{}\" {{ ... }}", self.regex)
     }
 }
