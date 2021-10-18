@@ -218,7 +218,12 @@ impl From<CreateGraphNode> for Statement {
 
 impl DisplayWithContext for CreateGraphNode {
     fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
-        write!(f, "node {} at {}", self.node.display_with(ctx), self.location)
+        write!(
+            f,
+            "node {} at {}",
+            self.node.display_with(ctx),
+            self.location
+        )
     }
 }
 
