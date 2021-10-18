@@ -105,7 +105,7 @@ impl DisplayWithContext for AddEdgeAttribute {
         for attr in &self.attributes {
             write!(f, " {}", attr.display_with(ctx))?;
         }
-        write!(f, "")
+        write!(f, " at {}", self.location)
     }
 }
 
@@ -129,7 +129,7 @@ impl DisplayWithContext for AddGraphNodeAttribute {
         for attr in &self.attributes {
             write!(f, " {}", attr.display_with(ctx),)?;
         }
-        write!(f, "")
+        write!(f, " at {}", self.location)
     }
 }
 
@@ -151,9 +151,10 @@ impl DisplayWithContext for Assign {
     fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
         write!(
             f,
-            "set {} = {}",
+            "set {} = {} at {}",
             self.variable.display_with(ctx),
             self.value.display_with(ctx),
+            self.location,
         )
     }
 }
@@ -194,9 +195,10 @@ impl DisplayWithContext for CreateEdge {
     fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
         write!(
             f,
-            "edge {} -> {}",
+            "edge {} -> {} at {}",
             self.source.display_with(ctx),
             self.sink.display_with(ctx),
+            self.location,
         )
     }
 }
@@ -216,7 +218,7 @@ impl From<CreateGraphNode> for Statement {
 
 impl DisplayWithContext for CreateGraphNode {
     fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
-        write!(f, "node {}", self.node.display_with(ctx),)
+        write!(f, "node {} at {}", self.node.display_with(ctx), self.location)
     }
 }
 
@@ -238,9 +240,10 @@ impl DisplayWithContext for DeclareImmutable {
     fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
         write!(
             f,
-            "let {} = {}",
+            "let {} = {} at {}",
             self.variable.display_with(ctx),
             self.value.display_with(ctx),
+            self.location,
         )
     }
 }
@@ -263,9 +266,10 @@ impl DisplayWithContext for DeclareMutable {
     fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
         write!(
             f,
-            "var {} = {}",
+            "var {} = {} at {}",
             self.variable.display_with(ctx),
             self.value.display_with(ctx),
+            self.location,
         )
     }
 }
@@ -289,7 +293,7 @@ impl DisplayWithContext for Print {
         for val in &self.values {
             write!(f, " {},", val.display_with(ctx),)?;
         }
-        write!(f, "")
+        write!(f, " at {}", self.location)
     }
 }
 
@@ -309,11 +313,12 @@ impl From<Scan> for Statement {
 
 impl DisplayWithContext for Scan {
     fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
-        write!(f, "scan {} {{", self.value.display_with(ctx))?;
-        for arm in &self.arms {
-            write!(f, " {}", arm.display_with(ctx))?;
-        }
-        write!(f, " }}")
+        write!(
+            f,
+            "scan {} {{ ... }} at {}",
+            self.value.display_with(ctx),
+            self.location
+        )
     }
 }
 
@@ -335,11 +340,7 @@ impl PartialEq for ScanArm {
 
 impl DisplayWithContext for ScanArm {
     fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
-        write!(f, "\"{}\" {{", self.regex)?;
-        for stmt in &self.statements {
-            write!(f, " {}", stmt.display_with(ctx))?;
-        }
-        write!(f, " }}")
+        write!(f, "\"{}\" {{ ... }}", self.regex)
     }
 }
 
