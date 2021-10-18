@@ -7,6 +7,7 @@
 
 use tree_sitter_graph::ast::*;
 use tree_sitter_graph::Context;
+use tree_sitter_graph::Location;
 
 #[test]
 fn can_parse_blocks() {
@@ -43,7 +44,11 @@ fn can_parse_blocks() {
     assert_eq!(
         statements,
         vec![vec![
-            CreateGraphNode { node: loc1.into() }.into(),
+            CreateGraphNode {
+                node: loc1.into(),
+                location: Location { row: 4, column: 10 }
+            }
+            .into(),
             CreateGraphNode {
                 node: ScopedVariable {
                     scope: Box::new(
@@ -56,6 +61,7 @@ fn can_parse_blocks() {
                     name: prop1,
                 }
                 .into(),
+                location: Location { row: 5, column: 10 },
             }
             .into(),
             CreateEdge {
@@ -71,6 +77,7 @@ fn can_parse_blocks() {
                 }
                 .into(),
                 sink: loc1.into(),
+                location: Location { row: 6, column: 10 },
             }
             .into(),
             AddEdgeAttribute {
@@ -90,6 +97,7 @@ fn can_parse_blocks() {
                     name: precedence,
                     value: Expression::TrueLiteral
                 }],
+                location: Location { row: 7, column: 10 },
             }
             .into(),
             AddGraphNodeAttribute {
@@ -114,6 +122,7 @@ fn can_parse_blocks() {
                         value: Expression::TrueLiteral
                     },
                 ],
+                location: Location { row: 8, column: 10 },
             }
             .into(),
             DeclareMutable {
@@ -129,6 +138,7 @@ fn can_parse_blocks() {
                 }
                 .into(),
                 value: loc1.into(),
+                location: Location { row: 9, column: 10 },
             }
             .into(),
             Assign {
@@ -144,6 +154,10 @@ fn can_parse_blocks() {
                 }
                 .into(),
                 value: loc1.into(),
+                location: Location {
+                    row: 10,
+                    column: 10
+                },
             }
             .into(),
         ]]
@@ -179,16 +193,19 @@ fn can_parse_literals() {
             DeclareImmutable {
                 variable: f.into(),
                 value: Expression::FalseLiteral,
+                location: Location { row: 3, column: 10 },
             }
             .into(),
             DeclareImmutable {
                 variable: n.into(),
                 value: Expression::NullLiteral,
+                location: Location { row: 4, column: 10 },
             }
             .into(),
             DeclareImmutable {
                 variable: t.into(),
                 value: Expression::TrueLiteral,
+                location: Location { row: 5, column: 10 },
             }
             .into(),
         ]]
@@ -219,6 +236,7 @@ fn can_parse_strings() {
         vec![vec![DeclareImmutable {
             variable: loc1.into(),
             value: String::from("\"abc,\ndef\\").into(),
+            location: Location { row: 3, column: 10 },
         }
         .into()]]
     );
