@@ -8,9 +8,12 @@
 //! Defines the AST structure of a graph DSL file
 
 use regex::Regex;
+use std::fmt;
 use tree_sitter::Language;
 use tree_sitter::Query;
 
+use crate::Context;
+use crate::DisplayWithContext;
 use crate::Identifier;
 use crate::Location;
 
@@ -60,6 +63,22 @@ pub enum Statement {
     Print(Print),
 }
 
+impl DisplayWithContext for Statement {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        match self {
+            Statement::DeclareImmutable(stmt) => stmt.fmt(f, ctx),
+            Statement::DeclareMutable(stmt) => stmt.fmt(f, ctx),
+            Statement::Assign(stmt) => stmt.fmt(f, ctx),
+            Statement::CreateGraphNode(stmt) => stmt.fmt(f, ctx),
+            Statement::AddGraphNodeAttribute(stmt) => stmt.fmt(f, ctx),
+            Statement::CreateEdge(stmt) => stmt.fmt(f, ctx),
+            Statement::AddEdgeAttribute(stmt) => stmt.fmt(f, ctx),
+            Statement::Scan(stmt) => stmt.fmt(f, ctx),
+            Statement::Print(stmt) => stmt.fmt(f, ctx),
+        }
+    }
+}
+
 /// An `attr` statement that adds an attribute to an edge
 #[derive(Debug, Eq, PartialEq)]
 pub struct AddEdgeAttribute {
@@ -72,6 +91,21 @@ pub struct AddEdgeAttribute {
 impl From<AddEdgeAttribute> for Statement {
     fn from(statement: AddEdgeAttribute) -> Statement {
         Statement::AddEdgeAttribute(statement)
+    }
+}
+
+impl DisplayWithContext for AddEdgeAttribute {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        write!(
+            f,
+            "attr ({} -> {})",
+            self.source.display_with(ctx),
+            self.sink.display_with(ctx),
+        )?;
+        for attr in &self.attributes {
+            write!(f, " {}", attr.display_with(ctx))?;
+        }
+        write!(f, "")
     }
 }
 
@@ -89,6 +123,16 @@ impl From<AddGraphNodeAttribute> for Statement {
     }
 }
 
+impl DisplayWithContext for AddGraphNodeAttribute {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        write!(f, "attr ({})", self.node.display_with(ctx),)?;
+        for attr in &self.attributes {
+            write!(f, " {}", attr.display_with(ctx),)?;
+        }
+        write!(f, "")
+    }
+}
+
 /// A `set` statement that updates the value of a mutable variable
 #[derive(Debug, Eq, PartialEq)]
 pub struct Assign {
@@ -103,11 +147,33 @@ impl From<Assign> for Statement {
     }
 }
 
+impl DisplayWithContext for Assign {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        write!(
+            f,
+            "set {} = {}",
+            self.variable.display_with(ctx),
+            self.value.display_with(ctx),
+        )
+    }
+}
+
 /// The name and value of an attribute
 #[derive(Debug, Eq, PartialEq)]
 pub struct Attribute {
     pub name: Identifier,
     pub value: Expression,
+}
+
+impl DisplayWithContext for Attribute {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        write!(
+            f,
+            "{} = {}",
+            self.name.display_with(ctx),
+            self.value.display_with(ctx),
+        )
+    }
 }
 
 /// An `edge` statement that creates a new edge
@@ -124,6 +190,17 @@ impl From<CreateEdge> for Statement {
     }
 }
 
+impl DisplayWithContext for CreateEdge {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        write!(
+            f,
+            "edge {} -> {}",
+            self.source.display_with(ctx),
+            self.sink.display_with(ctx),
+        )
+    }
+}
+
 /// A `node` statement that creates a new graph node
 #[derive(Debug, Eq, PartialEq)]
 pub struct CreateGraphNode {
@@ -134,6 +211,12 @@ pub struct CreateGraphNode {
 impl From<CreateGraphNode> for Statement {
     fn from(statement: CreateGraphNode) -> Statement {
         Statement::CreateGraphNode(statement)
+    }
+}
+
+impl DisplayWithContext for CreateGraphNode {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        write!(f, "node {}", self.node.display_with(ctx),)
     }
 }
 
@@ -151,6 +234,17 @@ impl From<DeclareImmutable> for Statement {
     }
 }
 
+impl DisplayWithContext for DeclareImmutable {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        write!(
+            f,
+            "let {} = {}",
+            self.variable.display_with(ctx),
+            self.value.display_with(ctx),
+        )
+    }
+}
+
 /// A `var` statement that declares a new mutable variable
 #[derive(Debug, Eq, PartialEq)]
 pub struct DeclareMutable {
@@ -162,6 +256,17 @@ pub struct DeclareMutable {
 impl From<DeclareMutable> for Statement {
     fn from(statement: DeclareMutable) -> Statement {
         Statement::DeclareMutable(statement)
+    }
+}
+
+impl DisplayWithContext for DeclareMutable {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        write!(
+            f,
+            "var {} = {}",
+            self.variable.display_with(ctx),
+            self.value.display_with(ctx),
+        )
     }
 }
 
@@ -178,6 +283,16 @@ impl From<Print> for Statement {
     }
 }
 
+impl DisplayWithContext for Print {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        write!(f, "print")?;
+        for val in &self.values {
+            write!(f, " {},", val.display_with(ctx),)?;
+        }
+        write!(f, "")
+    }
+}
+
 /// A `scan` statement that matches regular expressions against a string
 #[derive(Debug, Eq, PartialEq)]
 pub struct Scan {
@@ -189,6 +304,12 @@ pub struct Scan {
 impl From<Scan> for Statement {
     fn from(statement: Scan) -> Statement {
         Statement::Scan(statement)
+    }
+}
+
+impl DisplayWithContext for Scan {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        write!(f, "scan {} {{ ... }}", self.value.display_with(ctx))
     }
 }
 
@@ -208,11 +329,26 @@ impl PartialEq for ScanArm {
     }
 }
 
+impl DisplayWithContext for ScanArm {
+    fn fmt(&self, f: &mut fmt::Formatter, _ctx: &Context) -> fmt::Result {
+        write!(f, "{:?} {{ ... }}", self.regex.as_str())
+    }
+}
+
 /// A reference to a variable
 #[derive(Debug, Eq, PartialEq)]
 pub enum Variable {
     Scoped(ScopedVariable),
     Unscoped(UnscopedVariable),
+}
+
+impl DisplayWithContext for Variable {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        match self {
+            Variable::Scoped(variable) => variable.fmt(f, ctx),
+            Variable::Unscoped(variable) => variable.fmt(f, ctx),
+        }
+    }
 }
 
 /// A reference to a scoped variable
@@ -225,6 +361,17 @@ pub struct ScopedVariable {
 impl From<ScopedVariable> for Variable {
     fn from(variable: ScopedVariable) -> Variable {
         Variable::Scoped(variable)
+    }
+}
+
+impl DisplayWithContext for ScopedVariable {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        write!(
+            f,
+            "{}.{}",
+            self.scope.display_with(ctx),
+            self.name.display_with(ctx),
+        )
     }
 }
 
@@ -243,6 +390,12 @@ impl From<UnscopedVariable> for Variable {
 impl From<Identifier> for Variable {
     fn from(name: Identifier) -> Variable {
         UnscopedVariable { name }.into()
+    }
+}
+
+impl DisplayWithContext for UnscopedVariable {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        write!(f, "{}", self.name.display_with(ctx))
     }
 }
 
@@ -269,6 +422,24 @@ pub enum Expression {
     RegexCapture(RegexCapture),
 }
 
+impl DisplayWithContext for Expression {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        match self {
+            Expression::FalseLiteral => write!(f, "false"),
+            Expression::NullLiteral => write!(f, "#null"),
+            Expression::TrueLiteral => write!(f, "true"),
+            Expression::IntegerConstant(expr) => expr.fmt(f, ctx),
+            Expression::StringConstant(expr) => expr.fmt(f, ctx),
+            Expression::List(expr) => expr.fmt(f, ctx),
+            Expression::Set(expr) => expr.fmt(f, ctx),
+            Expression::Capture(expr) => expr.fmt(f, ctx),
+            Expression::Variable(expr) => expr.fmt(f, ctx),
+            Expression::Call(expr) => expr.fmt(f, ctx),
+            Expression::RegexCapture(expr) => expr.fmt(f, ctx),
+        }
+    }
+}
+
 /// A function call
 #[derive(Debug, Eq, PartialEq)]
 pub struct Call {
@@ -279,6 +450,16 @@ pub struct Call {
 impl From<Call> for Expression {
     fn from(expr: Call) -> Expression {
         Expression::Call(expr)
+    }
+}
+
+impl DisplayWithContext for Call {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        write!(f, "({}", self.function.display_with(ctx))?;
+        for arg in &self.parameters {
+            write!(f, " {}", arg.display_with(ctx))?;
+        }
+        write!(f, ")")
     }
 }
 
@@ -297,6 +478,12 @@ impl From<Capture> for Expression {
     }
 }
 
+impl DisplayWithContext for Capture {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        write!(f, "{}", self.name.display_with(ctx))
+    }
+}
+
 /// An integer constant
 #[derive(Debug, Eq, PartialEq)]
 pub struct IntegerConstant {
@@ -306,6 +493,12 @@ pub struct IntegerConstant {
 impl From<IntegerConstant> for Expression {
     fn from(expr: IntegerConstant) -> Expression {
         Expression::IntegerConstant(expr)
+    }
+}
+
+impl DisplayWithContext for IntegerConstant {
+    fn fmt(&self, f: &mut fmt::Formatter, _ctx: &Context) -> fmt::Result {
+        write!(f, "{}", self.value)
     }
 }
 
@@ -321,6 +514,22 @@ impl From<ListComprehension> for Expression {
     }
 }
 
+impl DisplayWithContext for ListComprehension {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        write!(f, "[")?;
+        let mut first = true;
+        for elem in &self.elements {
+            if first {
+                write!(f, "{}", elem.display_with(ctx))?;
+                first = false;
+            } else {
+                write!(f, ", {}", elem.display_with(ctx))?;
+            }
+        }
+        write!(f, "]")
+    }
+}
+
 /// A reference to one of the regex captures in a `scan` statement
 #[derive(Debug, Eq, PartialEq)]
 pub struct RegexCapture {
@@ -330,6 +539,12 @@ pub struct RegexCapture {
 impl From<RegexCapture> for Expression {
     fn from(expr: RegexCapture) -> Expression {
         Expression::RegexCapture(expr)
+    }
+}
+
+impl DisplayWithContext for RegexCapture {
+    fn fmt(&self, f: &mut fmt::Formatter, _ctx: &Context) -> fmt::Result {
+        write!(f, "${}", self.match_index)
     }
 }
 
@@ -345,6 +560,22 @@ impl From<SetComprehension> for Expression {
     }
 }
 
+impl DisplayWithContext for SetComprehension {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        write!(f, "{{")?;
+        let mut first = true;
+        for elem in &self.elements {
+            if first {
+                write!(f, "{}", elem.display_with(ctx))?;
+                first = false;
+            } else {
+                write!(f, ", {}", elem.display_with(ctx))?;
+            }
+        }
+        write!(f, "}}")
+    }
+}
+
 /// A string constant
 #[derive(Debug, Eq, PartialEq)]
 pub struct StringConstant {
@@ -354,6 +585,12 @@ pub struct StringConstant {
 impl From<StringConstant> for Expression {
     fn from(expr: StringConstant) -> Expression {
         Expression::StringConstant(expr)
+    }
+}
+
+impl DisplayWithContext for StringConstant {
+    fn fmt(&self, f: &mut fmt::Formatter, _ctx: &Context) -> fmt::Result {
+        write!(f, "{:?}", self.value)
     }
 }
 

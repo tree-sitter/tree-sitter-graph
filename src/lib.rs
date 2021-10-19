@@ -42,9 +42,17 @@ pub use parser::ParseError;
 use string_interner::symbol::SymbolU32;
 use string_interner::StringInterner;
 
+use std::fmt;
+
 /// An identifier that appears in a graph DSL file or in the graph that is produced as an output.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Identifier(SymbolU32);
+
+impl DisplayWithContext for Identifier {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        write!(f, "{}", ctx.identifiers.resolve(self.0).unwrap())
+    }
+}
 
 /// A context in which graph DSL files are executed.
 #[derive(Default)]
@@ -73,5 +81,31 @@ impl Context {
 
     pub fn resolve(&self, identifier: Identifier) -> &str {
         self.identifiers.resolve(identifier.0).unwrap()
+    }
+}
+
+/// Trait to Display with a given Context
+pub trait DisplayWithContext
+where
+    Self: Sized,
+{
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result;
+
+    fn display_with<'a>(&'a self, ctx: &'a Context) -> Box<dyn fmt::Display + 'a> {
+        struct Impl<'a, T: DisplayWithContext>(&'a T, &'a Context);
+
+        impl<'a, T: DisplayWithContext> fmt::Display for Impl<'a, T> {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                self.0.fmt(f, self.1)
+            }
+        }
+
+        Box::new(Impl(self, ctx))
+    }
+}
+
+impl<T: DisplayWithContext> DisplayWithContext for Box<T> {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        self.as_ref().fmt(f, ctx)
     }
 }

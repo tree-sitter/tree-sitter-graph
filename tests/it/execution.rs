@@ -22,7 +22,7 @@ fn check_execution(python_source: &str, dsl_source: &str, expected_graph: &str) 
     let mut functions = Functions::stdlib(&mut ctx);
     let mut globals = Variables::new();
     let graph = file
-        .execute(&tree, python_source, &mut functions, &mut globals)
+        .execute(&ctx, &tree, python_source, &mut functions, &mut globals)
         .expect("Could not execute file");
     assert_eq!(graph.display_with(&ctx).to_string(), expected_graph);
 }

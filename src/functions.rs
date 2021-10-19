@@ -13,6 +13,7 @@ use crate::execution::ExecutionError;
 use crate::graph::Graph;
 use crate::graph::Value;
 use crate::Context;
+use crate::DisplayWithContext;
 use crate::Identifier;
 
 /// The implementation of a function that can be called from the graph DSL.
@@ -37,13 +38,15 @@ pub trait Function {
 ///
 /// ```
 /// # use tree_sitter_graph::functions::Parameters;
+/// # use tree_sitter_graph::graph::Graph;
 /// # use tree_sitter_graph::graph::Value;
 /// # use tree_sitter_graph::ExecutionError;
 /// # fn main() -> Result<(), ExecutionError> {
+/// # let graph = Graph::new();
 /// # let param_vec = vec![Value::String("test".to_string()), Value::Integer(42)];
 /// # let mut params = param_vec.into_iter();
-/// let first_param = params.param()?.into_string()?;
-/// let second_param = params.param()?.into_integer()?;
+/// let first_param = params.param()?.into_string(&graph)?;
+/// let second_param = params.param()?.into_integer(&graph)?;
 /// // etc
 /// params.finish()?;
 /// # Ok(())
@@ -63,13 +66,20 @@ where
     I: Iterator<Item = Value>,
 {
     fn param(&mut self) -> Result<Value, ExecutionError> {
-        let value = self.next().ok_or(ExecutionError::InvalidParameters)?;
+        let value = self
+            .next()
+            .ok_or(ExecutionError::InvalidParameters(format!(
+                "expected more parameters"
+            )))?;
         Ok(value)
     }
 
     fn finish(&mut self) -> Result<(), ExecutionError> {
-        if self.next().is_some() {
-            return Err(ExecutionError::InvalidParameters);
+        let value = self.next();
+        if value.is_some() {
+            return Err(ExecutionError::InvalidParameters(format!(
+                "unexpected extra parameter"
+            )));
         }
         Ok(())
     }
@@ -119,6 +129,7 @@ impl Functions {
     /// Calls a named function, returning an error if there is no function with that name.
     pub fn call(
         &mut self,
+        ctx: &Context,
         name: Identifier,
         graph: &mut Graph,
         source: &str,
@@ -127,7 +138,10 @@ impl Functions {
         let function = self
             .functions
             .get_mut(&name)
-            .ok_or(ExecutionError::UndefinedFunction)?;
+            .ok_or(ExecutionError::UndefinedFunction(format!(
+                "{}",
+                name.display_with(ctx)
+            )))?;
         function.call(graph, source, parameters)
     }
 }
@@ -192,13 +206,13 @@ pub mod stdlib {
     impl Function for Plus {
         fn call(
             &mut self,
-            _graph: &mut Graph,
+            graph: &mut Graph,
             _source: &str,
             parameters: &mut dyn Parameters,
         ) -> Result<Value, ExecutionError> {
             let mut result = 0;
             while let Ok(parameter) = parameters.param() {
-                result += parameter.into_integer()?;
+                result += parameter.into_integer(graph)?;
             }
             Ok(Value::Integer(result))
         }
@@ -210,14 +224,14 @@ pub mod stdlib {
     impl Function for Replace {
         fn call(
             &mut self,
-            _graph: &mut Graph,
+            graph: &mut Graph,
             _source: &str,
             parameters: &mut dyn Parameters,
         ) -> Result<Value, ExecutionError> {
-            let text = parameters.param()?.into_string()?;
-            let pattern = parameters.param()?.into_string()?;
+            let text = parameters.param()?.into_string(graph)?;
+            let pattern = parameters.param()?.into_string(graph)?;
             let pattern = Regex::new(&pattern).map_err(ExecutionError::other)?;
-            let replacement = parameters.param()?.into_string()?;
+            let replacement = parameters.param()?.into_string(graph)?;
             parameters.finish()?;
             Ok(Value::String(
                 pattern.replace_all(&text, replacement).to_string(),
