@@ -420,7 +420,12 @@ impl Scan {
                 statement
                     .execute(exec)
                     .with_context(|| format!("Executing {}", statement.display_with(exec.ctx)))
-                    .with_context(|| format!("Matching {} in arm {}", match_string, arm.regex,))?;
+                    .with_context(|| {
+                        format!(
+                            "Matching {} with arm \"{}\" {{ ... }}",
+                            match_string, arm.regex,
+                        )
+                    })?;
             }
 
             i += regex_captures.get(0).unwrap().range().end;
