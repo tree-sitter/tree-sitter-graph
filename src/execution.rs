@@ -40,7 +40,6 @@ use crate::ast::StringConstant;
 use crate::ast::UnscopedVariable;
 use crate::ast::Variable;
 use crate::functions::Functions;
-use crate::graph::DisplayWithGraph;
 use crate::graph::Graph;
 use crate::graph::GraphNodeRef;
 use crate::graph::SyntaxNodeRef;
@@ -304,7 +303,7 @@ impl AddGraphNodeAttribute {
                     ExecutionError::DuplicateAttribute(format!(
                         " {} on graph node ({}) in {}",
                         attribute.name.display_with(exec.ctx),
-                        node.display_with(exec.graph),
+                        node,
                         self.display_with(exec.ctx),
                     ))
                 })?;
@@ -321,8 +320,8 @@ impl CreateEdge {
         if let Err(_) = exec.graph[source].add_edge(sink) {
             Err(ExecutionError::DuplicateEdge(format!(
                 "({} -> {}) in {}",
-                source.display_with(exec.graph),
-                sink.display_with(exec.graph),
+                source,
+                sink,
                 self.display_with(ctx)
             )))?;
         }
@@ -340,8 +339,8 @@ impl AddEdgeAttribute {
                 Some(edge) => Ok(edge),
                 None => Err(ExecutionError::UndefinedEdge(format!(
                     "({} -> {}) in {}",
-                    source.display_with(exec.graph),
-                    sink.display_with(exec.graph),
+                    source,
+                    sink,
                     self.display_with(exec.ctx)
                 ))),
             }?;
@@ -349,8 +348,8 @@ impl AddEdgeAttribute {
                 ExecutionError::DuplicateAttribute(format!(
                     " {} on edge ({} -> {}) in {}",
                     attribute.name.display_with(exec.ctx),
-                    source.display_with(exec.graph),
-                    sink.display_with(exec.graph),
+                    source,
+                    sink,
                     self.display_with(exec.ctx),
                 ))
             })?;
@@ -361,7 +360,7 @@ impl AddEdgeAttribute {
 
 impl Scan {
     fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
-        let match_string = self.value.evaluate(exec)?.into_string(exec.graph)?;
+        let match_string = self.value.evaluate(exec)?.into_string()?;
 
         let mut i = 0;
         let mut matches = Vec::new();
@@ -438,7 +437,7 @@ impl Print {
                 eprint!("{}", expr.value);
             } else {
                 let value = value.evaluate(exec)?;
-                eprint!("{}", value.display_with(exec.graph));
+                eprint!("{}", value);
             }
         }
         eprintln!();
@@ -482,14 +481,14 @@ impl Condition {
         match self {
             Condition::Some { value, .. } => Ok(!value.evaluate(exec)?.is_null()),
             Condition::None { value, .. } => Ok(value.evaluate(exec)?.is_null()),
-            Condition::Bool { value, .. } => Ok(value.evaluate(exec)?.into_bool(exec.graph)?),
+            Condition::Bool { value, .. } => Ok(value.evaluate(exec)?.into_bool()?),
         }
     }
 }
 
 impl ForIn {
     fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
-        let values = self.value.evaluate(exec)?.into_list(exec.graph)?;
+        let values = self.value.evaluate(exec)?.into_list()?;
         let mut loop_locals = VariableMap::new_child(exec.locals);
         for value in values {
             loop_locals.clear();
@@ -541,7 +540,7 @@ impl Expression {
             _ => Err(ExecutionError::ExpectedGraphNode(format!(
                 " {}, got {}",
                 self.display_with(exec.ctx),
-                node.display_with(exec.graph)
+                node
             ))),
         }
     }
@@ -662,7 +661,7 @@ impl ScopedVariable {
             _ => {
                 return Err(ExecutionError::InvalidVariableScope(format!(
                     " got {}",
-                    scope.display_with(exec.graph)
+                    scope
                 )))
             }
         };
@@ -673,7 +672,7 @@ impl ScopedVariable {
             Err(ExecutionError::UndefinedVariable(format!(
                 "{} on node {}",
                 self.display_with(exec.ctx),
-                scope.display_with(exec.graph)
+                scope
             )))
         }
     }
@@ -690,7 +689,7 @@ impl ScopedVariable {
             _ => {
                 return Err(ExecutionError::InvalidVariableScope(format!(
                     " got {}",
-                    scope.display_with(exec.graph)
+                    scope
                 )))
             }
         };
@@ -707,7 +706,7 @@ impl ScopedVariable {
             _ => {
                 return Err(ExecutionError::InvalidVariableScope(format!(
                     " got {}",
-                    scope.display_with(exec.graph)
+                    scope,
                 )))
             }
         };

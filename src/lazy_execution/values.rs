@@ -13,7 +13,6 @@ use std::convert::From;
 use std::fmt;
 
 use crate::execution::ExecutionError;
-use crate::graph::DisplayWithGraph;
 use crate::graph::Graph;
 use crate::graph::GraphNodeRef;
 use crate::graph::SyntaxNodeRef;
@@ -132,7 +131,7 @@ impl LazyValue {
             Self::ScopedVariable(expr) => expr.evaluate(exec),
             Self::Call(expr) => expr.evaluate(exec),
         }?;
-        trace!("}} = {}", ret.display_with(exec.graph));
+        trace!("}} = {}", ret);
         Ok(ret)
     }
 
@@ -143,10 +142,7 @@ impl LazyValue {
         let node = self.evaluate(exec)?;
         match node {
             Value::GraphNode(node) => Ok(node),
-            _ => Err(ExecutionError::ExpectedGraphNode(format!(
-                " got {}",
-                node.display_with(exec.graph)
-            ))),
+            _ => Err(ExecutionError::ExpectedGraphNode(format!(" got {}", node))),
         }
     }
 
@@ -157,10 +153,7 @@ impl LazyValue {
         let node = self.evaluate(exec)?;
         match node {
             Value::SyntaxNode(node) => Ok(node),
-            _ => Err(ExecutionError::ExpectedSyntaxNode(format!(
-                " got {}",
-                node.display_with(exec.graph)
-            ))),
+            _ => Err(ExecutionError::ExpectedSyntaxNode(format!(" got {}", node))),
         }
     }
 }
@@ -173,7 +166,7 @@ impl DisplayWithContextAndGraph for LazyValue {
         graph: &Graph<'tree>,
     ) -> fmt::Result {
         match self {
-            Self::Value(value) => write!(f, "{}", value.display_with(graph)),
+            Self::Value(value) => write!(f, "{}", value),
             Self::List(expr) => expr.fmt(f, ctx, graph),
             Self::Set(expr) => expr.fmt(f, ctx, graph),
             Self::Variable(expr) => expr.fmt(f, ctx, graph),

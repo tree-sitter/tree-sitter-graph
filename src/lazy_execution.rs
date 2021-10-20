@@ -25,7 +25,6 @@ use crate::execution::query_capture_value;
 use crate::execution::ExecutionError;
 use crate::functions::Functions;
 use crate::graph;
-use crate::graph::DisplayWithGraph as _;
 use crate::graph::Graph;
 use crate::variables::Globals;
 use crate::variables::VariableMap;
@@ -189,11 +188,7 @@ impl ast::Stanza {
             prev_element_debug_info,
         };
         let node = query_capture_value(self.full_match_file_capture_index, One, &mat, exec.graph);
-        debug!(
-            "match {} at {}",
-            node.display_with(exec.graph),
-            self.location
-        );
+        debug!("match {} at {}", node, self.location);
         trace!("{{");
         for statement in &self.statements {
             statement
@@ -290,7 +285,7 @@ impl ast::AddEdgeAttribute {
 
 impl ast::Scan {
     fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
-        let match_string = self.value.evaluate_eager(exec)?.into_string(exec.graph)?;
+        let match_string = self.value.evaluate_eager(exec)?.into_string()?;
 
         let mut i = 0;
         let mut matches = Vec::new();
@@ -421,14 +416,14 @@ impl ast::Condition {
         match self {
             Self::Some { value, .. } => Ok(!value.evaluate_eager(exec)?.is_null()),
             Self::None { value, .. } => Ok(value.evaluate_eager(exec)?.is_null()),
-            Self::Bool { value, .. } => Ok(value.evaluate_eager(exec)?.into_bool(exec.graph)?),
+            Self::Bool { value, .. } => Ok(value.evaluate_eager(exec)?.into_bool()?),
         }
     }
 }
 
 impl ast::ForIn {
     fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
-        let values = self.value.evaluate_eager(exec)?.into_list(exec.graph)?;
+        let values = self.value.evaluate_eager(exec)?.into_list()?;
         let mut loop_locals = VariableMap::new_child(exec.locals);
         for value in values {
             loop_locals.clear();

@@ -19,7 +19,6 @@ use std::rc::Rc;
 
 use crate::execution::ExecutionError;
 use crate::graph;
-use crate::graph::DisplayWithGraph;
 use crate::graph::Graph;
 use crate::graph::SyntaxNodeRef;
 use crate::parser::Location;
@@ -159,7 +158,7 @@ impl LazyScopedVariables {
             None => {
                 return Err(ExecutionError::UndefinedScopedVariable(format!(
                     "{}.{}",
-                    scope.display_with(exec.graph),
+                    scope,
                     name.display_with(exec.ctx),
                 )));
             }
@@ -175,7 +174,7 @@ impl LazyScopedVariables {
                         Some(_) => {
                             return Err(ExecutionError::DuplicateVariable(format!(
                                 "{}.{} set at {} and {}",
-                                node.display_with(exec.graph),
+                                node,
                                 name.display_with(exec.ctx),
                                 prev_debug_info.unwrap(),
                                 debug_info,
@@ -188,26 +187,22 @@ impl LazyScopedVariables {
                     .get(&scope)
                     .ok_or(ExecutionError::UndefinedScopedVariable(format!(
                         "{}.{}",
-                        scope.display_with(exec.graph),
+                        scope,
                         name.display_with(exec.ctx),
                     )))?
                     .clone();
                 values.replace(ScopedValues::Forced(map));
                 Ok(result)
             }
-            ScopedValues::Forcing => {
-                Err(ExecutionError::RecursivelyDefinedScopedVariable(format!(
-                    "_.{} requested on {}",
-                    name.display_with(exec.ctx),
-                    scope.display_with(exec.graph)
-                )))
-            }
+            ScopedValues::Forcing => Err(ExecutionError::RecursivelyDefinedScopedVariable(
+                format!("_.{} requested on {}", name.display_with(exec.ctx), scope),
+            )),
             ScopedValues::Forced(map) => {
                 let result = map
                     .get(&scope)
                     .ok_or(ExecutionError::UndefinedScopedVariable(format!(
                         "{}.{}",
-                        scope.display_with(exec.graph),
+                        scope,
                         name.display_with(exec.ctx),
                     )))?
                     .clone();
@@ -247,7 +242,7 @@ impl DisplayWithContextAndGraph for ThunkState {
         match self {
             Self::Unforced(value) => write!(f, "?{{{}}}", value.display_with(ctx, graph)),
             Self::Forcing => write!(f, "~{{?}}"),
-            Self::Forced(value) => write!(f, "!{{{}}}", value.display_with(graph)),
+            Self::Forced(value) => write!(f, "!{{{}}}", value),
         }
     }
 }

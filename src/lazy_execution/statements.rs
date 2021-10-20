@@ -13,7 +13,6 @@ use std::convert::From;
 use std::fmt;
 
 use crate::execution::ExecutionError;
-use crate::graph::DisplayWithGraph;
 use crate::graph::Graph;
 use crate::Context;
 use crate::DisplayWithContext as _;
@@ -120,7 +119,7 @@ impl LazyAddGraphNodeAttribute {
                     ExecutionError::DuplicateAttribute(format!(
                         "{} on {} at {} and {}",
                         attribute.name.display_with(exec.ctx),
-                        node.display_with(exec.graph),
+                        node,
                         prev_debug_info.unwrap(),
                         self.debug_info,
                     ))
@@ -166,8 +165,8 @@ impl LazyCreateEdge {
         if let Err(_) = exec.graph[source].add_edge(sink) {
             Err(ExecutionError::DuplicateEdge(format!(
                 "({} -> {}) at {} and {}",
-                source.display_with(exec.graph),
-                sink.display_with(exec.graph),
+                source,
+                sink,
                 prev_debug_info.unwrap(),
                 self.debug_info,
             )))?;
@@ -221,9 +220,7 @@ impl LazyAddEdgeAttribute {
                 Some(edge) => Ok(edge),
                 None => Err(ExecutionError::UndefinedEdge(format!(
                     "({} -> {}) at {}",
-                    source.display_with(exec.graph),
-                    sink.display_with(exec.graph),
-                    self.debug_info,
+                    source, sink, self.debug_info,
                 ))),
             }?;
             let prev_debug_info = exec.prev_element_debug_info.insert(
@@ -234,8 +231,8 @@ impl LazyAddEdgeAttribute {
                 ExecutionError::DuplicateAttribute(format!(
                     "{} on edge ({} -> {}) at {} and {}",
                     attribute.name.display_with(exec.ctx),
-                    source.display_with(exec.graph),
-                    sink.display_with(exec.graph),
+                    source,
+                    sink,
                     prev_debug_info.unwrap(),
                     self.debug_info,
                 ))
@@ -287,7 +284,7 @@ impl LazyPrint {
                 LazyPrintArgument::Text(string) => eprint!("{}", string),
                 LazyPrintArgument::Value(value) => {
                     let value = value.evaluate(exec)?;
-                    eprint!("{}", value.display_with(exec.graph));
+                    eprint!("{}", value);
                 }
             }
         }

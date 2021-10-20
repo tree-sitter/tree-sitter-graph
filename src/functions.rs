@@ -42,11 +42,10 @@ pub trait Function {
 /// # use tree_sitter_graph::graph::Value;
 /// # use tree_sitter_graph::ExecutionError;
 /// # fn main() -> Result<(), ExecutionError> {
-/// # let graph = Graph::new();
 /// # let param_vec = vec![Value::String("test".to_string()), Value::Integer(42)];
 /// # let mut params = param_vec.into_iter();
-/// let first_param = params.param()?.into_string(&graph)?;
-/// let second_param = params.param()?.into_integer(&graph)?;
+/// let first_param = params.param()?.into_string()?;
+/// let second_param = params.param()?.into_integer()?;
 /// // etc
 /// params.finish()?;
 /// # Ok(())
@@ -212,7 +211,7 @@ pub mod stdlib {
                 _source: &str,
                 parameters: &mut dyn Parameters,
             ) -> Result<Value, ExecutionError> {
-                let node = graph[parameters.param()?.into_syntax_node_ref(graph)?];
+                let node = graph[parameters.param()?.into_syntax_node_ref()?];
                 parameters.finish()?;
                 let parent = match node.parent() {
                     Some(parent) => parent,
@@ -240,7 +239,7 @@ pub mod stdlib {
                 source: &str,
                 parameters: &mut dyn Parameters,
             ) -> Result<Value, ExecutionError> {
-                let node = graph[parameters.param()?.into_syntax_node_ref(graph)?];
+                let node = graph[parameters.param()?.into_syntax_node_ref()?];
                 parameters.finish()?;
                 Ok(Value::String(source[node.byte_range()].to_string()))
             }
@@ -257,7 +256,7 @@ pub mod stdlib {
                 _source: &str,
                 parameters: &mut dyn Parameters,
             ) -> Result<Value, ExecutionError> {
-                let node = graph[parameters.param()?.into_syntax_node_ref(graph)?];
+                let node = graph[parameters.param()?.into_syntax_node_ref()?];
                 parameters.finish()?;
                 Ok(Value::Integer(node.start_position().row as u32))
             }
@@ -275,7 +274,7 @@ pub mod stdlib {
                 _source: &str,
                 parameters: &mut dyn Parameters,
             ) -> Result<Value, ExecutionError> {
-                let node = graph[parameters.param()?.into_syntax_node_ref(graph)?];
+                let node = graph[parameters.param()?.into_syntax_node_ref()?];
                 parameters.finish()?;
                 Ok(Value::Integer(node.start_position().column as u32))
             }
@@ -292,7 +291,7 @@ pub mod stdlib {
                 _source: &str,
                 parameters: &mut dyn Parameters,
             ) -> Result<Value, ExecutionError> {
-                let node = graph[parameters.param()?.into_syntax_node_ref(graph)?];
+                let node = graph[parameters.param()?.into_syntax_node_ref()?];
                 parameters.finish()?;
                 Ok(Value::Integer(node.end_position().row as u32))
             }
@@ -309,7 +308,7 @@ pub mod stdlib {
                 _source: &str,
                 parameters: &mut dyn Parameters,
             ) -> Result<Value, ExecutionError> {
-                let node = graph[parameters.param()?.into_syntax_node_ref(graph)?];
+                let node = graph[parameters.param()?.into_syntax_node_ref()?];
                 parameters.finish()?;
                 Ok(Value::Integer(node.end_position().column as u32))
             }
@@ -326,7 +325,7 @@ pub mod stdlib {
                 _source: &str,
                 parameters: &mut dyn Parameters,
             ) -> Result<Value, ExecutionError> {
-                let node = graph[parameters.param()?.into_syntax_node_ref(graph)?];
+                let node = graph[parameters.param()?.into_syntax_node_ref()?];
                 parameters.finish()?;
                 Ok(Value::String(node.kind().to_string()))
             }
@@ -344,7 +343,7 @@ pub mod stdlib {
                 _source: &str,
                 parameters: &mut dyn Parameters,
             ) -> Result<Value, ExecutionError> {
-                let node = graph[parameters.param()?.into_syntax_node_ref(graph)?];
+                let node = graph[parameters.param()?.into_syntax_node_ref()?];
                 parameters.finish()?;
                 Ok(Value::Integer(node.named_child_count() as u32))
             }
@@ -380,11 +379,11 @@ pub mod stdlib {
         impl Function for Not {
             fn call(
                 &mut self,
-                graph: &mut Graph,
+                _graph: &mut Graph,
                 _source: &str,
                 parameters: &mut dyn Parameters,
             ) -> Result<Value, ExecutionError> {
-                let result = !parameters.param()?.into_bool(graph)?;
+                let result = !parameters.param()?.into_bool()?;
                 parameters.finish()?;
                 Ok(result.into())
             }
@@ -396,13 +395,13 @@ pub mod stdlib {
         impl Function for And {
             fn call(
                 &mut self,
-                graph: &mut Graph,
+                _graph: &mut Graph,
                 _source: &str,
                 parameters: &mut dyn Parameters,
             ) -> Result<Value, ExecutionError> {
                 let mut result = true;
                 while let Ok(parameter) = parameters.param() {
-                    result &= parameter.into_bool(graph)?;
+                    result &= parameter.into_bool()?;
                 }
                 Ok(result.into())
             }
@@ -414,13 +413,13 @@ pub mod stdlib {
         impl Function for Or {
             fn call(
                 &mut self,
-                graph: &mut Graph,
+                _graph: &mut Graph,
                 _source: &str,
                 parameters: &mut dyn Parameters,
             ) -> Result<Value, ExecutionError> {
                 let mut result = false;
                 while let Ok(parameter) = parameters.param() {
-                    result |= parameter.into_bool(graph)?;
+                    result |= parameter.into_bool()?;
                 }
                 Ok(result.into())
             }
@@ -436,13 +435,13 @@ pub mod stdlib {
         impl Function for Plus {
             fn call(
                 &mut self,
-                graph: &mut Graph,
+                _graph: &mut Graph,
                 _source: &str,
                 parameters: &mut dyn Parameters,
             ) -> Result<Value, ExecutionError> {
                 let mut result = 0;
                 while let Ok(parameter) = parameters.param() {
-                    result += parameter.into_integer(graph)?;
+                    result += parameter.into_integer()?;
                 }
                 Ok(Value::Integer(result))
             }
@@ -458,14 +457,14 @@ pub mod stdlib {
         impl Function for Replace {
             fn call(
                 &mut self,
-                graph: &mut Graph,
+                _graph: &mut Graph,
                 _source: &str,
                 parameters: &mut dyn Parameters,
             ) -> Result<Value, ExecutionError> {
-                let text = parameters.param()?.into_string(graph)?;
-                let pattern = parameters.param()?.into_string(graph)?;
+                let text = parameters.param()?.into_string()?;
+                let pattern = parameters.param()?.into_string()?;
                 let pattern = Regex::new(&pattern).map_err(ExecutionError::other)?;
-                let replacement = parameters.param()?.into_string(graph)?;
+                let replacement = parameters.param()?.into_string()?;
                 parameters.finish()?;
                 Ok(Value::String(
                     pattern.replace_all(&text, replacement).to_string(),

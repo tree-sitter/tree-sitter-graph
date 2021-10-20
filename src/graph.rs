@@ -30,7 +30,7 @@ use crate::Identifier;
 /// that they don't outlive the tree-sitter syntax tree that they are generated from.
 #[derive(Default)]
 pub struct Graph<'tree> {
-    syntax_nodes: HashMap<SyntaxNodeRef, Node<'tree>>,
+    syntax_nodes: HashMap<SyntaxNodeID, Node<'tree>>,
     graph_nodes: Vec<GraphNode>,
 }
 
@@ -48,9 +48,14 @@ impl<'tree> Graph<'tree> {
     /// The graph won't contain _every_ syntax node in the parsed syntax tree; it will only contain
     /// those nodes that are referenced at some point during the execution of the graph DSL file.
     pub fn add_syntax_node(&mut self, node: Node<'tree>) -> SyntaxNodeRef {
-        let index = SyntaxNodeRef(node.id() as SyntaxNodeID);
-        self.syntax_nodes.insert(index, node);
-        index
+        let index = node.id() as SyntaxNodeID;
+        let node_ref = SyntaxNodeRef {
+            index,
+            kind: node.kind(),
+            position: node.start_position(),
+        };
+        self.syntax_nodes.entry(index).or_insert(node);
+        node_ref
     }
 
     /// Adds a new graph node to the graph, returning a graph DSL reference to it.
@@ -74,7 +79,7 @@ impl<'tree> Graph<'tree> {
                         f,
                         "node {}\n{}",
                         node_index,
-                        node.attributes.display_with(ctx, graph)
+                        node.attributes.display_with(ctx)
                     )?;
                     for (sink, edge) in &node.outgoing_edges {
                         write!(
@@ -82,7 +87,7 @@ impl<'tree> Graph<'tree> {
                             "edge {} -> {}\n{}",
                             node_index,
                             *sink,
-                            edge.attributes.display_with(ctx, graph)
+                            edge.attributes.display_with(ctx)
                         )?;
                     }
                 }
@@ -212,7 +217,7 @@ impl<'tree> Graph<'tree> {
                         serializer.collect_seq(set.iter().map(|value| ctx.with(value)))
                     }
                     // FIXME: we don't distinguish between syntax tree node IDs, graph node IDs, and integers
-                    Value::SyntaxNode(node) => serializer.serialize_u32(node.0),
+                    Value::SyntaxNode(node) => serializer.serialize_u32(node.index),
                     Value::GraphNode(node) => serializer.serialize_u32(node.0),
                 }
             }
@@ -236,8 +241,8 @@ impl<'tree> Graph<'tree> {
 
 impl<'tree> Index<SyntaxNodeRef> for Graph<'tree> {
     type Output = Node<'tree>;
-    fn index(&self, index: SyntaxNodeRef) -> &Node<'tree> {
-        &self.syntax_nodes[&index]
+    fn index(&self, node_ref: SyntaxNodeRef) -> &Node<'tree> {
+        &self.syntax_nodes[&node_ref.index]
     }
 }
 
@@ -365,18 +370,13 @@ impl Attributes {
     }
 
     /// fmt::Displays the contents of this attribute set.
-    pub fn display_with<'a>(
-        &'a self,
-        ctx: &'a Context,
-        graph: &'a Graph,
-    ) -> impl fmt::Display + 'a {
-        struct DisplayAttributes<'a, 'tree>(&'a Attributes, &'a Context, &'a Graph<'tree>);
+    pub fn display_with<'a>(&'a self, ctx: &'a Context) -> impl fmt::Display + 'a {
+        struct DisplayAttributes<'a>(&'a Attributes, &'a Context);
 
-        impl<'a, 'tree> fmt::Display for DisplayAttributes<'a, 'tree> {
+        impl<'a> fmt::Display for DisplayAttributes<'a> {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 let attributes = self.0;
                 let ctx = self.1;
-                let graph = self.2;
 
                 let mut keys = attributes
                     .values
@@ -386,13 +386,13 @@ impl Attributes {
                 keys.sort_by(|a, b| a.0.cmp(b.0));
                 for (name, key) in &keys {
                     let value = &attributes.values[key];
-                    write!(f, "  {}: {}\n", name, value.display_with(graph),)?;
+                    write!(f, "  {}: {}\n", name, value,)?;
                 }
                 Ok(())
             }
         }
 
-        DisplayAttributes(self, ctx, graph)
+        DisplayAttributes(self, ctx)
     }
 }
 
@@ -421,129 +421,87 @@ impl Value {
         }
     }
     /// Coerces this value into a boolean, returning an error if it's some other type of value.
-    pub fn into_bool(self, graph: &Graph) -> Result<bool, ExecutionError> {
+    pub fn into_bool(self) -> Result<bool, ExecutionError> {
         match self {
             Value::Boolean(value) => Ok(value),
-            _ => Err(ExecutionError::ExpectedBoolean(format!(
-                "got {}",
-                self.display_with(graph)
-            ))),
+            _ => Err(ExecutionError::ExpectedBoolean(format!("got {}", self))),
         }
     }
 
-    pub fn as_bool(&self, graph: &Graph) -> Result<bool, ExecutionError> {
+    pub fn as_bool(&self) -> Result<bool, ExecutionError> {
         match self {
             Value::Boolean(value) => Ok(*value),
-            _ => Err(ExecutionError::ExpectedBoolean(format!(
-                "got {}",
-                self.display_with(graph)
-            ))),
+            _ => Err(ExecutionError::ExpectedBoolean(format!("got {}", self))),
         }
     }
 
     /// Coerces this value into an integer, returning an error if it's some other type of value.
-    pub fn into_integer(self, graph: &Graph) -> Result<u32, ExecutionError> {
+    pub fn into_integer(self) -> Result<u32, ExecutionError> {
         match self {
             Value::Integer(value) => Ok(value),
-            _ => Err(ExecutionError::ExpectedInteger(format!(
-                "got {}",
-                self.display_with(graph)
-            ))),
+            _ => Err(ExecutionError::ExpectedInteger(format!("got {}", self))),
         }
     }
 
-    pub fn as_integer(&self, graph: &Graph) -> Result<u32, ExecutionError> {
+    pub fn as_integer(&self) -> Result<u32, ExecutionError> {
         match self {
             Value::Integer(value) => Ok(*value),
-            _ => Err(ExecutionError::ExpectedInteger(format!(
-                "got {}",
-                self.display_with(graph)
-            ))),
+            _ => Err(ExecutionError::ExpectedInteger(format!("got {}", self))),
         }
     }
 
     /// Coerces this value into a string, returning an error if it's some other type of value.
-    pub fn into_string(self, graph: &Graph) -> Result<String, ExecutionError> {
+    pub fn into_string(self) -> Result<String, ExecutionError> {
         match self {
             Value::String(value) => Ok(value),
-            _ => Err(ExecutionError::ExpectedString(format!(
-                "got {}",
-                self.display_with(graph)
-            ))),
+            _ => Err(ExecutionError::ExpectedString(format!("got {}", self))),
         }
     }
 
-    pub fn as_string(&self, graph: &Graph) -> Result<&str, ExecutionError> {
+    pub fn as_string(&self) -> Result<&str, ExecutionError> {
         match self {
             Value::String(value) => Ok(value),
-            _ => Err(ExecutionError::ExpectedString(format!(
-                "got {}",
-                self.display_with(graph)
-            ))),
+            _ => Err(ExecutionError::ExpectedString(format!("got {}", self))),
         }
     }
 
     /// Coerces this value into a list, returning an error if it's some other type of value.
-    pub fn into_list(self, graph: &Graph) -> Result<Vec<Value>, ExecutionError> {
+    pub fn into_list(self) -> Result<Vec<Value>, ExecutionError> {
         match self {
             Value::List(values) => Ok(values),
-            _ => Err(ExecutionError::ExpectedList(format!(
-                "got {}",
-                self.display_with(graph)
-            ))),
+            _ => Err(ExecutionError::ExpectedList(format!("got {}", self))),
         }
     }
 
-    pub fn as_list(&self, graph: &Graph) -> Result<&Vec<Value>, ExecutionError> {
+    pub fn as_list(&self) -> Result<&Vec<Value>, ExecutionError> {
         match self {
             Value::List(values) => Ok(values),
-            _ => Err(ExecutionError::ExpectedList(format!(
-                "got {}",
-                self.display_with(graph)
-            ))),
+            _ => Err(ExecutionError::ExpectedList(format!("got {}", self))),
         }
     }
 
     /// Coerces this value into a graph node reference, returning an error if it's some other type
     /// of value.
-    pub fn into_graph_node_ref<'a, 'tree>(
-        self,
-        graph: &'a Graph<'tree>,
-    ) -> Result<GraphNodeRef, ExecutionError> {
+    pub fn into_graph_node_ref<'a, 'tree>(self) -> Result<GraphNodeRef, ExecutionError> {
         match self {
             Value::GraphNode(node) => Ok(node),
-            _ => Err(ExecutionError::ExpectedGraphNode(format!(
-                "got {}",
-                self.display_with(graph)
-            ))),
+            _ => Err(ExecutionError::ExpectedGraphNode(format!("got {}", self))),
         }
     }
 
-    pub fn as_graph_node_ref<'a, 'tree>(
-        &self,
-        graph: &'a Graph<'tree>,
-    ) -> Result<GraphNodeRef, ExecutionError> {
+    pub fn as_graph_node_ref<'a, 'tree>(&self) -> Result<GraphNodeRef, ExecutionError> {
         match self {
             Value::GraphNode(node) => Ok(*node),
-            _ => Err(ExecutionError::ExpectedGraphNode(format!(
-                "got {}",
-                self.display_with(graph)
-            ))),
+            _ => Err(ExecutionError::ExpectedGraphNode(format!("got {}", self))),
         }
     }
 
     /// Coerces this value into a syntax node reference, returning an error if it's some other type
     /// of value.
-    pub fn into_syntax_node_ref<'a, 'tree>(
-        self,
-        graph: &'a Graph<'tree>,
-    ) -> Result<SyntaxNodeRef, ExecutionError> {
+    pub fn into_syntax_node_ref<'a, 'tree>(self) -> Result<SyntaxNodeRef, ExecutionError> {
         match self {
             Value::SyntaxNode(node) => Ok(node),
-            _ => Err(ExecutionError::ExpectedSyntaxNode(format!(
-                "got {}",
-                self.display_with(graph)
-            ))),
+            _ => Err(ExecutionError::ExpectedSyntaxNode(format!("got {}", self))),
         }
     }
 
@@ -554,19 +512,13 @@ impl Value {
         self,
         graph: &'a Graph<'tree>,
     ) -> Result<&'a Node<'tree>, ExecutionError> {
-        Ok(&graph[self.into_syntax_node_ref(graph)?])
+        Ok(&graph[self.into_syntax_node_ref()?])
     }
 
-    pub fn as_syntax_node_ref<'a, 'tree>(
-        &self,
-        graph: &'a Graph<'tree>,
-    ) -> Result<SyntaxNodeRef, ExecutionError> {
+    pub fn as_syntax_node_ref<'a, 'tree>(&self) -> Result<SyntaxNodeRef, ExecutionError> {
         match self {
             Value::SyntaxNode(node) => Ok(*node),
-            _ => Err(ExecutionError::ExpectedSyntaxNode(format!(
-                "got {}",
-                self.display_with(graph)
-            ))),
+            _ => Err(ExecutionError::ExpectedSyntaxNode(format!("got {}", self))),
         }
     }
 }
@@ -601,8 +553,8 @@ impl From<Vec<Value>> for Value {
     }
 }
 
-impl DisplayWithGraph for Value {
-    fn fmt(&self, f: &mut fmt::Formatter, graph: &Graph) -> fmt::Result {
+impl std::fmt::Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Value::Null => write!(f, "#null"),
             Value::Boolean(value) => {
@@ -619,10 +571,10 @@ impl DisplayWithGraph for Value {
                 let mut first = true;
                 for element in value {
                     if first {
-                        write!(f, "{}", element.display_with(graph))?;
+                        write!(f, "{}", element)?;
                         first = false;
                     } else {
-                        write!(f, ", {}", element.display_with(graph))?;
+                        write!(f, ", {}", element)?;
                     }
                 }
                 write!(f, "]")
@@ -632,23 +584,27 @@ impl DisplayWithGraph for Value {
                 let mut first = true;
                 for element in value {
                     if first {
-                        write!(f, "{}", element.display_with(graph))?;
+                        write!(f, "{}", element)?;
                         first = false;
                     } else {
-                        write!(f, ", {}", element.display_with(graph))?;
+                        write!(f, ", {}", element)?;
                     }
                 }
                 write!(f, "}}")
             }
-            Value::SyntaxNode(node) => node.fmt(f, graph),
-            Value::GraphNode(node) => node.fmt(f, graph),
+            Value::SyntaxNode(node) => node.fmt(f),
+            Value::GraphNode(node) => node.fmt(f),
         }
     }
 }
 
 /// A reference to a syntax node in a graph
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct SyntaxNodeRef(SyntaxNodeID);
+pub struct SyntaxNodeRef {
+    index: SyntaxNodeID,
+    kind: &'static str,
+    position: tree_sitter::Point,
+}
 
 impl From<SyntaxNodeRef> for Value {
     fn from(value: SyntaxNodeRef) -> Value {
@@ -656,20 +612,16 @@ impl From<SyntaxNodeRef> for Value {
     }
 }
 
-impl DisplayWithGraph for SyntaxNodeRef {
-    fn fmt(&self, f: &mut fmt::Formatter, graph: &Graph) -> fmt::Result {
-        let node = graph[*self];
-        write!(f, "{}", format_node(&node))
+impl std::fmt::Display for SyntaxNodeRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "[syntax node {} ({}, {})]",
+            self.kind,
+            self.position.row + 1,
+            self.position.column + 1,
+        )
     }
-}
-
-pub fn format_node(node: &Node) -> String {
-    format!(
-        "[syntax node {} ({}, {})]",
-        node.kind(),
-        node.start_position().row + 1,
-        node.start_position().column + 1
-    )
 }
 
 /// A reference to a graph node
@@ -682,28 +634,8 @@ impl From<GraphNodeRef> for Value {
     }
 }
 
-impl DisplayWithGraph for GraphNodeRef {
-    fn fmt(&self, f: &mut fmt::Formatter, _graph: &Graph) -> fmt::Result {
+impl std::fmt::Display for GraphNodeRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "[graph node {}]", self.0)
-    }
-}
-
-/// Trait to Display with a given Context
-pub trait DisplayWithGraph
-where
-    Self: Sized,
-{
-    fn fmt<'tree>(&self, f: &mut fmt::Formatter, graph: &Graph<'tree>) -> fmt::Result;
-
-    fn display_with<'a, 'tree>(&'a self, graph: &'a Graph<'tree>) -> Box<dyn fmt::Display + 'a> {
-        struct Impl<'a, 'tree, T: DisplayWithGraph>(&'a T, &'a Graph<'tree>);
-
-        impl<'a, 'tree, T: DisplayWithGraph> fmt::Display for Impl<'a, 'tree, T> {
-            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                self.0.fmt(f, self.1)
-            }
-        }
-
-        Box::new(Impl(self, graph))
     }
 }
