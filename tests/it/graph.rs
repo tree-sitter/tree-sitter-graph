@@ -24,6 +24,31 @@ fn can_overwrite_attributes() {
 }
 
 #[test]
+fn can_iterate_graph_nodes() {
+    let mut graph = Graph::new();
+    let node0 = graph.add_graph_node();
+    let node1 = graph.add_graph_node();
+    let node2 = graph.add_graph_node();
+    let nodes = graph.iter_nodes().collect::<Vec<_>>();
+    assert_eq!(nodes, vec![node0, node1, node2]);
+}
+
+#[test]
+fn can_iterate_graph_edges() {
+    let mut graph = Graph::new();
+    let node0 = graph.add_graph_node();
+    let node1 = graph.add_graph_node();
+    let node2 = graph.add_graph_node();
+    let _ = graph[node0].add_edge(node1);
+    let _ = graph[node0].add_edge(node2);
+    let edges = graph[node0]
+        .iter_edges()
+        .map(|(node, _)| node)
+        .collect::<Vec<_>>();
+    assert_eq!(edges, vec![node1, node2]);
+}
+
+#[test]
 fn can_display_graph() {
     let python_source = "pass";
     let mut parser = Parser::new();
