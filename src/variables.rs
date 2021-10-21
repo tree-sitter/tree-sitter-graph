@@ -111,7 +111,7 @@ impl<V> Variables<V> for VariableMap<'_, V> {
 
     fn get(&self, name: &Identifier) -> Option<&V> {
         self.values
-            .get(&name)
+            .get(name)
             .map(|v| &v.value)
             .or_else(|| self.parent.as_ref().map(|p| p.get(name)).flatten())
     }

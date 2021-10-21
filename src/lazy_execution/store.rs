@@ -134,7 +134,7 @@ impl LazyScopedVariables {
         name: &Identifier,
         exec: &mut EvaluationContext,
     ) -> Result<LazyValue, ExecutionError> {
-        let values = match self.variables.get(&name) {
+        let values = match self.variables.get(name) {
             Some(v) => v,
             None => {
                 return Err(ExecutionError::UndefinedScopedVariable(format!(

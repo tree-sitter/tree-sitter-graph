@@ -19,7 +19,7 @@ fn can_overwrite_attributes() {
     let name = Identifier::from("name");
     attrs.add(name.clone(), "node0").unwrap();
     attrs.add(name.clone(), "overwritten").unwrap_err();
-    assert_eq!(*attrs.get(name).unwrap(), Value::from("overwritten"));
+    assert_eq!(*attrs.get(&name).unwrap(), Value::from("overwritten"));
 }
 
 #[test]

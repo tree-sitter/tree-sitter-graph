@@ -7,10 +7,12 @@
 
 //! Defines data types for the graphs produced by the graph DSL
 
+use std::borrow::Borrow;
 use std::collections::hash_map::Entry;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::fmt;
+use std::hash::Hash;
 use std::ops::Index;
 use std::ops::IndexMut;
 
@@ -279,8 +281,12 @@ impl Attributes {
     }
 
     /// Returns the value of a particular attribute, if it exists.
-    pub fn get(&self, name: Identifier) -> Option<&Value> {
-        self.values.get(&name)
+    pub fn get<Q>(&self, name: &Q) -> Option<&Value>
+    where
+        Q: ?Sized + Eq + Hash,
+        Identifier: Borrow<Q>,
+    {
+        self.values.get(name.borrow())
     }
 }
 
@@ -289,7 +295,7 @@ impl std::fmt::Display for Attributes {
         let mut keys = self.values.keys().collect::<Vec<_>>();
         keys.sort_by(|a, b| a.cmp(b));
         for key in &keys {
-            let value = &self.values[key];
+            let value = &self.values[*key];
             write!(f, "  {}: {}\n", key, value)?;
         }
         Ok(())

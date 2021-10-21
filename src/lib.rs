@@ -42,6 +42,8 @@ pub use execution::Globals as Variables;
 pub use parser::Location;
 pub use parser::ParseError;
 
+use std::borrow::Borrow;
+use std::hash::Hash;
 use std::ops::Deref;
 use std::rc::Rc;
 
@@ -49,7 +51,7 @@ use serde::Serialize;
 use serde::Serializer;
 
 /// An identifier that appears in a graph DSL file or in the graph that is produced as an output.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Identifier(Rc<String>);
 
 impl Identifier {
@@ -60,6 +62,12 @@ impl Identifier {
     pub fn into_string(mut self) -> String {
         Rc::make_mut(&mut self.0);
         Rc::try_unwrap(self.0).unwrap()
+    }
+}
+
+impl Borrow<str> for Identifier {
+    fn borrow(&self) -> &str {
+        self.as_str()
     }
 }
 
@@ -79,6 +87,12 @@ impl std::fmt::Display for Identifier {
 impl From<&str> for Identifier {
     fn from(value: &str) -> Identifier {
         Identifier(Rc::new(String::from(value)))
+    }
+}
+
+impl Hash for Identifier {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
     }
 }
 
