@@ -13,8 +13,6 @@ use tree_sitter::CaptureQuantifier;
 use tree_sitter::Language;
 use tree_sitter::Query;
 
-use crate::Context;
-use crate::DisplayWithContext;
 use crate::Identifier;
 use crate::Location;
 
@@ -73,20 +71,20 @@ pub enum Statement {
     ForIn(ForIn),
 }
 
-impl DisplayWithContext for Statement {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+impl std::fmt::Display for Statement {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Statement::DeclareImmutable(stmt) => stmt.fmt(f, ctx),
-            Statement::DeclareMutable(stmt) => stmt.fmt(f, ctx),
-            Statement::Assign(stmt) => stmt.fmt(f, ctx),
-            Statement::CreateGraphNode(stmt) => stmt.fmt(f, ctx),
-            Statement::AddGraphNodeAttribute(stmt) => stmt.fmt(f, ctx),
-            Statement::CreateEdge(stmt) => stmt.fmt(f, ctx),
-            Statement::AddEdgeAttribute(stmt) => stmt.fmt(f, ctx),
-            Statement::Scan(stmt) => stmt.fmt(f, ctx),
-            Statement::Print(stmt) => stmt.fmt(f, ctx),
-            Statement::If(stmt) => stmt.fmt(f, ctx),
-            Statement::ForIn(stmt) => stmt.fmt(f, ctx),
+            Self::DeclareImmutable(stmt) => stmt.fmt(f),
+            Self::DeclareMutable(stmt) => stmt.fmt(f),
+            Self::Assign(stmt) => stmt.fmt(f),
+            Self::CreateGraphNode(stmt) => stmt.fmt(f),
+            Self::AddGraphNodeAttribute(stmt) => stmt.fmt(f),
+            Self::CreateEdge(stmt) => stmt.fmt(f),
+            Self::AddEdgeAttribute(stmt) => stmt.fmt(f),
+            Self::Scan(stmt) => stmt.fmt(f),
+            Self::Print(stmt) => stmt.fmt(f),
+            Self::If(stmt) => stmt.fmt(f),
+            Self::ForIn(stmt) => stmt.fmt(f),
         }
     }
 }
@@ -106,16 +104,11 @@ impl From<AddEdgeAttribute> for Statement {
     }
 }
 
-impl DisplayWithContext for AddEdgeAttribute {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
-        write!(
-            f,
-            "attr ({} -> {})",
-            self.source.display_with(ctx),
-            self.sink.display_with(ctx),
-        )?;
+impl std::fmt::Display for AddEdgeAttribute {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "attr ({} -> {})", self.source, self.sink)?;
         for attr in &self.attributes {
-            write!(f, " {}", attr.display_with(ctx))?;
+            write!(f, " {}", attr)?;
         }
         write!(f, " at {}", self.location)
     }
@@ -135,11 +128,11 @@ impl From<AddGraphNodeAttribute> for Statement {
     }
 }
 
-impl DisplayWithContext for AddGraphNodeAttribute {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
-        write!(f, "attr ({})", self.node.display_with(ctx),)?;
+impl std::fmt::Display for AddGraphNodeAttribute {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "attr ({})", self.node)?;
         for attr in &self.attributes {
-            write!(f, " {}", attr.display_with(ctx),)?;
+            write!(f, " {}", attr)?;
         }
         write!(f, " at {}", self.location)
     }
@@ -159,14 +152,12 @@ impl From<Assign> for Statement {
     }
 }
 
-impl DisplayWithContext for Assign {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+impl std::fmt::Display for Assign {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
             "set {} = {} at {}",
-            self.variable.display_with(ctx),
-            self.value.display_with(ctx),
-            self.location,
+            self.variable, self.value, self.location,
         )
     }
 }
@@ -178,14 +169,9 @@ pub struct Attribute {
     pub value: Expression,
 }
 
-impl DisplayWithContext for Attribute {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
-        write!(
-            f,
-            "{} = {}",
-            self.name.display_with(ctx),
-            self.value.display_with(ctx),
-        )
+impl std::fmt::Display for Attribute {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{} = {}", self.name, self.value)
     }
 }
 
@@ -203,14 +189,12 @@ impl From<CreateEdge> for Statement {
     }
 }
 
-impl DisplayWithContext for CreateEdge {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+impl std::fmt::Display for CreateEdge {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
             "edge {} -> {} at {}",
-            self.source.display_with(ctx),
-            self.sink.display_with(ctx),
-            self.location,
+            self.source, self.sink, self.location,
         )
     }
 }
@@ -228,14 +212,9 @@ impl From<CreateGraphNode> for Statement {
     }
 }
 
-impl DisplayWithContext for CreateGraphNode {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
-        write!(
-            f,
-            "node {} at {}",
-            self.node.display_with(ctx),
-            self.location
-        )
+impl std::fmt::Display for CreateGraphNode {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "node {} at {}", self.node, self.location)
     }
 }
 
@@ -253,14 +232,12 @@ impl From<DeclareImmutable> for Statement {
     }
 }
 
-impl DisplayWithContext for DeclareImmutable {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+impl std::fmt::Display for DeclareImmutable {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
             "let {} = {} at {}",
-            self.variable.display_with(ctx),
-            self.value.display_with(ctx),
-            self.location,
+            self.variable, self.value, self.location,
         )
     }
 }
@@ -279,14 +256,12 @@ impl From<DeclareMutable> for Statement {
     }
 }
 
-impl DisplayWithContext for DeclareMutable {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+impl std::fmt::Display for DeclareMutable {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
             "var {} = {} at {}",
-            self.variable.display_with(ctx),
-            self.value.display_with(ctx),
-            self.location,
+            self.variable, self.value, self.location,
         )
     }
 }
@@ -304,11 +279,11 @@ impl From<Print> for Statement {
     }
 }
 
-impl DisplayWithContext for Print {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+impl std::fmt::Display for Print {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "print")?;
         for val in &self.values {
-            write!(f, " {},", val.display_with(ctx),)?;
+            write!(f, " {},", val)?;
         }
         write!(f, " at {}", self.location)
     }
@@ -328,14 +303,9 @@ impl From<Scan> for Statement {
     }
 }
 
-impl DisplayWithContext for Scan {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
-        write!(
-            f,
-            "scan {} {{ ... }} at {}",
-            self.value.display_with(ctx),
-            self.location
-        )
+impl std::fmt::Display for Scan {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "scan {} {{ ... }} at {}", self.value, self.location)
     }
 }
 
@@ -355,8 +325,8 @@ impl PartialEq for ScanArm {
     }
 }
 
-impl DisplayWithContext for ScanArm {
-    fn fmt(&self, f: &mut fmt::Formatter, _ctx: &Context) -> fmt::Result {
+impl std::fmt::Display for ScanArm {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{:?} {{ ... }}", self.regex.as_str())
     }
 }
@@ -374,16 +344,16 @@ impl From<If> for Statement {
     }
 }
 
-impl DisplayWithContext for If {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+impl std::fmt::Display for If {
+    fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
         let mut first = true;
         for arm in &self.arms {
             if first {
                 first = false;
-                write!(f, "if {} {{ ... }}", arm.conditions.display_with(ctx))?;
+                write!(f, "if {} {{ ... }}", DisplayConditions(&arm.conditions))?;
             } else {
                 if !arm.conditions.is_empty() {
-                    write!(f, " elif {} {{ ... }}", arm.conditions.display_with(ctx))?;
+                    write!(f, " elif {} {{ ... }}", DisplayConditions(&arm.conditions))?;
                 } else {
                     write!(f, " else {{ ... }}")?;
                 }
@@ -401,6 +371,8 @@ pub struct IfArm {
     pub location: Location,
 }
 
+struct DisplayConditions<'a>(&'a Vec<Condition>);
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum Condition {
     Some {
@@ -417,32 +389,32 @@ pub enum Condition {
     },
 }
 
-impl DisplayWithContext for Vec<Condition> {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+impl std::fmt::Display for DisplayConditions<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
         let mut first = true;
-        for condition in self.iter() {
+        for condition in self.0.iter() {
             if first {
                 first = false;
-                write!(f, "{}", condition.display_with(ctx))?;
+                write!(f, "{}", condition)?;
             } else {
-                write!(f, ", {}", condition.display_with(ctx))?;
+                write!(f, ", {}", condition)?;
             }
         }
         Ok(())
     }
 }
 
-impl DisplayWithContext for Condition {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+impl std::fmt::Display for Condition {
+    fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
         match self {
             Condition::Some { value, .. } => {
-                write!(f, "some {}", value.display_with(ctx))
+                write!(f, "some {}", value)
             }
             Condition::None { value, .. } => {
-                write!(f, "none {}", value.display_with(ctx))
+                write!(f, "none {}", value)
             }
             Condition::Bool { value, .. } => {
-                write!(f, "{}", value.display_with(ctx))
+                write!(f, "{}", value)
             }
         }
     }
@@ -463,14 +435,12 @@ impl From<ForIn> for Statement {
     }
 }
 
-impl DisplayWithContext for ForIn {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+impl std::fmt::Display for ForIn {
+    fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
             "for {} in {} {{ ... }} at {}",
-            self.variable.display_with(ctx),
-            self.value.display_with(ctx),
-            self.location,
+            self.variable, self.value, self.location,
         )
     }
 }
@@ -482,11 +452,11 @@ pub enum Variable {
     Unscoped(UnscopedVariable),
 }
 
-impl DisplayWithContext for Variable {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+impl std::fmt::Display for Variable {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Variable::Scoped(variable) => variable.fmt(f, ctx),
-            Variable::Unscoped(variable) => variable.fmt(f, ctx),
+            Variable::Scoped(variable) => variable.fmt(f),
+            Variable::Unscoped(variable) => variable.fmt(f),
         }
     }
 }
@@ -505,14 +475,9 @@ impl From<ScopedVariable> for Variable {
     }
 }
 
-impl DisplayWithContext for ScopedVariable {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
-        write!(
-            f,
-            "{}.{}",
-            self.scope.display_with(ctx),
-            self.name.display_with(ctx),
-        )
+impl std::fmt::Display for ScopedVariable {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}.{}", self.scope, self.name)
     }
 }
 
@@ -529,9 +494,9 @@ impl From<UnscopedVariable> for Variable {
     }
 }
 
-impl DisplayWithContext for UnscopedVariable {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
-        write!(f, "{}", self.name.display_with(ctx))
+impl std::fmt::Display for UnscopedVariable {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.name)
     }
 }
 
@@ -558,20 +523,20 @@ pub enum Expression {
     RegexCapture(RegexCapture),
 }
 
-impl DisplayWithContext for Expression {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+impl std::fmt::Display for Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Expression::FalseLiteral => write!(f, "false"),
             Expression::NullLiteral => write!(f, "#null"),
             Expression::TrueLiteral => write!(f, "true"),
-            Expression::IntegerConstant(expr) => expr.fmt(f, ctx),
-            Expression::StringConstant(expr) => expr.fmt(f, ctx),
-            Expression::List(expr) => expr.fmt(f, ctx),
-            Expression::Set(expr) => expr.fmt(f, ctx),
-            Expression::Capture(expr) => expr.fmt(f, ctx),
-            Expression::Variable(expr) => expr.fmt(f, ctx),
-            Expression::Call(expr) => expr.fmt(f, ctx),
-            Expression::RegexCapture(expr) => expr.fmt(f, ctx),
+            Expression::IntegerConstant(expr) => expr.fmt(f),
+            Expression::StringConstant(expr) => expr.fmt(f),
+            Expression::List(expr) => expr.fmt(f),
+            Expression::Set(expr) => expr.fmt(f),
+            Expression::Capture(expr) => expr.fmt(f),
+            Expression::Variable(expr) => expr.fmt(f),
+            Expression::Call(expr) => expr.fmt(f),
+            Expression::RegexCapture(expr) => expr.fmt(f),
         }
     }
 }
@@ -589,11 +554,11 @@ impl From<Call> for Expression {
     }
 }
 
-impl DisplayWithContext for Call {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
-        write!(f, "({}", self.function.display_with(ctx))?;
+impl std::fmt::Display for Call {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "({}", self.function)?;
         for arg in &self.parameters {
-            write!(f, " {}", arg.display_with(ctx))?;
+            write!(f, " {}", arg)?;
         }
         write!(f, ")")
     }
@@ -619,9 +584,9 @@ impl From<Capture> for Expression {
     }
 }
 
-impl DisplayWithContext for Capture {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
-        write!(f, "@{}", self.name.display_with(ctx))
+impl std::fmt::Display for Capture {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "@{}", self.name)
     }
 }
 
@@ -637,8 +602,8 @@ impl From<IntegerConstant> for Expression {
     }
 }
 
-impl DisplayWithContext for IntegerConstant {
-    fn fmt(&self, f: &mut fmt::Formatter, _ctx: &Context) -> fmt::Result {
+impl std::fmt::Display for IntegerConstant {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", self.value)
     }
 }
@@ -655,16 +620,16 @@ impl From<ListComprehension> for Expression {
     }
 }
 
-impl DisplayWithContext for ListComprehension {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+impl std::fmt::Display for ListComprehension {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "[")?;
         let mut first = true;
         for elem in &self.elements {
             if first {
-                write!(f, "{}", elem.display_with(ctx))?;
+                write!(f, "{}", elem)?;
                 first = false;
             } else {
-                write!(f, ", {}", elem.display_with(ctx))?;
+                write!(f, ", {}", elem)?;
             }
         }
         write!(f, "]")
@@ -683,8 +648,8 @@ impl From<RegexCapture> for Expression {
     }
 }
 
-impl DisplayWithContext for RegexCapture {
-    fn fmt(&self, f: &mut fmt::Formatter, _ctx: &Context) -> fmt::Result {
+impl std::fmt::Display for RegexCapture {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "${}", self.match_index)
     }
 }
@@ -701,16 +666,16 @@ impl From<SetComprehension> for Expression {
     }
 }
 
-impl DisplayWithContext for SetComprehension {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+impl std::fmt::Display for SetComprehension {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{{")?;
         let mut first = true;
         for elem in &self.elements {
             if first {
-                write!(f, "{}", elem.display_with(ctx))?;
+                write!(f, "{}", elem)?;
                 first = false;
             } else {
-                write!(f, ", {}", elem.display_with(ctx))?;
+                write!(f, ", {}", elem)?;
             }
         }
         write!(f, "}}")
@@ -729,8 +694,8 @@ impl From<StringConstant> for Expression {
     }
 }
 
-impl DisplayWithContext for StringConstant {
-    fn fmt(&self, f: &mut fmt::Formatter, _ctx: &Context) -> fmt::Result {
+impl std::fmt::Display for StringConstant {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{:?}", self.value)
     }
 }

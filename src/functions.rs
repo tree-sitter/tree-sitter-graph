@@ -12,8 +12,6 @@ use std::collections::HashMap;
 use crate::execution::ExecutionError;
 use crate::graph::Graph;
 use crate::graph::Value;
-use crate::Context;
-use crate::DisplayWithContext;
 use crate::Identifier;
 
 /// The implementation of a function that can be called from the graph DSL.
@@ -98,41 +96,38 @@ impl Functions {
 
     /// Returns the standard library of functions, as defined in the [language
     /// reference][`crate::reference::functions`].
-    pub fn stdlib(ctx: &mut Context) -> Functions {
+    pub fn stdlib() -> Functions {
         let mut functions = Functions::new();
         // general functions
-        functions.add(ctx.add_identifier("is-null"), stdlib::IsNull);
+        functions.add(Identifier::from("is-null"), stdlib::IsNull);
         // tree functions
         functions.add(
-            ctx.add_identifier("named-child-index"),
+            Identifier::from("named-child-index"),
             stdlib::syntax::NamedChildIndex,
         );
+        functions.add(Identifier::from("source-text"), stdlib::syntax::SourceText);
+        functions.add(Identifier::from("start-row"), stdlib::syntax::StartRow);
         functions.add(
-            ctx.add_identifier("source-text"),
-            stdlib::syntax::SourceText,
-        );
-        functions.add(ctx.add_identifier("start-row"), stdlib::syntax::StartRow);
-        functions.add(
-            ctx.add_identifier("start-column"),
+            Identifier::from("start-column"),
             stdlib::syntax::StartColumn,
         );
-        functions.add(ctx.add_identifier("end-row"), stdlib::syntax::EndRow);
-        functions.add(ctx.add_identifier("end-column"), stdlib::syntax::EndColumn);
-        functions.add(ctx.add_identifier("node-type"), stdlib::syntax::NodeType);
+        functions.add(Identifier::from("end-row"), stdlib::syntax::EndRow);
+        functions.add(Identifier::from("end-column"), stdlib::syntax::EndColumn);
+        functions.add(Identifier::from("node-type"), stdlib::syntax::NodeType);
         functions.add(
-            ctx.add_identifier("named-child-count"),
+            Identifier::from("named-child-count"),
             stdlib::syntax::NamedChildCount,
         );
         // graph functions
-        functions.add(ctx.add_identifier("node"), stdlib::graph::Node);
+        functions.add(Identifier::from("node"), stdlib::graph::Node);
         // boolean functions
-        functions.add(ctx.add_identifier("not"), stdlib::bool::Not);
-        functions.add(ctx.add_identifier("and"), stdlib::bool::And);
-        functions.add(ctx.add_identifier("or"), stdlib::bool::Or);
+        functions.add(Identifier::from("not"), stdlib::bool::Not);
+        functions.add(Identifier::from("and"), stdlib::bool::And);
+        functions.add(Identifier::from("or"), stdlib::bool::Or);
         // math functions
-        functions.add(ctx.add_identifier("plus"), stdlib::math::Plus);
+        functions.add(Identifier::from("plus"), stdlib::math::Plus);
         // string functions
-        functions.add(ctx.add_identifier("replace"), stdlib::string::Replace);
+        functions.add(Identifier::from("replace"), stdlib::string::Replace);
         functions
     }
 
@@ -147,19 +142,15 @@ impl Functions {
     /// Calls a named function, returning an error if there is no function with that name.
     pub fn call(
         &mut self,
-        ctx: &Context,
-        name: Identifier,
+        name: &Identifier,
         graph: &mut Graph,
         source: &str,
         parameters: &mut dyn Parameters,
     ) -> Result<Value, ExecutionError> {
         let function = self
             .functions
-            .get_mut(&name)
-            .ok_or(ExecutionError::UndefinedFunction(format!(
-                "{}",
-                name.display_with(ctx)
-            )))?;
+            .get_mut(name)
+            .ok_or(ExecutionError::UndefinedFunction(format!("{}", name)))?;
         function.call(graph, source, parameters)
     }
 }

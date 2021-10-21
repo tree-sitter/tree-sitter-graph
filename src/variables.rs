@@ -16,11 +16,11 @@ use crate::Identifier;
 #[derive(Debug, Error)]
 pub enum VariableError {
     #[error("Cannot assign immutable variable")]
-    CannotAssignImmutableVariable(Identifier),
+    CannotAssignImmutableVariable(String),
     #[error("Variable already defined")]
-    VariableAlreadyDefined(Identifier),
+    VariableAlreadyDefined(String),
     #[error("Undefined variable")]
-    UndefinedVariable(Identifier),
+    UndefinedVariable(String),
 }
 
 /// An environment of named variables
@@ -82,24 +82,28 @@ impl<V> Variables<V> for VariableMap<'_, V> {
                 v.insert(variable);
                 Ok(())
             }
-            Occupied(_) => Err(VariableError::VariableAlreadyDefined(name)),
+            Occupied(o) => Err(VariableError::VariableAlreadyDefined(o.key().to_string())),
         }
     }
 
     fn set(&mut self, name: Identifier, value: V) -> Result<(), VariableError> {
         match self.values.entry(name) {
-            Vacant(_) => self
+            Vacant(v) => self
                 .parent
                 .as_mut()
-                .map(|parent| parent.set(name, value))
-                .unwrap_or(Err(VariableError::UndefinedVariable(name))),
+                .map(|parent| parent.set(v.key().clone(), value))
+                .unwrap_or(Err(VariableError::UndefinedVariable(
+                    v.into_key().to_string(),
+                ))),
             Occupied(mut o) => {
                 let mut variable = o.get_mut();
                 if variable.mutable {
                     variable.value = value;
                     Ok(())
                 } else {
-                    Err(VariableError::CannotAssignImmutableVariable(name))
+                    Err(VariableError::CannotAssignImmutableVariable(
+                        o.key().to_string(),
+                    ))
                 }
             }
         }

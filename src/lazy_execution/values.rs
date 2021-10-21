@@ -13,16 +13,12 @@ use std::convert::From;
 use std::fmt;
 
 use crate::execution::ExecutionError;
-use crate::graph::Graph;
 use crate::graph::GraphNodeRef;
 use crate::graph::SyntaxNodeRef;
 use crate::graph::Value;
-use crate::Context;
-use crate::DisplayWithContext;
 use crate::Identifier;
 
 use super::store::*;
-use super::DisplayWithContextAndGraph;
 use super::EvaluationContext;
 
 /// Lazy values
@@ -122,7 +118,7 @@ impl From<LazyCall> for LazyValue {
 
 impl LazyValue {
     pub(super) fn evaluate(&self, exec: &mut EvaluationContext) -> Result<Value, ExecutionError> {
-        trace!("eval {} {{", self.display_with(exec.ctx, exec.graph));
+        trace!("eval {} {{", self);
         let ret = match self {
             Self::Value(value) => Ok(value.clone()),
             Self::List(expr) => expr.evaluate(exec),
@@ -158,20 +154,15 @@ impl LazyValue {
     }
 }
 
-impl DisplayWithContextAndGraph for LazyValue {
-    fn fmt<'tree>(
-        &self,
-        f: &mut fmt::Formatter,
-        ctx: &Context,
-        graph: &Graph<'tree>,
-    ) -> fmt::Result {
+impl fmt::Display for LazyValue {
+    fn fmt<'tree>(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Value(value) => write!(f, "{}", value),
-            Self::List(expr) => expr.fmt(f, ctx, graph),
-            Self::Set(expr) => expr.fmt(f, ctx, graph),
-            Self::Variable(expr) => expr.fmt(f, ctx, graph),
-            Self::ScopedVariable(expr) => expr.fmt(f, ctx, graph),
-            Self::Call(expr) => expr.fmt(f, ctx, graph),
+            Self::List(expr) => expr.fmt(f),
+            Self::Set(expr) => expr.fmt(f),
+            Self::Variable(expr) => expr.fmt(f),
+            Self::ScopedVariable(expr) => expr.fmt(f),
+            Self::Call(expr) => expr.fmt(f),
         }
     }
 }
@@ -194,7 +185,7 @@ impl LazyScopedVariable {
     fn resolve<'a>(&self, exec: &'a mut EvaluationContext) -> Result<LazyValue, ExecutionError> {
         let scope = self.scope.as_ref().evaluate_as_syntax_node(exec)?;
         let scoped_store = &exec.scoped_store;
-        scoped_store.evaluate(scope, self.name, exec)
+        scoped_store.evaluate(&scope, &self.name, exec)
     }
 
     pub(super) fn evaluate(&self, exec: &mut EvaluationContext) -> Result<Value, ExecutionError> {
@@ -203,14 +194,9 @@ impl LazyScopedVariable {
     }
 }
 
-impl DisplayWithContextAndGraph for LazyScopedVariable {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context, graph: &Graph) -> fmt::Result {
-        write!(
-            f,
-            "(scoped {} '{})",
-            self.scope.display_with(ctx, graph),
-            self.name.display_with(ctx),
-        )
+impl fmt::Display for LazyScopedVariable {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "(scoped {} '{})", self.scope, self.name,)
     }
 }
 
@@ -235,16 +221,16 @@ impl LazyList {
     }
 }
 
-impl DisplayWithContextAndGraph for LazyList {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context, graph: &Graph) -> fmt::Result {
+impl fmt::Display for LazyList {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "(list")?;
         let mut first = true;
         for elem in &self.elements {
             if first {
                 first = false;
-                write!(f, "{}", elem.display_with(ctx, graph))?;
+                write!(f, "{}", elem)?;
             } else {
-                write!(f, " {}", elem.display_with(ctx, graph))?;
+                write!(f, " {}", elem)?;
             }
         }
         write!(f, ")")
@@ -272,16 +258,16 @@ impl LazySet {
     }
 }
 
-impl DisplayWithContextAndGraph for LazySet {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context, graph: &Graph) -> fmt::Result {
+impl fmt::Display for LazySet {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "(set")?;
         let mut first = true;
         for elem in &self.elements {
             if first {
                 first = false;
-                write!(f, "{}", elem.display_with(ctx, graph))?;
+                write!(f, "{}", elem)?;
             } else {
-                write!(f, " {}", elem.display_with(ctx, graph))?;
+                write!(f, " {}", elem)?;
             }
         }
         write!(f, ")")
@@ -310,8 +296,7 @@ impl LazyCall {
         }
 
         exec.functions.call(
-            exec.ctx,
-            self.function,
+            &self.function,
             exec.graph,
             exec.source,
             &mut exec
@@ -321,11 +306,11 @@ impl LazyCall {
     }
 }
 
-impl DisplayWithContextAndGraph for LazyCall {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context, graph: &Graph) -> fmt::Result {
-        write!(f, "(call '{}", self.function.display_with(ctx))?;
+impl fmt::Display for LazyCall {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "(call '{}", self.function)?;
         for arg in &self.arguments {
-            write!(f, " {}", arg.display_with(ctx, graph))?;
+            write!(f, " {}", arg)?;
         }
         write!(f, ")")
     }

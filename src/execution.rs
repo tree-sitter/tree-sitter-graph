@@ -47,8 +47,6 @@ use crate::graph::Value;
 pub use crate::variables::Globals;
 use crate::variables::VariableMap;
 use crate::variables::Variables;
-use crate::Context;
-use crate::DisplayWithContext;
 
 impl File {
     /// Executes this graph DSL file against a source file.  You must provide the parsed syntax
@@ -56,14 +54,13 @@ impl File {
     /// provide the set of functions and global variables that are available during execution.
     pub fn execute<'tree>(
         &self,
-        ctx: &Context,
         tree: &'tree Tree,
         source: &'tree str,
         functions: &mut Functions,
         globals: &Globals,
     ) -> Result<Graph<'tree>, ExecutionError> {
         let mut graph = Graph::new();
-        self.execute_into(ctx, &mut graph, tree, source, functions, globals)?;
+        self.execute_into(&mut graph, tree, source, functions, globals)?;
         Ok(graph)
     }
 
@@ -74,7 +71,6 @@ impl File {
     /// “pre-seed” the graph with some predefined nodes and/or edges before executing the DSL file.
     pub fn execute_into<'tree>(
         &self,
-        ctx: &Context,
         graph: &mut Graph<'tree>,
         tree: &'tree Tree,
         source: &'tree str,
@@ -91,7 +87,6 @@ impl File {
         let mut cursor = QueryCursor::new();
         for stanza in &self.stanzas {
             stanza.execute(
-                ctx,
                 tree,
                 source,
                 graph,
@@ -176,7 +171,6 @@ impl ExecutionError {
 }
 
 struct ExecutionContext<'a, 'g, 's, 'tree> {
-    ctx: &'a Context,
     source: &'tree str,
     graph: &'a mut Graph<'tree>,
     functions: &'a mut Functions,
@@ -207,7 +201,6 @@ impl<'a> ScopedVariables<'a> {
 impl Stanza {
     fn execute<'l, 's, 'tree>(
         &self,
-        ctx: &Context,
         tree: &'tree Tree,
         source: &'tree str,
         graph: &mut Graph<'tree>,
@@ -223,7 +216,6 @@ impl Stanza {
         for mat in matches {
             locals.clear();
             let mut exec = ExecutionContext {
-                ctx,
                 source,
                 graph,
                 functions,
@@ -237,7 +229,7 @@ impl Stanza {
             for statement in &self.statements {
                 statement
                     .execute(&mut exec)
-                    .with_context(|| format!("Executing {}", statement.display_with(exec.ctx)))?;
+                    .with_context(|| format!("Executing {}", statement))?;
             }
         }
         Ok(())
@@ -298,13 +290,11 @@ impl AddGraphNodeAttribute {
             let value = attribute.value.evaluate(exec)?;
             exec.graph[node]
                 .attributes
-                .add(attribute.name, value)
+                .add(attribute.name.clone(), value)
                 .map_err(|_| {
                     ExecutionError::DuplicateAttribute(format!(
                         " {} on graph node ({}) in {}",
-                        attribute.name.display_with(exec.ctx),
-                        node,
-                        self.display_with(exec.ctx),
+                        attribute.name, node, self,
                     ))
                 })?;
         }
@@ -316,13 +306,10 @@ impl CreateEdge {
     fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
         let source = self.source.evaluate_as_node(exec)?;
         let sink = self.sink.evaluate_as_node(exec)?;
-        let ctx = exec.ctx;
         if let Err(_) = exec.graph[source].add_edge(sink) {
             Err(ExecutionError::DuplicateEdge(format!(
                 "({} -> {}) in {}",
-                source,
-                sink,
-                self.display_with(ctx)
+                source, sink, self,
             )))?;
         }
         Ok(())
@@ -339,20 +326,17 @@ impl AddEdgeAttribute {
                 Some(edge) => Ok(edge),
                 None => Err(ExecutionError::UndefinedEdge(format!(
                     "({} -> {}) in {}",
-                    source,
-                    sink,
-                    self.display_with(exec.ctx)
+                    source, sink, self,
                 ))),
             }?;
-            edge.attributes.add(attribute.name, value).map_err(|_| {
-                ExecutionError::DuplicateAttribute(format!(
-                    " {} on edge ({} -> {}) in {}",
-                    attribute.name.display_with(exec.ctx),
-                    source,
-                    sink,
-                    self.display_with(exec.ctx),
-                ))
-            })?;
+            edge.attributes
+                .add(attribute.name.clone(), value)
+                .map_err(|_| {
+                    ExecutionError::DuplicateAttribute(format!(
+                        " {} on edge ({} -> {}) in {}",
+                        attribute.name, source, sink, self,
+                    ))
+                })?;
         }
         Ok(())
     }
@@ -399,7 +383,6 @@ impl Scan {
 
             let mut arm_locals = VariableMap::new_child(exec.locals);
             let mut arm_exec = ExecutionContext {
-                ctx: exec.ctx,
                 source: exec.source,
                 graph: exec.graph,
                 functions: exec.functions,
@@ -414,7 +397,7 @@ impl Scan {
             for statement in &arm.statements {
                 statement
                     .execute(&mut arm_exec)
-                    .with_context(|| format!("Executing {}", statement.display_with(arm_exec.ctx)))
+                    .with_context(|| format!("Executing {}", statement))
                     .with_context(|| {
                         format!(
                             "Matching {} with arm \"{}\" {{ ... }}",
@@ -455,7 +438,6 @@ impl If {
             if result {
                 let mut arm_locals = VariableMap::new_child(exec.locals);
                 let mut arm_exec = ExecutionContext {
-                    ctx: exec.ctx,
                     source: exec.source,
                     graph: exec.graph,
                     functions: exec.functions,
@@ -493,7 +475,6 @@ impl ForIn {
         for value in values {
             loop_locals.clear();
             let mut loop_exec = ExecutionContext {
-                ctx: exec.ctx,
                 source: exec.source,
                 graph: exec.graph,
                 functions: exec.functions,
@@ -539,8 +520,7 @@ impl Expression {
             Value::GraphNode(node) => Ok(node),
             _ => Err(ExecutionError::ExpectedGraphNode(format!(
                 " {}, got {}",
-                self.display_with(exec.ctx),
-                node
+                self, node,
             ))),
         }
     }
@@ -598,8 +578,7 @@ impl Call {
             exec.function_parameters.push(parameter);
         }
         exec.functions.call(
-            exec.ctx,
-            self.function,
+            &self.function,
             exec.graph,
             exec.source,
             &mut exec
@@ -611,9 +590,10 @@ impl Call {
 
 impl RegexCapture {
     fn evaluate(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
-        let capture = exec.current_regex_captures.get(self.match_index).ok_or(
-            ExecutionError::UndefinedRegexCapture(format!("{}", self.display_with(exec.ctx))),
-        )?;
+        let capture = exec
+            .current_regex_captures
+            .get(self.match_index)
+            .ok_or(ExecutionError::UndefinedRegexCapture(format!("{}", self)))?;
         Ok(Value::String(capture.clone()))
     }
 }
@@ -671,8 +651,7 @@ impl ScopedVariable {
         } else {
             Err(ExecutionError::UndefinedVariable(format!(
                 "{} on node {}",
-                self.display_with(exec.ctx),
-                scope
+                self, scope,
             )))
         }
     }
@@ -694,9 +673,9 @@ impl ScopedVariable {
             }
         };
         let variables = exec.scoped.get(scope);
-        variables.add(self.name, value, mutable).map_err(|_| {
-            ExecutionError::DuplicateVariable(format!(" {}", self.display_with(exec.ctx)))
-        })
+        variables
+            .add(self.name.clone(), value, mutable)
+            .map_err(|_| ExecutionError::DuplicateVariable(format!(" {}", self)))
     }
 
     fn set(&self, exec: &mut ExecutionContext, value: Value) -> Result<(), ExecutionError> {
@@ -711,9 +690,9 @@ impl ScopedVariable {
             }
         };
         let variables = exec.scoped.get(scope);
-        variables.set(self.name, value).map_err(|_| {
-            ExecutionError::DuplicateVariable(format!(" {}", self.display_with(exec.ctx)))
-        })
+        variables
+            .set(self.name.clone(), value)
+            .map_err(|_| ExecutionError::DuplicateVariable(format!(" {}", self)))
     }
 }
 
@@ -724,9 +703,7 @@ impl UnscopedVariable {
         } else {
             exec.locals.get(&self.name)
         }
-        .ok_or_else(|| {
-            ExecutionError::UndefinedVariable(format!("{}", self.display_with(exec.ctx)))
-        })
+        .ok_or_else(|| ExecutionError::UndefinedVariable(format!("{}", self)))
     }
 
     fn add(
@@ -738,29 +715,26 @@ impl UnscopedVariable {
         if exec.globals.get(&self.name).is_some() {
             return Err(ExecutionError::DuplicateVariable(format!(
                 " global {}",
-                self.display_with(exec.ctx)
+                self,
             )));
         }
-        exec.locals.add(self.name, value, mutable).map_err(|_| {
-            ExecutionError::DuplicateVariable(format!(" local {}", self.display_with(exec.ctx)))
-        })
+        exec.locals
+            .add(self.name.clone(), value, mutable)
+            .map_err(|_| ExecutionError::DuplicateVariable(format!(" local {}", self)))
     }
 
     fn set(&self, exec: &mut ExecutionContext, value: Value) -> Result<(), ExecutionError> {
         if exec.globals.get(&self.name).is_some() {
             return Err(ExecutionError::CannotAssignImmutableVariable(format!(
                 " global {}",
-                self.display_with(exec.ctx)
+                self,
             )));
         }
-        exec.locals.set(self.name, value).map_err(|_| {
+        exec.locals.set(self.name.clone(), value).map_err(|_| {
             if exec.locals.get(&self.name).is_some() {
-                ExecutionError::CannotAssignImmutableVariable(format!(
-                    "{}",
-                    self.display_with(exec.ctx)
-                ))
+                ExecutionError::CannotAssignImmutableVariable(format!("{}", self))
             } else {
-                ExecutionError::UndefinedVariable(format!("{}", self.display_with(exec.ctx)))
+                ExecutionError::UndefinedVariable(format!("{}", self))
             }
         })
     }

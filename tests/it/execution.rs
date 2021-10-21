@@ -9,8 +9,8 @@ use indoc::indoc;
 use tree_sitter::Parser;
 use tree_sitter_graph::ast::File;
 use tree_sitter_graph::functions::Functions;
-use tree_sitter_graph::Context;
 use tree_sitter_graph::ExecutionError;
+use tree_sitter_graph::Identifier;
 use tree_sitter_graph::Variables;
 
 fn init_log() {
@@ -27,16 +27,15 @@ fn execute(python_source: &str, dsl_source: &str) -> Result<String, ExecutionErr
     let mut parser = Parser::new();
     parser.set_language(tree_sitter_python::language()).unwrap();
     let tree = parser.parse(python_source, None).unwrap();
-    let mut ctx = Context::new();
-    let file = File::from_str(tree_sitter_python::language(), &mut ctx, dsl_source)
-        .expect("Cannot parse file");
-    let mut functions = Functions::stdlib(&mut ctx);
+    let file =
+        File::from_str(tree_sitter_python::language(), dsl_source).expect("Cannot parse file");
+    let mut functions = Functions::stdlib();
     let mut globals = Variables::new();
     globals
-        .add(ctx.add_identifier("filename"), "test.py".into())
+        .add(Identifier::from("filename"), "test.py".into())
         .map_err(|_| ExecutionError::DuplicateVariable("filename".into()))?;
-    let graph = file.execute(&ctx, &tree, python_source, &mut functions, &mut globals)?;
-    let result = graph.display_with(&ctx).to_string();
+    let graph = file.execute(&tree, python_source, &mut functions, &mut globals)?;
+    let result = graph.pretty_print().to_string();
     Ok(result)
 }
 
