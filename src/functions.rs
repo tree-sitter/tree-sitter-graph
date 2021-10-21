@@ -43,7 +43,7 @@ pub trait Function {
 /// # let param_vec = vec![Value::String("test".to_string()), Value::Integer(42)];
 /// # let mut params = param_vec.into_iter();
 /// let first_param = params.param()?.into_string()?;
-/// let second_param = params.param()?.into_integer()?;
+/// let second_param = params.param()?.as_integer()?;
 /// // etc
 /// params.finish()?;
 /// # Ok(())
@@ -374,7 +374,7 @@ pub mod stdlib {
                 _source: &str,
                 parameters: &mut dyn Parameters,
             ) -> Result<Value, ExecutionError> {
-                let result = !parameters.param()?.into_bool()?;
+                let result = !parameters.param()?.as_boolean()?;
                 parameters.finish()?;
                 Ok(result.into())
             }
@@ -392,7 +392,7 @@ pub mod stdlib {
             ) -> Result<Value, ExecutionError> {
                 let mut result = true;
                 while let Ok(parameter) = parameters.param() {
-                    result &= parameter.into_bool()?;
+                    result &= parameter.as_boolean()?;
                 }
                 Ok(result.into())
             }
@@ -410,7 +410,7 @@ pub mod stdlib {
             ) -> Result<Value, ExecutionError> {
                 let mut result = false;
                 while let Ok(parameter) = parameters.param() {
-                    result |= parameter.into_bool()?;
+                    result |= parameter.as_boolean()?;
                 }
                 Ok(result.into())
             }
@@ -432,7 +432,7 @@ pub mod stdlib {
             ) -> Result<Value, ExecutionError> {
                 let mut result = 0;
                 while let Ok(parameter) = parameters.param() {
-                    result += parameter.into_integer()?;
+                    result += parameter.as_integer()?;
                 }
                 Ok(Value::Integer(result))
             }

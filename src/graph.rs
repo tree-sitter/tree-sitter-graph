@@ -324,21 +324,22 @@ pub enum Value {
 
 impl Value {
     /// Check if this value is null
-    pub fn is_null(self) -> bool {
+    pub fn is_null(&self) -> bool {
         match self {
             Value::Null => true,
             _ => false,
         }
     }
+
     /// Coerces this value into a boolean, returning an error if it's some other type of value.
-    pub fn into_bool(self) -> Result<bool, ExecutionError> {
+    pub fn into_boolean(self) -> Result<bool, ExecutionError> {
         match self {
             Value::Boolean(value) => Ok(value),
             _ => Err(ExecutionError::ExpectedBoolean(format!("got {}", self))),
         }
     }
 
-    pub fn as_bool(&self) -> Result<bool, ExecutionError> {
+    pub fn as_boolean(&self) -> Result<bool, ExecutionError> {
         match self {
             Value::Boolean(value) => Ok(*value),
             _ => Err(ExecutionError::ExpectedBoolean(format!("got {}", self))),
@@ -368,7 +369,7 @@ impl Value {
         }
     }
 
-    pub fn as_string(&self) -> Result<&str, ExecutionError> {
+    pub fn as_str(&self) -> Result<&str, ExecutionError> {
         match self {
             Value::String(value) => Ok(value),
             _ => Err(ExecutionError::ExpectedString(format!("got {}", self))),
@@ -554,6 +555,13 @@ impl std::fmt::Display for SyntaxNodeRef {
 /// A reference to a graph node
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct GraphNodeRef(GraphNodeID);
+
+impl GraphNodeRef {
+    /// Returns the index of the graph node that this reference refers to.
+    pub fn index(self) -> usize {
+        self.0 as usize
+    }
+}
 
 impl From<GraphNodeRef> for Value {
     fn from(value: GraphNodeRef) -> Value {

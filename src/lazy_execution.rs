@@ -403,7 +403,7 @@ impl ast::Condition {
         match self {
             Self::Some { value, .. } => Ok(!value.evaluate_eager(exec)?.is_null()),
             Self::None { value, .. } => Ok(value.evaluate_eager(exec)?.is_null()),
-            Self::Bool { value, .. } => Ok(value.evaluate_eager(exec)?.into_bool()?),
+            Self::Bool { value, .. } => Ok(value.evaluate_eager(exec)?.into_boolean()?),
         }
     }
 }

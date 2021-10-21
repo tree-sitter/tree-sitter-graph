@@ -41,7 +41,6 @@ use crate::ast::UnscopedVariable;
 use crate::ast::Variable;
 use crate::functions::Functions;
 use crate::graph::Graph;
-use crate::graph::GraphNodeRef;
 use crate::graph::SyntaxNodeRef;
 use crate::graph::Value;
 pub use crate::variables::Globals;
@@ -285,7 +284,7 @@ impl CreateGraphNode {
 
 impl AddGraphNodeAttribute {
     fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
-        let node = self.node.evaluate_as_node(exec)?;
+        let node = self.node.evaluate(exec)?.into_graph_node_ref()?;
         for attribute in &self.attributes {
             let value = attribute.value.evaluate(exec)?;
             exec.graph[node]
@@ -304,8 +303,8 @@ impl AddGraphNodeAttribute {
 
 impl CreateEdge {
     fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
-        let source = self.source.evaluate_as_node(exec)?;
-        let sink = self.sink.evaluate_as_node(exec)?;
+        let source = self.source.evaluate(exec)?.into_graph_node_ref()?;
+        let sink = self.sink.evaluate(exec)?.into_graph_node_ref()?;
         if let Err(_) = exec.graph[source].add_edge(sink) {
             Err(ExecutionError::DuplicateEdge(format!(
                 "({} -> {}) in {}",
@@ -318,8 +317,8 @@ impl CreateEdge {
 
 impl AddEdgeAttribute {
     fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
-        let source = self.source.evaluate_as_node(exec)?;
-        let sink = self.sink.evaluate_as_node(exec)?;
+        let source = self.source.evaluate(exec)?.into_graph_node_ref()?;
+        let sink = self.sink.evaluate(exec)?.into_graph_node_ref()?;
         for attribute in &self.attributes {
             let value = attribute.value.evaluate(exec)?;
             let edge = match exec.graph[source].get_edge_mut(sink) {
@@ -463,7 +462,7 @@ impl Condition {
         match self {
             Condition::Some { value, .. } => Ok(!value.evaluate(exec)?.is_null()),
             Condition::None { value, .. } => Ok(value.evaluate(exec)?.is_null()),
-            Condition::Bool { value, .. } => Ok(value.evaluate(exec)?.into_bool()?),
+            Condition::Bool { value, .. } => Ok(value.evaluate(exec)?.into_boolean()?),
         }
     }
 }
@@ -508,20 +507,6 @@ impl Expression {
             Expression::Variable(expr) => expr.evaluate(exec),
             Expression::Call(expr) => expr.evaluate(exec),
             Expression::RegexCapture(expr) => expr.evaluate(exec),
-        }
-    }
-
-    fn evaluate_as_node(
-        &self,
-        exec: &mut ExecutionContext,
-    ) -> Result<GraphNodeRef, ExecutionError> {
-        let node = self.evaluate(exec)?;
-        match node {
-            Value::GraphNode(node) => Ok(node),
-            _ => Err(ExecutionError::ExpectedGraphNode(format!(
-                " {}, got {}",
-                self, node,
-            ))),
         }
     }
 }
