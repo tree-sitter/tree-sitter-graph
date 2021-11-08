@@ -451,6 +451,8 @@ pub enum Expression {
     Set(SetComprehension),
     // Syntax nodes
     Capture(Capture),
+    // Existence of capture
+    CaptureExists(CaptureExists),
     // Variables
     Variable(Variable),
     // Functions
@@ -470,6 +472,7 @@ impl DisplayWithContext for Expression {
             Expression::List(expr) => expr.fmt(f, ctx),
             Expression::Set(expr) => expr.fmt(f, ctx),
             Expression::Capture(expr) => expr.fmt(f, ctx),
+            Expression::CaptureExists(expr) => expr.fmt(f, ctx),
             Expression::Variable(expr) => expr.fmt(f, ctx),
             Expression::Call(expr) => expr.fmt(f, ctx),
             Expression::RegexCapture(expr) => expr.fmt(f, ctx),
@@ -518,6 +521,24 @@ impl From<Capture> for Expression {
 impl DisplayWithContext for Capture {
     fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
         write!(f, "{}", self.name.display_with(ctx))
+    }
+}
+
+/// An expression that checks whether a capture exists
+#[derive(Debug, Eq, PartialEq)]
+pub struct CaptureExists {
+    pub capture: Capture,
+}
+
+impl From<CaptureExists> for Expression {
+    fn from(expr: CaptureExists) -> Expression {
+        Expression::CaptureExists(expr)
+    }
+}
+
+impl DisplayWithContext for CaptureExists {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        write!(f, "?{}", self.capture.display_with(ctx))
     }
 }
 

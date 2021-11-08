@@ -18,6 +18,7 @@ use crate::ast::AddGraphNodeAttribute;
 use crate::ast::Assign;
 use crate::ast::Call;
 use crate::ast::Capture;
+use crate::ast::CaptureExists;
 use crate::ast::CreateEdge;
 use crate::ast::CreateGraphNode;
 use crate::ast::DeclareImmutable;
@@ -473,6 +474,7 @@ impl Expression {
             Expression::List(expr) => expr.evaluate(exec),
             Expression::Set(expr) => expr.evaluate(exec),
             Expression::Capture(expr) => expr.evaluate(exec),
+            Expression::CaptureExists(expr) => expr.evaluate(exec),
             Expression::Variable(expr) => expr.evaluate(exec),
             Expression::Call(expr) => expr.evaluate(exec),
             Expression::RegexCapture(expr) => expr.evaluate(exec),
@@ -541,6 +543,16 @@ impl Capture {
             "{}",
             self.display_with(exec.ctx)
         )))
+    }
+}
+
+impl CaptureExists {
+    fn evaluate(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+        match self.capture.evaluate(exec) {
+            Err(ExecutionError::UndefinedCapture(_)) => Ok(Value::Boolean(false)),
+            Ok(_) => Ok(Value::Boolean(true)),
+            Err(e) => Err(e),
+        }
     }
 }
 

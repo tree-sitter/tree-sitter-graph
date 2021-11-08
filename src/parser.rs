@@ -43,6 +43,8 @@ pub enum ParseError {
     QueryError(#[from] QueryError),
     #[error("Undefined query capture '{0}' at {1}")]
     UndefinedCapture(String, Location),
+    #[error("Expected capture at {0}")]
+    ExpectedCapture(Location),
     #[error("Unexpected character '{0}' in {1} at {2}")]
     UnexpectedCharacter(char, &'static str, Location),
     #[error("Unexpected end of file at {0}")]
@@ -498,6 +500,7 @@ impl Parser<'_> {
             '#' => self.parse_literal()?,
             '"' => self.parse_string()?.into(),
             '@' => self.parse_capture(current_query)?,
+            '?' => self.parse_capture_exists(current_query)?,
             '$' => self.parse_regex_capture()?,
             '(' => self.parse_call(current_query)?,
             ch if ch.is_ascii_digit() => self.parse_integer_constant()?,
@@ -570,6 +573,19 @@ impl Parser<'_> {
         };
         let name = self.ctx.add_identifier(&self.source[start..end]);
         Ok(ast::Capture { index, name }.into())
+    }
+
+    fn parse_capture_exists(
+        &mut self,
+        current_query: &Query,
+    ) -> Result<ast::Expression, ParseError> {
+        let capture_location = self.location;
+        self.consume_token("?")?;
+        self.consume_whitespace();
+        match self.parse_capture(current_query)? {
+            ast::Expression::Capture(capture) => Ok(ast::CaptureExists { capture }.into()),
+            _ => Err(ParseError::ExpectedCapture(capture_location)),
+        }
     }
 
     fn parse_integer_constant(&mut self) -> Result<ast::Expression, ParseError> {
