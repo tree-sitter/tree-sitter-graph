@@ -218,3 +218,31 @@ fn can_use_if_statements() {
         "#},
     );
 }
+
+#[test]
+fn can_check_existence_of_capture() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module (expression_statement)? @expr) @root
+          {
+            node node0
+            attr (node0) has_root = ?@root
+            attr (node0) has_expr = ? @expr
+            if (not ?@expr) {
+              attr (node0) no_expr = "true"
+            }
+            if (or ?@root ?@expr) {
+              attr (node0) has_root_or_expr = "true"
+            }
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            has_root: #true
+            has_expr: #false
+            no_expr: "true"
+            has_root_or_expr: "true"
+        "#},
+    );
+}
