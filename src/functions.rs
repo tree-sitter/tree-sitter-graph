@@ -115,6 +115,9 @@ impl Functions {
             ctx.add_identifier("named-child-count"),
             stdlib::NamedChildCount,
         );
+        functions.add(ctx.add_identifier("and"), stdlib::And);
+        functions.add(ctx.add_identifier("or"), stdlib::Or);
+        functions.add(ctx.add_identifier("not"), stdlib::Not);
         functions
     }
 
@@ -357,6 +360,61 @@ pub mod stdlib {
             let node = parameters.param()?.into_syntax_node(graph)?;
             parameters.finish()?;
             Ok(Value::Integer(node.named_child_count() as u32))
+        }
+    }
+
+    // The implementation of the standard [`and`][`crate::reference::functions#and`] function.
+
+    pub struct And;
+
+    impl Function for And {
+        fn call(
+            &mut self,
+            graph: &mut Graph,
+            _source: &str,
+            parameters: &mut dyn Parameters,
+        ) -> Result<Value, ExecutionError> {
+            let mut result = true;
+            while let Ok(parameter) = parameters.param() {
+                result &= parameter.into_boolean(graph)?;
+            }
+            Ok(Value::Boolean(result))
+        }
+    }
+
+    // The implementation of the standard [`or`][`crate::reference::functions#or`] function.
+
+    pub struct Or;
+
+    impl Function for Or {
+        fn call(
+            &mut self,
+            graph: &mut Graph,
+            _source: &str,
+            parameters: &mut dyn Parameters,
+        ) -> Result<Value, ExecutionError> {
+            let mut result = false;
+            while let Ok(parameter) = parameters.param() {
+                result |= parameter.into_boolean(graph)?;
+            }
+            Ok(Value::Boolean(result))
+        }
+    }
+
+    // The implementation of the standard [`not`][`crate::reference::functions#not`] function.
+
+    pub struct Not;
+
+    impl Function for Not {
+        fn call(
+            &mut self,
+            graph: &mut Graph,
+            _source: &str,
+            parameters: &mut dyn Parameters,
+        ) -> Result<Value, ExecutionError> {
+            let parameter = parameters.param()?;
+            parameters.finish()?;
+            Ok(Value::Boolean(!parameter.into_boolean(graph)?))
         }
     }
 }

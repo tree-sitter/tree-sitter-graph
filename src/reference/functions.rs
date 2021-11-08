@@ -124,3 +124,24 @@
 //!     - `node`: A syntax node
 //!   - Output parameter:
 //!     - The zero-based end row of `node`
+//!
+//! ## `and`
+//!
+//! Returns true if and only if all of the input parameters are true.
+//!
+//!   - Input parameters: zero or more expressions evaluating to boolean values
+//!   - Output parameter: the boolean conjunction of all of the input parameters
+//!
+//! ## `or`
+//!
+//! Returns true if and only if at least one of the input parameters is true.
+//!
+//!   - Input parameters: zero or more expressions evaluating to boolean values
+//!   - Output parameter: the boolean disjunction of all of the input parameters
+//!
+//! ## `not`
+//!
+//! Returns the negation of the input parameter.
+//!
+//!   - Input parameters: one expression evaluating to a boolean value
+//!   - Output parameter: the negation of the input parameter
