@@ -530,7 +530,6 @@ impl Capture {
 
 impl Call {
     fn evaluate(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
-        exec.function_parameters.clear();
         for parameter in &self.parameters {
             let parameter = parameter.evaluate(exec)?;
             exec.function_parameters.push(parameter);
@@ -540,7 +539,9 @@ impl Call {
             self.function,
             exec.graph,
             exec.source,
-            &mut exec.function_parameters.drain(..),
+            &mut exec
+                .function_parameters
+                .drain(exec.function_parameters.len() - self.parameters.len()..),
         )
     }
 }
