@@ -59,6 +59,8 @@ pub enum Statement {
     AddEdgeAttribute(AddEdgeAttribute),
     // Regular expression
     Scan(Scan),
+    // Control flow
+    If(If),
     // Debugging
     Print(Print),
 }
@@ -74,6 +76,7 @@ impl DisplayWithContext for Statement {
             Statement::CreateEdge(stmt) => stmt.fmt(f, ctx),
             Statement::AddEdgeAttribute(stmt) => stmt.fmt(f, ctx),
             Statement::Scan(stmt) => stmt.fmt(f, ctx),
+            Statement::If(stmt) => stmt.fmt(f, ctx),
             Statement::Print(stmt) => stmt.fmt(f, ctx),
         }
     }
@@ -346,6 +349,26 @@ impl PartialEq for ScanArm {
 impl DisplayWithContext for ScanArm {
     fn fmt(&self, f: &mut fmt::Formatter, _ctx: &Context) -> fmt::Result {
         write!(f, "{:?} {{ ... }}", self.regex.as_str())
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct If {
+    pub condition: Expression,
+    pub consequence: Vec<Statement>,
+    pub location: Location,
+}
+
+impl From<If> for Statement {
+    fn from(statement: If) -> Statement {
+        Statement::If(statement)
+    }
+}
+
+impl DisplayWithContext for If {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        write!(f, "if {} {{ ... }}", self.condition.display_with(ctx),)?;
+        Ok(())
     }
 }
 

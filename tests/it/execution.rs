@@ -194,3 +194,27 @@ fn can_nest_function_calls() {
         "#},
     );
 }
+
+#[test]
+fn can_use_if_statements() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node node0
+            let t = #true
+            if t {
+              attr (node0) tval = "true"
+            }
+            if #false {
+              attr (node0) fval = "false"
+            }
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            tval: "true"
+        "#},
+    );
+}

@@ -277,6 +277,17 @@ impl Value {
         }
     }
 
+    /// Coerces this value into a boolean, returning an error if it's some other type of value.
+    pub fn into_boolean(self, graph: &Graph) -> Result<bool, ExecutionError> {
+        match self {
+            Value::Boolean(value) => Ok(value),
+            _ => Err(ExecutionError::ExpectedBoolean(format!(
+                "got {}",
+                self.display_with(graph)
+            ))),
+        }
+    }
+
     /// Coerces this value into a syntax node reference, returning an error if it's some other type
     /// of value.
     pub fn into_syntax_node<'a, 'tree>(

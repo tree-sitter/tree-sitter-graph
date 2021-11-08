@@ -24,6 +24,7 @@ use crate::ast::DeclareImmutable;
 use crate::ast::DeclareMutable;
 use crate::ast::Expression;
 use crate::ast::File;
+use crate::ast::If;
 use crate::ast::IntegerConstant;
 use crate::ast::ListComprehension;
 use crate::ast::Print;
@@ -100,6 +101,8 @@ pub enum ExecutionError {
     ExpectedInteger(String),
     #[error("Expected a string {0}")]
     ExpectedString(String),
+    #[error("Expected a boolean {0}")]
+    ExpectedBoolean(String),
     #[error("Expected a syntax node {0}")]
     ExpectedSyntaxNode(String),
     #[error("Invalid parameters {0}")]
@@ -275,6 +278,7 @@ impl Statement {
             Statement::CreateEdge(statement) => statement.execute(exec),
             Statement::AddEdgeAttribute(statement) => statement.execute(exec),
             Statement::Scan(statement) => statement.execute(exec),
+            Statement::If(statement) => statement.execute(exec),
             Statement::Print(statement) => statement.execute(exec),
         }
     }
@@ -431,6 +435,18 @@ impl Scan {
             i += regex_captures.get(0).unwrap().range().end;
         }
 
+        Ok(())
+    }
+}
+
+impl If {
+    fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        let condition = self.condition.evaluate(exec)?;
+        if condition.into_boolean(exec.graph)? {
+            for statement in &self.consequence {
+                statement.execute(exec)?;
+            }
+        }
         Ok(())
     }
 }

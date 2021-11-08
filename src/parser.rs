@@ -95,6 +95,7 @@ struct Parser<'a> {
     set_keyword: Identifier,
     true_keyword: Identifier,
     var_keyword: Identifier,
+    if_keyword: Identifier,
 }
 
 fn is_ident_start(c: char) -> bool {
@@ -119,6 +120,7 @@ impl<'a> Parser<'a> {
         let set_keyword = ctx.add_identifier("set");
         let true_keyword = ctx.add_identifier("true");
         let var_keyword = ctx.add_identifier("var");
+        let if_keyword = ctx.add_identifier("if");
         Parser {
             ctx,
             source,
@@ -136,6 +138,7 @@ impl<'a> Parser<'a> {
             set_keyword,
             true_keyword,
             var_keyword,
+            if_keyword,
         }
     }
 }
@@ -433,6 +436,16 @@ impl Parser<'_> {
             Ok(ast::Scan {
                 value,
                 arms,
+                location: keyword_location,
+            }
+            .into())
+        } else if keyword == self.if_keyword {
+            let condition = self.parse_expression(current_query)?;
+            self.consume_whitespace();
+            let consequence = self.parse_statements(current_query)?;
+            Ok(ast::If {
+                condition,
+                consequence,
                 location: keyword_location,
             }
             .into())
