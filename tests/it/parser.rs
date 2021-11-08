@@ -241,3 +241,137 @@ fn can_parse_strings() {
         .into()]]
     );
 }
+
+#[test]
+fn can_parse_lists() {
+    let mut ctx = Context::new();
+    let source = r#"
+        (identifier)
+        {
+          let list1 = [1, 2, 3]
+          let list2 = []
+          let list3 = ["hello", "world",]
+        }
+    "#;
+    let mut file = File::new(tree_sitter_python::language());
+    file.parse(&mut ctx, source).expect("Cannot parse file");
+
+    let list1 = ctx.add_identifier("list1");
+    let list2 = ctx.add_identifier("list2");
+    let list3 = ctx.add_identifier("list3");
+
+    let statements = file
+        .stanzas
+        .into_iter()
+        .map(|s| s.statements)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        statements,
+        vec![vec![
+            DeclareImmutable {
+                variable: list1.into(),
+                value: ListComprehension {
+                    elements: vec![
+                        IntegerConstant { value: 1 }.into(),
+                        IntegerConstant { value: 2 }.into(),
+                        IntegerConstant { value: 3 }.into(),
+                    ],
+                }
+                .into(),
+                location: Location { row: 3, column: 10 },
+            }
+            .into(),
+            DeclareImmutable {
+                variable: list2.into(),
+                value: ListComprehension { elements: vec![] }.into(),
+                location: Location { row: 4, column: 10 },
+            }
+            .into(),
+            DeclareImmutable {
+                variable: list3.into(),
+                value: ListComprehension {
+                    elements: vec![
+                        StringConstant {
+                            value: String::from("hello")
+                        }
+                        .into(),
+                        StringConstant {
+                            value: String::from("world")
+                        }
+                        .into(),
+                    ],
+                }
+                .into(),
+                location: Location { row: 5, column: 10 },
+            }
+            .into()
+        ]]
+    );
+}
+
+#[test]
+fn can_parse_sets() {
+    let mut ctx = Context::new();
+    let source = r#"
+        (identifier)
+        {
+          let set1 = {1, 2, 3}
+          let set2 = {}
+          let set3 = {"hello", "world",}
+        }
+    "#;
+    let mut file = File::new(tree_sitter_python::language());
+    file.parse(&mut ctx, source).expect("Cannot parse file");
+
+    let set1 = ctx.add_identifier("set1");
+    let set2 = ctx.add_identifier("set2");
+    let set3 = ctx.add_identifier("set3");
+
+    let statements = file
+        .stanzas
+        .into_iter()
+        .map(|s| s.statements)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        statements,
+        vec![vec![
+            DeclareImmutable {
+                variable: set1.into(),
+                value: SetComprehension {
+                    elements: vec![
+                        IntegerConstant { value: 1 }.into(),
+                        IntegerConstant { value: 2 }.into(),
+                        IntegerConstant { value: 3 }.into(),
+                    ],
+                }
+                .into(),
+                location: Location { row: 3, column: 10 },
+            }
+            .into(),
+            DeclareImmutable {
+                variable: set2.into(),
+                value: SetComprehension { elements: vec![] }.into(),
+                location: Location { row: 4, column: 10 },
+            }
+            .into(),
+            DeclareImmutable {
+                variable: set3.into(),
+                value: SetComprehension {
+                    elements: vec![
+                        StringConstant {
+                            value: String::from("hello")
+                        }
+                        .into(),
+                        StringConstant {
+                            value: String::from("world")
+                        }
+                        .into(),
+                    ],
+                }
+                .into(),
+                location: Location { row: 5, column: 10 },
+            }
+            .into()
+        ]]
+    );
+}

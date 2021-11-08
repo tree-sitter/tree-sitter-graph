@@ -487,6 +487,8 @@ impl Parser<'_> {
             '@' => self.parse_capture(current_query)?,
             '$' => self.parse_regex_capture()?,
             '(' => self.parse_call(current_query)?,
+            '[' => self.parse_list(current_query)?,
+            '{' => self.parse_set(current_query)?,
             ch if ch.is_ascii_digit() => self.parse_integer_constant()?,
             ch if is_ident_start(ch) => self.parse_identifier("variable name")?.into(),
             ch => {
@@ -525,6 +527,39 @@ impl Parser<'_> {
             parameters,
         }
         .into())
+    }
+
+    fn parse_sequence(
+        &mut self,
+        current_query: &Query,
+        end_marker: char,
+    ) -> Result<Vec<ast::Expression>, ParseError> {
+        let mut elements = Vec::new();
+        while self.peek()? != end_marker {
+            elements.push(self.parse_expression(current_query)?);
+            self.consume_whitespace();
+            if self.peek()? != end_marker {
+                self.consume_token(",")?;
+                self.consume_whitespace();
+            }
+        }
+        Ok(elements)
+    }
+
+    fn parse_list(&mut self, current_query: &Query) -> Result<ast::Expression, ParseError> {
+        self.consume_token("[")?;
+        self.consume_whitespace();
+        let elements = self.parse_sequence(current_query, ']')?;
+        self.consume_token("]")?;
+        Ok(ast::ListComprehension { elements }.into())
+    }
+
+    fn parse_set(&mut self, current_query: &Query) -> Result<ast::Expression, ParseError> {
+        self.consume_token("{")?;
+        self.consume_whitespace();
+        let elements = self.parse_sequence(current_query, '}')?;
+        self.consume_token("}")?;
+        Ok(ast::SetComprehension { elements }.into())
     }
 
     fn parse_capture(&mut self, current_query: &Query) -> Result<ast::Expression, ParseError> {
