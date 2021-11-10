@@ -439,9 +439,13 @@ impl Print {
     fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
         for value in &self.values {
             let value = value.evaluate(exec)?;
-            print!("{}", value.display_with(exec.graph));
+            if let Value::String(s) = value {
+                print!("{}", s);
+            } else {
+                print!("{}", value.display_with(exec.graph));
+            }
         }
-        println!("");
+        println!();
         Ok(())
     }
 }
