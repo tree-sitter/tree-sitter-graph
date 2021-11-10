@@ -176,3 +176,21 @@ fn can_match_stanza_multiple_times() {
         "#},
     );
 }
+
+#[test]
+fn can_nest_function_calls() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node node0
+            attr (node0) val = (replace "accacc" (replace "abc" "b" "c") (replace "abc" "a" "b"))
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            val: "bbcbbc"
+        "#},
+    );
+}
