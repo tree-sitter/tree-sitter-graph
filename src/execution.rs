@@ -396,7 +396,9 @@ impl Scan {
             for (index, arm) in self.arms.iter().enumerate() {
                 let captures = arm.regex.captures(&match_string[i..]);
                 if let Some(captures) = captures {
-                    matches.push((captures, index));
+                    if !captures.get(0).unwrap().range().is_empty() {
+                        matches.push((captures, index));
+                    }
                 }
             }
 
