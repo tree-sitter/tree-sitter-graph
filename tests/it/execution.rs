@@ -194,3 +194,23 @@ fn can_nest_function_calls() {
         "#},
     );
 }
+
+#[test]
+fn skips_empty_matches() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            scan "abc" {
+              "|" {
+              }
+            }
+            node n
+          }
+        "#},
+        indoc! {r#"
+          node 0
+        "#},
+    );
+}
