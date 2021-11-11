@@ -392,7 +392,7 @@ impl Parser<'_> {
         } else if keyword == self.print_keyword {
             let mut values = vec![self.parse_expression(current_query)?];
             self.consume_whitespace();
-            while self.peek()? == ',' {
+            while self.try_peek() == Some(',') {
                 self.consume_token(",")?;
                 self.consume_whitespace();
                 values.push(self.parse_expression(current_query)?);
