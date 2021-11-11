@@ -162,11 +162,6 @@ impl Parser<'_> {
         Ok(ch)
     }
 
-    #[allow(dead_code)]
-    fn try_next(&mut self) -> Option<char> {
-        self.next().ok()
-    }
-
     fn skip(&mut self) -> Result<(), ParseError> {
         self.next().map(|_| ())
     }

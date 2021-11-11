@@ -438,14 +438,14 @@ impl Scan {
 impl Print {
     fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
         for value in &self.values {
-            let value = value.evaluate(exec)?;
-            if let Value::String(s) = value {
-                print!("{}", s);
+            if let Expression::StringConstant(expr) = value {
+                eprint!("{}", expr.value);
             } else {
-                print!("{}", value.display_with(exec.graph));
+                let value = value.evaluate(exec)?;
+                eprint!("{}", value.display_with(exec.graph));
             }
         }
-        println!();
+        eprintln!();
         Ok(())
     }
 }
