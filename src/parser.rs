@@ -162,10 +162,6 @@ impl Parser<'_> {
         Ok(ch)
     }
 
-    fn try_next(&mut self) -> Option<char> {
-        self.next().ok()
-    }
-
     fn skip(&mut self) -> Result<(), ParseError> {
         self.next().map(|_| ())
     }
@@ -396,10 +392,13 @@ impl Parser<'_> {
         } else if keyword == self.print_keyword {
             let mut values = vec![self.parse_expression(current_query)?];
             self.consume_whitespace();
-            while self.try_next() == Some(',') {
+            while self.try_peek() == Some(',') {
+                self.consume_token(",")?;
+                self.consume_whitespace();
                 values.push(self.parse_expression(current_query)?);
                 self.consume_whitespace();
             }
+            self.consume_whitespace();
             Ok(ast::Print {
                 values,
                 location: keyword_location,

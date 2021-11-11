@@ -375,3 +375,36 @@ fn can_parse_sets() {
         ]]
     );
 }
+
+#[test]
+fn can_parse_print() {
+    let mut ctx = Context::new();
+    let source = r#"
+        (identifier)
+        {
+          print "x =", 5
+        }    
+    "#;
+    let mut file = File::new(tree_sitter_python::language());
+    file.parse(&mut ctx, source).expect("Cannot parse file");
+
+    let statements = file
+        .stanzas
+        .into_iter()
+        .map(|s| s.statements)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        statements,
+        vec![vec![Print {
+            values: vec![
+                StringConstant {
+                    value: String::from("x =")
+                }
+                .into(),
+                IntegerConstant { value: 5 }.into(),
+            ],
+            location: Location { row: 3, column: 10 },
+        }
+        .into()]]
+    );
+}
