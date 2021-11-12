@@ -10,9 +10,10 @@ use tree_sitter::Parser;
 use tree_sitter_graph::ast::File;
 use tree_sitter_graph::functions::Functions;
 use tree_sitter_graph::Context;
+use tree_sitter_graph::ExecutionError;
 use tree_sitter_graph::Variables;
 
-fn check_execution(python_source: &str, dsl_source: &str, expected_graph: &str) {
+fn execute(python_source: &str, dsl_source: &str) -> Result<String, ExecutionError> {
     let mut parser = Parser::new();
     parser.set_language(tree_sitter_python::language()).unwrap();
     let tree = parser.parse(python_source, None).unwrap();
@@ -21,10 +22,22 @@ fn check_execution(python_source: &str, dsl_source: &str, expected_graph: &str) 
     file.parse(&mut ctx, dsl_source).expect("Cannot parse file");
     let mut functions = Functions::stdlib(&mut ctx);
     let mut globals = Variables::new();
-    let graph = file
-        .execute(&ctx, &tree, python_source, &mut functions, &mut globals)
-        .expect("Could not execute file");
-    assert_eq!(graph.display_with(&ctx).to_string(), expected_graph);
+    let graph = file.execute(&ctx, &tree, python_source, &mut functions, &mut globals)?;
+    let result = graph.display_with(&ctx).to_string();
+    Ok(result)
+}
+
+fn check_execution(python_source: &str, dsl_source: &str, expected_graph: &str) {
+    match execute(python_source, dsl_source) {
+        Ok(actual_graph) => assert_eq!(actual_graph, expected_graph),
+        Err(e) => panic!("Could not execute file: {}", e),
+    }
+}
+
+fn fail_execution(python_source: &str, dsl_source: &str) {
+    if let Ok(_) = execute(python_source, dsl_source) {
+        panic!("Execution succeeded unexpectedly");
+    }
 }
 
 #[test]
@@ -191,6 +204,23 @@ fn can_nest_function_calls() {
         indoc! {r#"
           node 0
             val: "bbcbbc"
+        "#},
+    );
+}
+
+#[test]
+fn cannot_use_nullable_regex() {
+    fail_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            scan "abc" {
+              "^\\b" {
+              }
+            }
+            node n
+          }
         "#},
     );
 }
