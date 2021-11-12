@@ -10,21 +10,53 @@ use tree_sitter::Parser;
 use tree_sitter_graph::ast::File;
 use tree_sitter_graph::functions::Functions;
 use tree_sitter_graph::Context;
+use tree_sitter_graph::ExecutionError;
+use tree_sitter_graph::ParseError;
 use tree_sitter_graph::Variables;
 
-fn check_execution(python_source: &str, dsl_source: &str, expected_graph: &str) {
+enum TestError {
+    Parse(ParseError),
+    Execute(ExecutionError),
+}
+
+fn execute(python_source: &str, dsl_source: &str) -> Result<String, TestError> {
     let mut parser = Parser::new();
     parser.set_language(tree_sitter_python::language()).unwrap();
     let tree = parser.parse(python_source, None).unwrap();
     let mut ctx = Context::new();
     let mut file = File::new(tree_sitter_python::language());
-    file.parse(&mut ctx, dsl_source).expect("Cannot parse file");
+    file.parse(&mut ctx, dsl_source)
+        .map_err(|e| TestError::Parse(e))?;
     let mut functions = Functions::stdlib(&mut ctx);
     let mut globals = Variables::new();
     let graph = file
         .execute(&ctx, &tree, python_source, &mut functions, &mut globals)
-        .expect("Could not execute file");
-    assert_eq!(graph.display_with(&ctx).to_string(), expected_graph);
+        .map_err(|e| TestError::Execute(e))?;
+    let result = graph.display_with(&ctx).to_string();
+    Ok(result)
+}
+
+fn check_execution(python_source: &str, dsl_source: &str, expected_graph: &str) {
+    match execute(python_source, dsl_source) {
+        Ok(actual_graph) => assert_eq!(actual_graph, expected_graph),
+        Err(TestError::Parse(e)) => panic!("Could not parse file: {}", e),
+        Err(TestError::Execute(e)) => panic!("Could not execute file: {}", e),
+    }
+}
+
+fn fail_parse(python_source: &str, dsl_source: &str, expected_error: &str) {
+    let expected_error = regex::Regex::new(expected_error).unwrap();
+    match execute(python_source, dsl_source) {
+        Err(TestError::Parse(e)) => {
+            if !expected_error.is_match(&e.to_string()) {
+                panic!(
+                    "Expected parse error to match /{}/, got \"{}\"",
+                    expected_error, e
+                )
+            }
+        }
+        _ => panic!("Parse succeeded unexpectedly"),
+    }
 }
 
 #[test]
@@ -196,8 +228,8 @@ fn can_nest_function_calls() {
 }
 
 #[test]
-fn skips_empty_matches() {
-    check_execution(
+fn cannot_use_nullable_regex() {
+    fail_parse(
         "pass",
         indoc! {r#"
           (module) @root
@@ -209,8 +241,6 @@ fn skips_empty_matches() {
             node n
           }
         "#},
-        indoc! {r#"
-          node 0
-        "#},
+        "Nullable regular expression",
     );
 }
