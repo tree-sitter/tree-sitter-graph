@@ -408,3 +408,22 @@ fn can_parse_print() {
         .into()]]
     );
 }
+
+#[test]
+fn cannot_parse_nullable_regex() {
+    let mut ctx = Context::new();
+    let source = r#"
+        (module) @root
+        {
+          scan "abc" {
+            "|" {
+            }
+          }
+          node n
+        }
+    "#;
+    let mut file = File::new(tree_sitter_python::language());
+    if let Ok(_) = file.parse(&mut ctx, source) {
+        panic!("Parse succeeded unexpectedly");
+    }
+}
