@@ -19,7 +19,7 @@ fn execute(python_source: &str, dsl_source: &str) -> Result<String, ExecutionErr
     let tree = parser.parse(python_source, None).unwrap();
     let mut ctx = Context::new();
     let mut file = File::new(tree_sitter_python::language());
-    file.parse(&mut ctx, dsl_source).expect("Could parse file");
+    file.parse(&mut ctx, dsl_source).expect("Cannot parse file");
     let mut functions = Functions::stdlib(&mut ctx);
     let mut globals = Variables::new();
     let graph = file.execute(&ctx, &tree, python_source, &mut functions, &mut globals)?;
