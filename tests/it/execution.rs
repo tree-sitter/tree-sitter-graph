@@ -11,27 +11,18 @@ use tree_sitter_graph::ast::File;
 use tree_sitter_graph::functions::Functions;
 use tree_sitter_graph::Context;
 use tree_sitter_graph::ExecutionError;
-use tree_sitter_graph::ParseError;
 use tree_sitter_graph::Variables;
 
-enum TestError {
-    Parse(ParseError),
-    Execute(ExecutionError),
-}
-
-fn execute(python_source: &str, dsl_source: &str) -> Result<String, TestError> {
+fn execute(python_source: &str, dsl_source: &str) -> Result<String, ExecutionError> {
     let mut parser = Parser::new();
     parser.set_language(tree_sitter_python::language()).unwrap();
     let tree = parser.parse(python_source, None).unwrap();
     let mut ctx = Context::new();
     let mut file = File::new(tree_sitter_python::language());
-    file.parse(&mut ctx, dsl_source)
-        .map_err(|e| TestError::Parse(e))?;
+    file.parse(&mut ctx, dsl_source).expect("Could parse file");
     let mut functions = Functions::stdlib(&mut ctx);
     let mut globals = Variables::new();
-    let graph = file
-        .execute(&ctx, &tree, python_source, &mut functions, &mut globals)
-        .map_err(|e| TestError::Execute(e))?;
+    let graph = file.execute(&ctx, &tree, python_source, &mut functions, &mut globals)?;
     let result = graph.display_with(&ctx).to_string();
     Ok(result)
 }
@@ -39,23 +30,13 @@ fn execute(python_source: &str, dsl_source: &str) -> Result<String, TestError> {
 fn check_execution(python_source: &str, dsl_source: &str, expected_graph: &str) {
     match execute(python_source, dsl_source) {
         Ok(actual_graph) => assert_eq!(actual_graph, expected_graph),
-        Err(TestError::Parse(e)) => panic!("Could not parse file: {}", e),
-        Err(TestError::Execute(e)) => panic!("Could not execute file: {}", e),
+        Err(e) => panic!("Could not execute file: {}", e),
     }
 }
 
-fn fail_parse(python_source: &str, dsl_source: &str, expected_error: &str) {
-    let expected_error = regex::Regex::new(expected_error).unwrap();
-    match execute(python_source, dsl_source) {
-        Err(TestError::Parse(e)) => {
-            if !expected_error.is_match(&e.to_string()) {
-                panic!(
-                    "Expected parse error to match /{}/, got \"{}\"",
-                    expected_error, e
-                )
-            }
-        }
-        _ => panic!("Parse succeeded unexpectedly"),
+fn fail_execution(python_source: &str, dsl_source: &str) {
+    if let Ok(_) = execute(python_source, dsl_source) {
+        panic!("Execution succeeded unexpectedly");
     }
 }
 
@@ -229,18 +210,17 @@ fn can_nest_function_calls() {
 
 #[test]
 fn cannot_use_nullable_regex() {
-    fail_parse(
+    fail_execution(
         "pass",
         indoc! {r#"
           (module) @root
           {
             scan "abc" {
-              "|" {
+              "^\\b" {
               }
             }
             node n
           }
         "#},
-        "Nullable regular expression",
     );
 }

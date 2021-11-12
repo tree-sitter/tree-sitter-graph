@@ -112,6 +112,8 @@ pub enum ExecutionError {
     UndefinedFunction(String),
     #[error("Undefined regex capture {0}")]
     UndefinedRegexCapture(String),
+    #[error("Empty regex capture {0}")]
+    EmptyRegexCapture(String),
     #[error("Undefined edge {0}")]
     UndefinedEdge(String),
     #[error("Undefined variable {0}")]
@@ -397,7 +399,10 @@ impl Scan {
                 let captures = arm.regex.captures(&match_string[i..]);
                 if let Some(captures) = captures {
                     if captures.get(0).unwrap().range().is_empty() {
-                        panic!("Empty match for regular expression /{}/", arm.regex);
+                        return Err(ExecutionError::EmptyRegexCapture(format!(
+                            "for regular expression /{}/",
+                            arm.regex
+                        )));
                     }
                     matches.push((captures, index));
                 }
