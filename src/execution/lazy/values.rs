@@ -1418,20 +1418,31 @@ impl DisplayWithContextAndGraph for AddEdgeAttribute {
 
 #[derive(Debug)]
 pub struct Print {
-    pub values: Vec<Value>,
+    arguments: Vec<PrintArgument>,
+}
+
+#[derive(Debug)]
+pub enum PrintArgument {
+    Text(String),
+    Value(Value),
 }
 
 impl Print {
-    pub fn new(values: Vec<Value>) -> Print {
-        Print { values }
+    pub fn new(arguments: Vec<PrintArgument>) -> Print {
+        Print { arguments }
     }
 
     pub fn evaluate(&self, exec: &mut EvaluationContext) -> Result<(), ExecutionError> {
-        for value in &self.values {
-            let value = value.evaluate(exec)?;
-            print!("{}", value.display_with(exec.graph));
+        for argument in &self.arguments {
+            match argument {
+                PrintArgument::Text(string) => eprint!("{}", string),
+                PrintArgument::Value(value) => {
+                    let value = value.evaluate(exec)?;
+                    eprint!("{}", value.display_with(exec.graph));
+                }
+            }
         }
-        println!("");
+        eprintln!("");
         Ok(())
     }
 }
@@ -1439,8 +1450,17 @@ impl Print {
 impl DisplayWithContextAndGraph for Print {
     fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context, graph: &Graph) -> fmt::Result {
         write!(f, "print")?;
-        for val in &self.values {
-            write!(f, " {},", val.display_with(ctx, graph))?;
+        let mut first = true;
+        for argument in &self.arguments {
+            if first {
+                first = false;
+            } else {
+                write!(f, ", ")?;
+            }
+            match argument {
+                PrintArgument::Text(string) => write!(f, "\"{}\"", string)?,
+                PrintArgument::Value(value) => write!(f, "{}", value.display_with(ctx, graph))?,
+            };
         }
         write!(f, "")
     }

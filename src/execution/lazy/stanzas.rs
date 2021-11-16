@@ -253,12 +253,16 @@ impl Scan {
 
 impl Print {
     fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
-        let values = self
-            .values
-            .iter()
-            .map(|e| e.evaluate_lazy(exec))
-            .collect::<Result<_, _>>()?;
-        let stmt = lazy::Print::new(values);
+        let mut arguments = Vec::new();
+        for value in &self.values {
+            let argument = if let Expression::StringConstant(expr) = value {
+                lazy::PrintArgument::Text(expr.value.clone())
+            } else {
+                lazy::PrintArgument::Value(value.evaluate_lazy(exec)?)
+            };
+            arguments.push(argument);
+        }
+        let stmt = lazy::Print::new(arguments);
         exec.lazy_graph.push(stmt.into());
         Ok(())
     }
