@@ -499,7 +499,11 @@ impl Parser<'_> {
             '[' => self.parse_list(current_query)?,
             '{' => self.parse_set(current_query)?,
             ch if ch.is_ascii_digit() => self.parse_integer_constant()?,
-            ch if is_ident_start(ch) => self.parse_identifier("variable name")?.into(),
+            ch if is_ident_start(ch) => {
+                let location = self.location;
+                let name = self.parse_identifier("variable name")?;
+                ast::UnscopedVariable { name, location }.into()
+            }
             ch => {
                 return Err(ParseError::UnexpectedCharacter(
                     ch,
@@ -512,10 +516,16 @@ impl Parser<'_> {
         while self.try_peek() == Some('.') {
             self.skip().unwrap();
             self.consume_whitespace();
+            let location = self.location;
             let scope = Box::new(expression);
             let name = self.parse_identifier("scoped variable name")?;
             self.consume_whitespace();
-            expression = ast::ScopedVariable { scope, name }.into();
+            expression = ast::ScopedVariable {
+                scope,
+                name,
+                location,
+            }
+            .into();
         }
         Ok(expression)
     }
