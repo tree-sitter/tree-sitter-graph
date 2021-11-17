@@ -18,6 +18,7 @@ use crate::Identifier;
 
 use super::values::BranchValue;
 use super::values::CurrentLoopListElementValue;
+use super::values::DebugInfo;
 use super::values::DisplayWithContextAndGraph as _;
 use super::values::EnterLoopValue;
 use super::values::LoopValue;
@@ -452,6 +453,7 @@ pub struct LoopVariables<'a> {
     inherited_variables: Vec<NamedLoopVariable>,
     iteration_values: Value, // scoped outside the loop
     iteration_value: Value,  // scoped inside the loop
+    debug_info: DebugInfo,   // debug info for this loop construct
 }
 
 struct NamedLoopVariable {
@@ -476,7 +478,11 @@ impl NamedLoopVariable {
 
 impl<'a> LoopVariables<'a> {
     /// Creates a new, empty environment of variables.
-    pub fn new(parent: &'a mut dyn Variables, iteration_values: Value) -> Self {
+    pub fn new(
+        parent: &'a mut dyn Variables,
+        iteration_values: Value,
+        debug_info: DebugInfo,
+    ) -> Self {
         let iteration_values = debug_assert_loop_depth!(parent.loop_depth(), iteration_values);
         let iteration_value = debug_assert_loop_depth!(
             parent.loop_depth() + 1,
@@ -486,8 +492,9 @@ impl<'a> LoopVariables<'a> {
             parent: parent,
             local_variables: LazyVariables::default(),
             inherited_variables: Vec::new(),
-            iteration_values: iteration_values.into(),
-            iteration_value: iteration_value,
+            iteration_values,
+            iteration_value,
+            debug_info,
         }
     }
 
@@ -508,14 +515,14 @@ impl<'a> LoopVariables<'a> {
                 let parent_value = self.parent.get(name, exec)?;
                 let loop_variable =
                     exec.store
-                        .add(g::Value::Null.into(), "".into(), exec.ctx, exec.graph);
+                        .add(g::Value::Null.into(), self.debug_info, exec.ctx, exec.graph);
                 let loop_value: Value =
                     LoopValue::new(parent_value.clone(), loop_variable.clone().into()).into();
                 let value: Value = PreviousLoopValue::new(loop_value.clone()).into();
                 exec.store.set(
                     &loop_variable,
                     value.clone(),
-                    "".into(),
+                    self.debug_info,
                     exec.ctx,
                     exec.graph,
                 );
@@ -570,6 +577,7 @@ impl Variables for LoopVariables<'_> {
         if self.local_variables.get(name, exec).is_ok() {
             self.local_variables.set(name, value, exec)
         } else {
+            let debug_info = self.debug_info;
             let iteration_values = self.iteration_values.clone();
 
             let value: Value = debug_assert_loop_depth!(self.loop_depth(), value).into();
@@ -577,7 +585,7 @@ impl Variables for LoopVariables<'_> {
             exec.store.set(
                 &variable.loop_variable,
                 value.clone(),
-                "".into(),
+                debug_info,
                 exec.ctx,
                 exec.graph,
             );

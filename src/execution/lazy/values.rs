@@ -14,6 +14,7 @@ use crate::graph::DisplayWithGraph;
 use crate::graph::Graph;
 use crate::graph::GraphNodeRef;
 use crate::graph::SyntaxNodeRef;
+use crate::parser::Location;
 use crate::Context;
 use crate::DisplayWithContext;
 use crate::Identifier;
@@ -184,7 +185,8 @@ impl ScopedVariables {
         &mut self,
         scope: Value,
         name: Identifier,
-        value: Variable,
+        value: Value,
+        debug_info: DebugInfo,
         ctx: &Context,
     ) -> Result<(), ExecutionError> {
         let values = self
@@ -193,7 +195,7 @@ impl ScopedVariables {
             .or_insert_with(|| Rc::new(RefCell::new(ScopedValues::new())));
         match values.replace(ScopedValues::Forcing) {
             ScopedValues::Unforced(mut pairs) => {
-                pairs.push((scope, value));
+                pairs.push((scope, value, debug_info));
                 values.replace(ScopedValues::Unforced(pairs));
                 Ok(())
             }
@@ -215,14 +217,13 @@ impl ScopedVariables {
         scope: SyntaxNodeRef,
         name: Identifier,
         exec: &mut EvaluationContext,
-    ) -> Result<Variable, ExecutionError> {
-        let scope_kind = exec.graph[scope].kind();
+    ) -> Result<Value, ExecutionError> {
         let values = match self.variables.get(&name) {
             Some(v) => v,
             None => {
                 return Err(ExecutionError::UndefinedScopedVariable(format!(
-                    "({}).{}",
-                    scope_kind,
+                    "{}.{}",
+                    scope.display_with(exec.graph),
                     name.display_with(exec.ctx),
                 )));
             }
@@ -230,15 +231,18 @@ impl ScopedVariables {
         match values.replace(ScopedValues::Forcing) {
             ScopedValues::Unforced(pairs) => {
                 let mut map = HashMap::new();
-                for (scope, value) in pairs.into_iter() {
+                let mut debug_infos = HashMap::new();
+                for (scope, value, debug_info) in pairs.into_iter() {
                     let node = scope.evaluate_as_syntax_node(exec)?;
+                    let prev_debug_info = debug_infos.insert(node, debug_info.clone());
                     match map.insert(node, value.clone()) {
                         Some(_) => {
                             return Err(ExecutionError::DuplicateVariable(format!(
-                                "({})@{}.{}",
-                                scope_kind,
+                                "{}.{} set at {} and {}",
                                 node.display_with(exec.graph),
                                 name.display_with(exec.ctx),
+                                prev_debug_info.unwrap(),
+                                debug_info,
                             )));
                         }
                         _ => {}
@@ -247,8 +251,7 @@ impl ScopedVariables {
                 let result = map
                     .get(&scope)
                     .ok_or(ExecutionError::UndefinedScopedVariable(format!(
-                        "({})@{}.{}",
-                        scope_kind,
+                        "{}.{}",
                         scope.display_with(exec.graph),
                         name.display_with(exec.ctx),
                     )))?
@@ -256,15 +259,18 @@ impl ScopedVariables {
                 values.replace(ScopedValues::Forced(map));
                 Ok(result)
             }
-            ScopedValues::Forcing => Err(ExecutionError::RecursivelyDefinedScopedVariable(
-                format!("{}", name.display_with(exec.ctx)),
-            )),
+            ScopedValues::Forcing => {
+                Err(ExecutionError::RecursivelyDefinedScopedVariable(format!(
+                    "_.{} requested on {}",
+                    name.display_with(exec.ctx),
+                    scope.display_with(exec.graph)
+                )))
+            }
             ScopedValues::Forced(map) => {
                 let result = map
                     .get(&scope)
                     .ok_or(ExecutionError::UndefinedScopedVariable(format!(
-                        "({})@{}.{}",
-                        scope_kind,
+                        "{}.{}",
                         scope.display_with(exec.graph),
                         name.display_with(exec.ctx),
                     )))?
@@ -277,9 +283,9 @@ impl ScopedVariables {
 }
 
 enum ScopedValues {
-    Unforced(Vec<(Value, Variable)>),
+    Unforced(Vec<(Value, Value, DebugInfo)>),
     Forcing,
-    Forced(HashMap<SyntaxNodeRef, Variable>),
+    Forced(HashMap<SyntaxNodeRef, Value>),
 }
 
 impl ScopedValues {
@@ -623,7 +629,7 @@ impl ScopedVariable {
         }
     }
 
-    fn resolve<'a>(&self, exec: &'a mut EvaluationContext) -> Result<Variable, ExecutionError> {
+    fn resolve<'a>(&self, exec: &'a mut EvaluationContext) -> Result<Value, ExecutionError> {
         let scope = self.scope.as_ref().evaluate_as_syntax_node(exec)?;
         let scoped_store = &exec.scoped_store;
         scoped_store.resolve(scope, self.name, exec)
@@ -1279,13 +1285,22 @@ impl DisplayWithContextAndGraph for Statement {
 
 #[derive(Debug)]
 pub struct AddGraphNodeAttribute {
-    pub node: Value,
-    pub attributes: Vec<Attribute>,
+    node: Value,
+    attributes: Vec<Attribute>,
+    debug_info: DebugInfo,
 }
 
 impl AddGraphNodeAttribute {
-    pub fn new(node: Value, attributes: Vec<Attribute>) -> AddGraphNodeAttribute {
-        AddGraphNodeAttribute { node, attributes }
+    pub fn new(
+        node: Value,
+        attributes: Vec<Attribute>,
+        debug_info: DebugInfo,
+    ) -> AddGraphNodeAttribute {
+        AddGraphNodeAttribute {
+            node,
+            attributes,
+            debug_info,
+        }
     }
 
     pub fn evaluate(&self, exec: &mut EvaluationContext) -> Result<(), ExecutionError> {
@@ -1297,9 +1312,10 @@ impl AddGraphNodeAttribute {
                 .add(attribute.name, value)
                 .map_err(|_| {
                     ExecutionError::DuplicateAttribute(format!(
-                        "{} on syntax node {}",
+                        "{} on {} at {}",
                         attribute.name.display_with(exec.ctx),
-                        node.display_with(exec.graph)
+                        node.display_with(exec.graph),
+                        self.debug_info,
                     ))
                 })?;
         }
@@ -1313,7 +1329,7 @@ impl DisplayWithContextAndGraph for AddGraphNodeAttribute {
         for attr in &self.attributes {
             write!(f, " {}", attr.display_with(ctx, graph))?;
         }
-        write!(f, "")
+        write!(f, " at {}", self.debug_info)
     }
 }
 
@@ -1321,13 +1337,18 @@ impl DisplayWithContextAndGraph for AddGraphNodeAttribute {
 
 #[derive(Debug)]
 pub struct CreateEdge {
-    pub source: Value,
-    pub sink: Value,
+    source: Value,
+    sink: Value,
+    debug_info: DebugInfo,
 }
 
 impl CreateEdge {
-    pub fn new(source: Value, sink: Value) -> CreateEdge {
-        CreateEdge { source, sink }
+    pub fn new(source: Value, sink: Value, debug_info: DebugInfo) -> CreateEdge {
+        CreateEdge {
+            source,
+            sink,
+            debug_info,
+        }
     }
 
     pub fn evaluate(&self, exec: &mut EvaluationContext) -> Result<(), ExecutionError> {
@@ -1335,9 +1356,10 @@ impl CreateEdge {
         let sink = self.sink.evaluate_as_graph_node(exec)?;
         if let Err(_) = exec.graph[source].add_edge(sink) {
             Err(ExecutionError::DuplicateEdge(format!(
-                "({} -> {})",
+                "({} -> {}) at {}",
                 source.display_with(exec.graph),
-                sink.display_with(exec.graph)
+                sink.display_with(exec.graph),
+                self.debug_info,
             )))?;
         }
         Ok(())
@@ -1348,9 +1370,10 @@ impl DisplayWithContextAndGraph for CreateEdge {
     fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context, graph: &Graph) -> fmt::Result {
         write!(
             f,
-            "edge {} -> {}",
+            "edge {} -> {} at {}",
             self.source.display_with(ctx, graph),
             self.sink.display_with(ctx, graph),
+            self.debug_info,
         )
     }
 }
@@ -1359,17 +1382,24 @@ impl DisplayWithContextAndGraph for CreateEdge {
 
 #[derive(Debug)]
 pub struct AddEdgeAttribute {
-    pub source: Value,
-    pub sink: Value,
-    pub attributes: Vec<Attribute>,
+    source: Value,
+    sink: Value,
+    attributes: Vec<Attribute>,
+    debug_info: DebugInfo,
 }
 
 impl AddEdgeAttribute {
-    pub fn new(source: Value, sink: Value, attributes: Vec<Attribute>) -> AddEdgeAttribute {
+    pub fn new(
+        source: Value,
+        sink: Value,
+        attributes: Vec<Attribute>,
+        debug_info: DebugInfo,
+    ) -> AddEdgeAttribute {
         AddEdgeAttribute {
             source,
             sink,
             attributes,
+            debug_info,
         }
     }
 
@@ -1381,17 +1411,19 @@ impl AddEdgeAttribute {
             let edge = match exec.graph[source].get_edge_mut(sink) {
                 Some(edge) => Ok(edge),
                 None => Err(ExecutionError::UndefinedEdge(format!(
-                    "({} -> {})",
+                    "({} -> {}) at {}",
                     source.display_with(exec.graph),
                     sink.display_with(exec.graph),
+                    self.debug_info,
                 ))),
             }?;
             edge.attributes.add(attribute.name, value).map_err(|_| {
                 ExecutionError::DuplicateAttribute(format!(
-                    "{} on edge ({} -> {})",
+                    "{} on edge ({} -> {}) at {}",
                     attribute.name.display_with(exec.ctx),
                     source.display_with(exec.graph),
                     sink.display_with(exec.graph),
+                    self.debug_info,
                 ))
             })?;
         }
@@ -1410,7 +1442,7 @@ impl DisplayWithContextAndGraph for AddEdgeAttribute {
         for attr in &self.attributes {
             write!(f, " {}", attr.display_with(ctx, graph),)?;
         }
-        write!(f, "")
+        write!(f, " at {}", self.debug_info)
     }
 }
 
@@ -1419,6 +1451,7 @@ impl DisplayWithContextAndGraph for AddEdgeAttribute {
 #[derive(Debug)]
 pub struct Print {
     arguments: Vec<PrintArgument>,
+    debug_info: DebugInfo,
 }
 
 #[derive(Debug)]
@@ -1428,8 +1461,11 @@ pub enum PrintArgument {
 }
 
 impl Print {
-    pub fn new(arguments: Vec<PrintArgument>) -> Print {
-        Print { arguments }
+    pub fn new(arguments: Vec<PrintArgument>, debug_info: DebugInfo) -> Print {
+        Print {
+            arguments,
+            debug_info,
+        }
     }
 
     pub fn evaluate(&self, exec: &mut EvaluationContext) -> Result<(), ExecutionError> {
@@ -1462,7 +1498,7 @@ impl DisplayWithContextAndGraph for Print {
                 PrintArgument::Value(value) => write!(f, "{}", value.display_with(ctx, graph))?,
             };
         }
-        write!(f, "")
+        write!(f, " at {}", self.debug_info)
     }
 }
 
@@ -1472,13 +1508,15 @@ impl DisplayWithContextAndGraph for Print {
 pub struct BranchStatement {
     branch_index: Value,
     branches: Vec<Vec<Statement>>,
+    debug_info: DebugInfo,
 }
 
 impl BranchStatement {
-    pub fn new(branch_index: Value, branches: Vec<Vec<Statement>>) -> Self {
+    pub fn new(branch_index: Value, branches: Vec<Vec<Statement>>, debug_info: DebugInfo) -> Self {
         Self {
             branch_index,
             branches,
+            debug_info,
         }
     }
 
@@ -1493,8 +1531,9 @@ impl BranchStatement {
                 Ok(())
             }
             _ => Err(ExecutionError::ExpectedInteger(format!(
-                " for index, got {}",
-                branch_index.display_with(exec.graph)
+                " for index, got {} at {}",
+                branch_index.display_with(exec.graph),
+                self.debug_info,
             ))),
         }
     }
@@ -1510,7 +1549,7 @@ impl DisplayWithContextAndGraph for BranchStatement {
         for (index, _) in self.branches.iter().enumerate() {
             write!(f, " {}: ...", index)?;
         }
-        write!(f, " }}")
+        write!(f, " }} at {}", self.debug_info)
     }
 }
 
@@ -1520,13 +1559,15 @@ impl DisplayWithContextAndGraph for BranchStatement {
 pub struct LoopStatement {
     iteration_values: Value,
     statements: Vec<Statement>,
+    debug_info: DebugInfo,
 }
 
 impl LoopStatement {
-    pub fn new(iteration_values: Value, statements: Vec<Statement>) -> Self {
+    pub fn new(iteration_values: Value, statements: Vec<Statement>, debug_info: DebugInfo) -> Self {
         Self {
             iteration_values,
             statements,
+            debug_info,
         }
     }
 
@@ -1563,8 +1604,9 @@ impl DisplayWithContextAndGraph for LoopStatement {
     fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context, graph: &Graph) -> fmt::Result {
         write!(
             f,
-            "loop {} {{ ... }}",
-            self.iteration_values.display_with(ctx, graph)
+            "loop {} {{ ... }} at {}",
+            self.iteration_values.display_with(ctx, graph),
+            self.debug_info,
         )
     }
 }
@@ -1595,23 +1637,17 @@ impl DisplayWithContextAndGraph for Attribute {
 }
 
 // DebugInfo
-
-pub struct DebugInfo(String);
+#[derive(Debug, Clone, Copy)]
+pub struct DebugInfo(Location);
 
 impl DebugInfo {
-    pub fn new(msg: String) -> DebugInfo {
-        DebugInfo(msg)
+    pub fn new(location: Location) -> DebugInfo {
+        DebugInfo(location)
     }
 }
 
-impl From<&str> for DebugInfo {
-    fn from(value: &str) -> Self {
-        Self(value.into())
-    }
-}
-
-impl From<String> for DebugInfo {
-    fn from(value: String) -> Self {
+impl From<Location> for DebugInfo {
+    fn from(value: Location) -> Self {
         Self(value)
     }
 }

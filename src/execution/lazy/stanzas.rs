@@ -154,7 +154,7 @@ impl AddGraphNodeAttribute {
             .iter()
             .map(|a| a.evaluate_lazy(exec))
             .collect::<Result<_, _>>()?;
-        let stmt = lazy::AddGraphNodeAttribute::new(node, attributes);
+        let stmt = lazy::AddGraphNodeAttribute::new(node, attributes, self.location.into());
         exec.lazy_graph.push(stmt.into());
         Ok(())
     }
@@ -164,7 +164,7 @@ impl CreateEdge {
     fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
         let source = self.source.evaluate_lazy(exec)?;
         let sink = self.sink.evaluate_lazy(exec)?;
-        let stmt = lazy::CreateEdge::new(source, sink);
+        let stmt = lazy::CreateEdge::new(source, sink, self.location.into());
         exec.lazy_graph.push(stmt.into());
         Ok(())
     }
@@ -179,7 +179,7 @@ impl AddEdgeAttribute {
             .iter()
             .map(|a| a.evaluate_lazy(exec))
             .collect::<Result<_, _>>()?;
-        let stmt = lazy::AddEdgeAttribute::new(source, sink, attributes);
+        let stmt = lazy::AddEdgeAttribute::new(source, sink, attributes, self.location.into());
         exec.lazy_graph.push(stmt.into());
         Ok(())
     }
@@ -199,13 +199,14 @@ impl Scan {
             .store
             .add(
                 lazy::Scan::new(match_value, regexes).into(),
-                "".into(),
+                self.location.into(),
                 exec.ctx,
                 exec.graph,
             )
             .into();
 
-        let mut scan_variables = LoopVariables::new(exec.variables, scan_value.clone());
+        let mut scan_variables =
+            LoopVariables::new(exec.variables, scan_value.clone(), self.location.into());
         let arm_index: lazy::Value =
             lazy::ListIndex::new(scan_variables.iteration_value().clone(), 0.into()).into();
         let regex_captures =
@@ -243,8 +244,10 @@ impl Scan {
             arm_variables.next();
         }
 
-        let arms_statement = lazy::BranchStatement::new(arm_index, lazy_graph_branches).into();
-        let scan_statement = lazy::LoopStatement::new(scan_value, vec![arms_statement]).into();
+        let arms_statement =
+            lazy::BranchStatement::new(arm_index, lazy_graph_branches, self.location.into()).into();
+        let scan_statement =
+            lazy::LoopStatement::new(scan_value, vec![arms_statement], self.location.into()).into();
         exec.lazy_graph.push(scan_statement);
 
         Ok(())
@@ -262,7 +265,7 @@ impl Print {
             };
             arguments.push(argument);
         }
-        let stmt = lazy::Print::new(arguments);
+        let stmt = lazy::Print::new(arguments, self.location.into());
         exec.lazy_graph.push(stmt.into());
         Ok(())
     }
@@ -399,12 +402,9 @@ impl Variable {
                 self.display_with(exec.ctx)
             ))),
             Variable::Unscoped(variable) => {
-                let value = exec.store.add(
-                    value,
-                    format!("{}", self.display_with(exec.ctx)).into(),
-                    exec.ctx,
-                    exec.graph,
-                );
+                let value = exec
+                    .store
+                    .add(value, variable.location.into(), exec.ctx, exec.graph);
                 variable.assign(value.into(), exec)
             }
         }
@@ -431,13 +431,16 @@ impl ScopedVariable {
             )));
         }
         let scope = self.scope.evaluate_lazy(exec)?;
-        let variable = exec.store.add(
-            value,
-            lazy::DebugInfo::new(format!("{}", self.display_with(exec.ctx))),
+        let variable = exec
+            .store
+            .add(value, self.location.into(), exec.ctx, exec.graph);
+        exec.scoped_store.add(
+            scope,
+            self.name,
+            variable.into(),
+            self.location.into(),
             exec.ctx,
-            exec.graph,
-        );
-        exec.scoped_store.add(scope, self.name, variable, exec.ctx)
+        )
     }
 }
 
@@ -462,12 +465,9 @@ impl UnscopedVariable {
         mutability: Mutability,
         exec: &mut ExecutionContext,
     ) -> Result<(), ExecutionError> {
-        let variable = exec.store.add(
-            value,
-            format!("{}", self.display_with(exec.ctx)).into(),
-            exec.ctx,
-            exec.graph,
-        );
+        let variable = exec
+            .store
+            .add(value, self.location.into(), exec.ctx, exec.graph);
         exec.variables.add(
             self.name,
             variable.into(),
