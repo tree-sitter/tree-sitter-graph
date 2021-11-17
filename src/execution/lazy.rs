@@ -11,6 +11,8 @@ mod variables;
 
 use anyhow::Context as _;
 
+use std::collections::HashMap;
+
 use tree_sitter::QueryCursor;
 use tree_sitter::Tree;
 
@@ -63,6 +65,7 @@ impl File {
                 regex_captures_identifier,
             )?;
         }
+        let mut prev_element_debug_info = HashMap::new();
         for graph_stmt in &lazy_graph {
             graph_stmt
                 .evaluate(&mut values::EvaluationContext {
@@ -74,6 +77,7 @@ impl File {
                     scoped_store: &mut scoped_store,
                     function_arguments: &mut function_arguments,
                     iteration: values::Iteration::new(),
+                    prev_element_debug_info: &mut prev_element_debug_info,
                 })
                 .with_context(|| format!("Executing {}", graph_stmt.display_with(ctx, &graph)))?;
         }

@@ -45,6 +45,14 @@ pub struct EvaluationContext<'a, 'tree> {
     pub scoped_store: &'a ScopedVariables,
     pub function_arguments: &'a mut Vec<graph::Value>, // re-usable buffer to reduce memory allocations
     pub iteration: Iteration,
+    pub prev_element_debug_info: &'a mut HashMap<GraphElementKey, DebugInfo>,
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub enum GraphElementKey {
+    NodeAttribute(GraphNodeRef, Identifier),
+    Edge(GraphNodeRef, GraphNodeRef),
+    EdgeAttribute(GraphNodeRef, GraphNodeRef, Identifier),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -1002,6 +1010,7 @@ impl CurrentLoopListElementValue {
                 scoped_store: exec.scoped_store,
                 function_arguments: exec.function_arguments,
                 iteration,
+                prev_element_debug_info: exec.prev_element_debug_info,
             })?
             .into_list(exec.graph)?;
         let iteration_index = exec.iteration.current_index().unwrap();
@@ -1052,6 +1061,7 @@ impl EnterLoopValue {
             scoped_store: exec.scoped_store,
             function_arguments: exec.function_arguments,
             iteration,
+            prev_element_debug_info: exec.prev_element_debug_info,
         })
     }
 }
@@ -1091,6 +1101,7 @@ impl PreviousLoopValue {
             scoped_store: exec.scoped_store,
             function_arguments: exec.function_arguments,
             iteration,
+            prev_element_debug_info: exec.prev_element_debug_info,
         })
     }
 }
@@ -1132,6 +1143,7 @@ impl LoopValue {
                 scoped_store: exec.scoped_store,
                 function_arguments: exec.function_arguments,
                 iteration,
+                prev_element_debug_info: exec.prev_element_debug_info,
             })
         }
     }
@@ -1319,14 +1331,19 @@ impl AddGraphNodeAttribute {
         let node = self.node.evaluate_as_graph_node(exec)?;
         for attribute in &self.attributes {
             let value = attribute.value.evaluate(exec)?;
+            let prev_debug_info = exec.prev_element_debug_info.insert(
+                GraphElementKey::NodeAttribute(node, attribute.name),
+                self.debug_info,
+            );
             exec.graph[node]
                 .attributes
                 .add(attribute.name, value)
                 .map_err(|_| {
                     ExecutionError::DuplicateAttribute(format!(
-                        "{} on {} at {}",
+                        "{} on {} at {} and {}",
                         attribute.name.display_with(exec.ctx),
                         node.display_with(exec.graph),
+                        prev_debug_info.unwrap(),
                         self.debug_info,
                     ))
                 })?;
@@ -1366,11 +1383,15 @@ impl CreateEdge {
     pub fn evaluate(&self, exec: &mut EvaluationContext) -> Result<(), ExecutionError> {
         let source = self.source.evaluate_as_graph_node(exec)?;
         let sink = self.sink.evaluate_as_graph_node(exec)?;
+        let prev_debug_info = exec
+            .prev_element_debug_info
+            .insert(GraphElementKey::Edge(source, sink), self.debug_info);
         if let Err(_) = exec.graph[source].add_edge(sink) {
             Err(ExecutionError::DuplicateEdge(format!(
-                "({} -> {}) at {}",
+                "({} -> {}) at {} and {}",
                 source.display_with(exec.graph),
                 sink.display_with(exec.graph),
+                prev_debug_info.unwrap(),
                 self.debug_info,
             )))?;
         }
@@ -1429,12 +1450,17 @@ impl AddEdgeAttribute {
                     self.debug_info,
                 ))),
             }?;
+            let prev_debug_info = exec.prev_element_debug_info.insert(
+                GraphElementKey::EdgeAttribute(source, sink, attribute.name),
+                self.debug_info,
+            );
             edge.attributes.add(attribute.name, value).map_err(|_| {
                 ExecutionError::DuplicateAttribute(format!(
-                    "{} on edge ({} -> {}) at {}",
+                    "{} on edge ({} -> {}) at {} and {}",
                     attribute.name.display_with(exec.ctx),
                     source.display_with(exec.graph),
                     sink.display_with(exec.graph),
+                    prev_debug_info.unwrap(),
                     self.debug_info,
                 ))
             })?;
@@ -1603,6 +1629,7 @@ impl LoopStatement {
                     scoped_store: exec.scoped_store,
                     function_arguments: exec.function_arguments,
                     iteration: iteration.clone(),
+                    prev_element_debug_info: exec.prev_element_debug_info,
                 })?;
             }
             iteration = iteration.prev();
