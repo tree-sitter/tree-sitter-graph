@@ -7,6 +7,8 @@
 
 //! Defines lazy expression values and graph statements for DSL evaluation
 
+use anyhow::Context as _;
+
 use crate::execution::ExecutionError;
 use crate::functions::Functions;
 use crate::graph;
@@ -19,7 +21,7 @@ use crate::Context;
 use crate::DisplayWithContext;
 use crate::Identifier;
 
-use log::trace;
+use log::{debug, trace};
 
 use regex::Regex;
 
@@ -164,7 +166,16 @@ impl Store {
         variable: &Variable,
         exec: &mut EvaluationContext,
     ) -> Result<graph::Value, ExecutionError> {
-        self.elements[variable.store_location].evaluate(exec)
+        let variable = &self.elements[variable.store_location];
+        let debug_info = variable.debug_info;
+        let value = variable.evaluate(exec).with_context(|| {
+            format!(
+                "via {} at {}",
+                variable.value.display_with(exec.ctx, exec.graph),
+                debug_info
+            )
+        })?;
+        Ok(value)
     }
 }
 
@@ -1218,7 +1229,8 @@ pub enum Statement {
 
 impl Statement {
     pub fn evaluate(&self, exec: &mut EvaluationContext) -> Result<(), ExecutionError> {
-        trace!("exec {} {{", self.display_with(exec.ctx, exec.graph));
+        debug!("eval {}", self.display_with(exec.ctx, exec.graph));
+        trace!("{{");
         let ret = match self {
             Statement::AddGraphNodeAttribute(stmt) => stmt.evaluate(exec),
             Statement::CreateEdge(stmt) => stmt.evaluate(exec),

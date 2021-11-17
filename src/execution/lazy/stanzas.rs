@@ -6,7 +6,9 @@
 // ------------------------------------------------------------------------------------------------
 
 use anyhow::Context as _;
+use log::{debug, trace};
 
+use tree_sitter::CaptureQuantifier::One;
 use tree_sitter::Query;
 use tree_sitter::QueryCursor;
 use tree_sitter::QueryMatch;
@@ -38,6 +40,7 @@ use crate::ast::UnscopedVariable;
 use crate::ast::Variable;
 use crate::execution::query_capture_value;
 use crate::execution::ExecutionError;
+use crate::graph::DisplayWithGraph as _;
 use crate::graph::Graph;
 use crate::graph::Value;
 use crate::parser::FULL_MATCH;
@@ -86,6 +89,7 @@ impl Stanza {
         lazy_graph: &mut Vec<lazy::Statement>,
         regex_captures_identifier: Identifier,
     ) -> Result<(), ExecutionError> {
+        let full_match_index = full_match_capture_index(&self.query);
         let matches = cursor.matches(&self.query, tree.root_node(), source.as_bytes());
         for mat in matches {
             variables.clear();
@@ -99,11 +103,19 @@ impl Stanza {
                 lazy_graph,
                 regex_captures_identifier,
             };
+            let node = query_capture_value(full_match_index, One, &mat, exec.graph);
+            debug!(
+                "match {} at {}",
+                node.display_with(exec.graph),
+                self.location
+            );
+            trace!("{{");
             for statement in &self.statements {
                 statement
                     .execute_lazy(&mut exec)
                     .with_context(|| format!("Executing {}", statement.display_with(exec.ctx)))?;
             }
+            trace!("}}");
         }
         Ok(())
     }
@@ -111,6 +123,7 @@ impl Stanza {
 
 impl Statement {
     fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        debug!("exec {}", self.display_with(exec.ctx));
         match self {
             Statement::DeclareImmutable(statement) => statement.execute_lazy(exec),
             Statement::DeclareMutable(statement) => statement.execute_lazy(exec),
