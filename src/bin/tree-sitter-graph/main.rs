@@ -24,6 +24,8 @@ use tree_sitter_loader::Loader;
 const BUILD_VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
 fn main() -> Result<()> {
+    init_log();
+
     let matches = App::new("tree-sitter-graph")
         .version(BUILD_VERSION)
         .author("Douglas Creager <dcreager@dcreager.net>")
@@ -97,4 +99,12 @@ fn main() -> Result<()> {
         print!("{}", graph.display_with(&ctx));
     }
     Ok(())
+}
+
+fn init_log() {
+    let _ = env_logger::builder()
+        .format_level(false)
+        .format_target(false)
+        .format_timestamp(None)
+        .init();
 }
