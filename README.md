@@ -17,7 +17,7 @@ tree-sitter-graph = "0.2"
 To use it as a program, install it via `cargo install`:
 
 ```
-$ cargo install tree-sitter-graph
+$ cargo install --features cli tree-sitter-graph
 ```
 
 Check out our [documentation](https://docs.rs/tree-sitter-graph/) for more
