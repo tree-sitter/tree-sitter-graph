@@ -99,6 +99,10 @@ pub enum ExecutionError {
     DuplicateVariable(String),
     #[error("Expected a graph node reference {0}")]
     ExpectedGraphNode(String),
+    #[error("Expected a list {0}")]
+    ExpectedList(String),
+    #[error("Expected a boolean {0}")]
+    ExpectedBoolean(String),
     #[error("Expected an integer {0}")]
     ExpectedInteger(String),
     #[error("Expected a string {0}")]

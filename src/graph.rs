@@ -255,6 +255,17 @@ pub enum Value {
 }
 
 impl Value {
+    /// Coerces this value into a boolean, returning an error if it's some other type of value.
+    pub fn into_bool(self, graph: &Graph) -> Result<bool, ExecutionError> {
+        match self {
+            Value::Boolean(value) => Ok(value),
+            _ => Err(ExecutionError::ExpectedBoolean(format!(
+                "got {}",
+                self.display_with(graph)
+            ))),
+        }
+    }
+
     /// Coerces this value into an integer, returning an error if it's some other type of value.
     pub fn into_integer(self, graph: &Graph) -> Result<u32, ExecutionError> {
         match self {
@@ -277,6 +288,17 @@ impl Value {
         }
     }
 
+    /// Coerces this value into a list, returning an error if it's some other type of value.
+    pub fn into_list(self, graph: &Graph) -> Result<Vec<Value>, ExecutionError> {
+        match self {
+            Value::List(values) => Ok(values),
+            _ => Err(ExecutionError::ExpectedList(format!(
+                "got {}",
+                self.display_with(graph)
+            ))),
+        }
+    }
+
     /// Coerces this value into a syntax node reference, returning an error if it's some other type
     /// of value.
     pub fn into_syntax_node<'a, 'tree>(
@@ -290,6 +312,12 @@ impl Value {
                 self.display_with(graph)
             ))),
         }
+    }
+}
+
+impl From<bool> for Value {
+    fn from(value: bool) -> Value {
+        Value::Boolean(value)
     }
 }
 
@@ -308,6 +336,12 @@ impl From<&str> for Value {
 impl From<String> for Value {
     fn from(value: String) -> Value {
         Value::String(value)
+    }
+}
+
+impl From<Vec<Value>> for Value {
+    fn from(value: Vec<Value>) -> Value {
+        Value::List(value)
     }
 }
 
