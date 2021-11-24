@@ -51,3 +51,6 @@ version = "0.19"
 [dependencies.tree-sitter-loader]
 optional = true
 version = "0.19"
+
+[patch.crates-io]
+tree-sitter = { git = "https://github.com/hendrikvanantwerpen/tree-sitter", branch = "expose-capture-suffixes" }

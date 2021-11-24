@@ -77,6 +77,12 @@
 //! [query]: https://tree-sitter.github.io/tree-sitter/using-parsers#pattern-matching-with-queries
 //! [captures]: https://tree-sitter.github.io/tree-sitter/using-parsers#capturing-nodes
 //!
+//! Query patterns can be suffixed by quantification operators. If a pattern with a quantification
+//! suffix is captured, the suffix determines the capture value. In the case of `?`, the capture value
+//! is a null value, or a syntax node. In the case of `+` and `*`, the value is a list of syntax node.
+//!
+//! [quantification]: https://tree-sitter.github.io/tree-sitter/using-parsers#quantification-operators
+//!
 //! Comments start with a semicolon, and extend to the end of the line.
 //!
 //! Identifiers start with either an ASCII letter or underscore, and all remaining characters are

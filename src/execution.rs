@@ -9,6 +9,7 @@ use std::collections::HashMap;
 
 use anyhow::Context as ErrorContext;
 use thiserror::Error;
+use tree_sitter::CaptureQuantifier;
 use tree_sitter::QueryCursor;
 use tree_sitter::QueryMatch;
 use tree_sitter::Tree;
@@ -536,16 +537,12 @@ impl SetComprehension {
 
 impl Capture {
     fn evaluate(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
-        for capture in exec.mat.captures {
-            if capture.index as usize == self.index {
-                let syntax_node = exec.graph.add_syntax_node(capture.node);
-                return Ok(Value::SyntaxNode(syntax_node));
-            }
-        }
-        Err(ExecutionError::UndefinedCapture(format!(
-            "{}",
-            self.display_with(exec.ctx)
-        )))
+        Ok(query_capture_value(
+            self.index,
+            self.quantifier,
+            exec.mat,
+            exec.graph,
+        ))
     }
 }
 
@@ -687,5 +684,42 @@ impl UnscopedVariable {
         exec.locals.add(self.name, value, mutable).map_err(|_| {
             ExecutionError::DuplicateVariable(format!(" local {}", self.display_with(exec.ctx)))
         })
+    }
+}
+
+/// Get the value for the given capture, considering the suffix
+pub fn query_capture_value<'tree>(
+    index: usize,
+    quantifier: CaptureQuantifier,
+    mat: &QueryMatch<'_, 'tree>,
+    graph: &mut Graph<'tree>,
+) -> Value {
+    let nodes = mat
+        .captures
+        .iter()
+        .filter(|c| c.index as usize == index)
+        .map(|c| c.node)
+        .collect::<Vec<_>>();
+    match quantifier {
+        CaptureQuantifier::Zero => panic!("Capture with quantifier 0 has no value"),
+        CaptureQuantifier::One => {
+            let syntax_node = graph.add_syntax_node(nodes[0]);
+            syntax_node.into()
+        }
+        CaptureQuantifier::ZeroOrMore | CaptureQuantifier::OneOrMore => {
+            let syntax_nodes = nodes
+                .iter()
+                .map(|n| graph.add_syntax_node(n.clone()).into())
+                .collect::<Vec<Value>>();
+            syntax_nodes.into()
+        }
+        CaptureQuantifier::ZeroOrOne => {
+            if nodes.is_empty() {
+                Value::Null.into()
+            } else {
+                let syntax_node = graph.add_syntax_node(nodes[0]);
+                syntax_node.into()
+            }
+        }
     }
 }

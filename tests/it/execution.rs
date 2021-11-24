@@ -224,3 +224,80 @@ fn cannot_use_nullable_regex() {
         "#},
     );
 }
+
+#[test]
+fn can_create_present_optional_capture() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module (_)? @stmts)
+          {
+            node n
+            attr (n) stmts = @stmts
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            stmts: [syntax node pass_statement (1, 1)]
+        "#},
+    );
+}
+
+#[test]
+fn can_create_missing_optional_capture() {
+    check_execution(
+        indoc! {r#"
+        "#},
+        indoc! {r#"
+          (module (_)? @stmts)
+          {
+            node n
+            attr (n) stmts = @stmts
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            stmts: #null
+        "#},
+    );
+}
+
+#[test]
+fn can_create_empty_list_capture() {
+    check_execution(
+        indoc! {r#"
+        "#},
+        indoc! {r#"
+          (module (_)* @stmts)
+          {
+            node n
+            attr (n) stmts = @stmts
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            stmts: []
+        "#},
+    );
+}
+
+#[test]
+fn can_create_nonempty_list_capture() {
+    check_execution(
+        indoc! {r#"
+          pass
+          pass
+        "#},
+        indoc! {r#"
+          (module (_)+ @stmts)
+          {
+            node n
+            attr (n) stmts = @stmts
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            stmts: [[syntax node pass_statement (1, 1)], [syntax node pass_statement (2, 1)]]
+        "#},
+    );
+}
