@@ -16,6 +16,7 @@ use tree_sitter::Parser;
 use tree_sitter_config::Config;
 use tree_sitter_graph::ast::File;
 use tree_sitter_graph::functions::Functions;
+use tree_sitter_graph::graph::Graph;
 use tree_sitter_graph::Context;
 use tree_sitter_graph::Variables;
 use tree_sitter_loader::Loader;
@@ -64,9 +65,16 @@ fn main() -> Result<()> {
         .with_context(|| anyhow!("Error parsing TSG file {}", tsg_path.display()))?;
     let mut functions = Functions::stdlib(&mut ctx);
     let mut globals = Variables::new();
-    let graph = file
-        .execute(&ctx, &tree, &source, &mut functions, &mut globals)
-        .with_context(|| format!("Could not execute TSG file {}", tsg_path.display()))?;
+    let mut graph = Graph::new();
+    file.execute(
+        &mut ctx,
+        &tree,
+        &source,
+        &mut functions,
+        &mut globals,
+        &mut graph,
+    )
+    .with_context(|| anyhow!("Could not execute TSG file {}", tsg_path.display()))?;
     if !quiet {
         print!("{}", graph.display_with(&ctx));
     }

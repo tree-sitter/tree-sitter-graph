@@ -9,6 +9,7 @@ use indoc::indoc;
 use tree_sitter::Parser;
 use tree_sitter_graph::ast::File;
 use tree_sitter_graph::functions::Functions;
+use tree_sitter_graph::graph::Graph;
 use tree_sitter_graph::Context;
 use tree_sitter_graph::ExecutionError;
 use tree_sitter_graph::Variables;
@@ -22,7 +23,15 @@ fn execute(python_source: &str, dsl_source: &str) -> Result<String, ExecutionErr
     file.parse(&mut ctx, dsl_source).expect("Cannot parse file");
     let mut functions = Functions::stdlib(&mut ctx);
     let mut globals = Variables::new();
-    let graph = file.execute(&ctx, &tree, python_source, &mut functions, &mut globals)?;
+    let mut graph = Graph::new();
+    file.execute(
+        &ctx,
+        &tree,
+        python_source,
+        &mut functions,
+        &mut globals,
+        &mut graph,
+    )?;
     let result = graph.display_with(&ctx).to_string();
     Ok(result)
 }
