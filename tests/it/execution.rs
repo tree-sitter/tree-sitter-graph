@@ -60,7 +60,7 @@ fn can_build_simple_graph() {
         indoc! {r#"
           node 0
             name: "node0"
-            source: [syntax node module (0, 0)]
+            source: [syntax node module (1, 1)]
           edge 0 -> 1
             precedence: 14
           node 1

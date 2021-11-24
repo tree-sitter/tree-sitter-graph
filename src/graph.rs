@@ -369,8 +369,17 @@ impl From<SyntaxNodeRef> for Value {
 impl DisplayWithGraph for SyntaxNodeRef {
     fn fmt(&self, f: &mut fmt::Formatter, graph: &Graph) -> fmt::Result {
         let node = graph[*self];
-        write!(f, "[syntax node {} {}]", node.kind(), node.start_position())
+        write!(f, "{}", format_node(&node))
     }
+}
+
+pub fn format_node(node: &Node) -> String {
+    format!(
+        "[syntax node {} ({}, {})]",
+        node.kind(),
+        node.start_position().row + 1,
+        node.start_position().column + 1
+    )
 }
 
 /// A reference to a graph node
