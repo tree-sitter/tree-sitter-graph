@@ -438,6 +438,21 @@
 //! }
 //! ```
 //!
+//! List iteration
+//!
+//! You can use a `for` statement to iterate over a list of values. The `for` statement specifies
+//! a variable name that is available inside the loop statements, an expression that evaluates to
+//! a list value, and a block of statements to execute for each element in the list:
+//!
+//! ```tsg
+//! (module (_)* @stmts)
+//! {
+//!   for stmt in @stmts {
+//!     print stmt
+//!   }
+//! }
+//! ```
+//!
 //! # Debugging
 //!
 //! To support members of the Ancient and Harmonious Order of Printf Debuggers, you can use `print`

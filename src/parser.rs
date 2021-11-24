@@ -89,6 +89,7 @@ struct Parser<'a> {
     attr_keyword: Identifier,
     edge_keyword: Identifier,
     false_keyword: Identifier,
+    for_keyword: Identifier,
     if_keyword: Identifier,
     let_keyword: Identifier,
     node_keyword: Identifier,
@@ -114,6 +115,7 @@ impl<'a> Parser<'a> {
         let attr_keyword = ctx.add_identifier("attr");
         let edge_keyword = ctx.add_identifier("edge");
         let false_keyword = ctx.add_identifier("false");
+        let for_keyword = ctx.add_identifier("for");
         let if_keyword = ctx.add_identifier("if");
         let let_keyword = ctx.add_identifier("let");
         let node_keyword = ctx.add_identifier("node");
@@ -132,6 +134,7 @@ impl<'a> Parser<'a> {
             attr_keyword,
             edge_keyword,
             false_keyword,
+            for_keyword,
             let_keyword,
             if_keyword,
             node_keyword,
@@ -497,6 +500,21 @@ impl Parser<'_> {
 
             Ok(ast::Conditional {
                 arms,
+                location: keyword_location,
+            }
+            .into())
+        } else if keyword == self.for_keyword {
+            let name = self.parse_identifier("loop variable name")?;
+            self.consume_whitespace();
+            self.consume_token("in")?;
+            self.consume_whitespace();
+            let values = self.parse_expression(current_query)?;
+            self.consume_whitespace();
+            let statements = self.parse_statements(current_query)?;
+            Ok(ast::ForIn {
+                name,
+                values,
+                statements,
                 location: keyword_location,
             }
             .into())

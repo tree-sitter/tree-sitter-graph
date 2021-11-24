@@ -26,6 +26,7 @@ use crate::ast::DeclareImmutable;
 use crate::ast::DeclareMutable;
 use crate::ast::Expression;
 use crate::ast::File;
+use crate::ast::ForIn;
 use crate::ast::IntegerConstant;
 use crate::ast::ListComprehension;
 use crate::ast::Print;
@@ -216,6 +217,12 @@ impl Variables {
             .map(move |index| &mut self.values[index])
     }
 
+    fn remove(&mut self, name: Identifier) {
+        if let Ok(index) = self.values.binary_search_by_key(&name, |v| v.name) {
+            self.values.remove(index);
+        }
+    }
+
     /// Clears this list of variables.
     pub fn clear(&mut self) {
         self.values.clear();
@@ -290,6 +297,7 @@ impl Statement {
             Statement::Scan(statement) => statement.execute(exec),
             Statement::Print(statement) => statement.execute(exec),
             Statement::Conditional(statement) => statement.execute(exec),
+            Statement::ForIn(statement) => statement.execute(exec),
         }
     }
 }
@@ -479,6 +487,23 @@ impl Conditional {
                 }
                 return Ok(());
             }
+        }
+        Ok(())
+    }
+}
+
+impl ForIn {
+    fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        let values = self.values.evaluate(exec)?;
+        let values = values.into_list(exec.graph)?;
+        for value in values {
+            exec.locals.add_immutable(self.name, value).map_err(|_| {
+                ExecutionError::DuplicateVariable(format!("{}", self.name.display_with(exec.ctx)))
+            })?;
+            for stmt in &self.statements {
+                stmt.execute(exec)?;
+            }
+            exec.locals.remove(self.name);
         }
         Ok(())
     }

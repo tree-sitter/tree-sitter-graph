@@ -983,3 +983,51 @@ fn can_parse_if_else() {
         ]]
     );
 }
+
+#[test]
+fn can_parse_for_in() {
+    let mut ctx = Context::new();
+    let source = r#"
+        (module)
+        {
+          for x in [1, 2, 3] {
+            print x
+          }
+        }
+    "#;
+    let mut file = File::new(tree_sitter_python::language());
+    file.parse(&mut ctx, source).expect("Cannot parse file");
+
+    let x = ctx.add_identifier("x");
+
+    let statements = file
+        .stanzas
+        .into_iter()
+        .map(|s| s.statements)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        statements,
+        vec![vec![ForIn {
+            name: x,
+            values: ListComprehension {
+                elements: vec![
+                    IntegerConstant { value: 1 }.into(),
+                    IntegerConstant { value: 2 }.into(),
+                    IntegerConstant { value: 3 }.into(),
+                ],
+            }
+            .into(),
+            statements: vec![Print {
+                values: vec![UnscopedVariable {
+                    name: x,
+                    location: Location { row: 4, column: 18 },
+                }
+                .into()],
+                location: Location { row: 4, column: 12 }
+            }
+            .into()],
+            location: Location { row: 3, column: 10 }
+        }
+        .into()]]
+    );
+}

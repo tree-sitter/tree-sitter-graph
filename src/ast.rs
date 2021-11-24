@@ -64,6 +64,8 @@ pub enum Statement {
     Print(Print),
     // Conditional
     Conditional(Conditional),
+    // ForIn
+    ForIn(ForIn),
 }
 
 impl DisplayWithContext for Statement {
@@ -79,6 +81,7 @@ impl DisplayWithContext for Statement {
             Statement::Scan(stmt) => stmt.fmt(f, ctx),
             Statement::Print(stmt) => stmt.fmt(f, ctx),
             Statement::Conditional(stmt) => stmt.fmt(f, ctx),
+            Statement::ForIn(stmt) => stmt.fmt(f, ctx),
         }
     }
 }
@@ -387,6 +390,33 @@ pub struct ConditionalArm {
     pub condition: Expression,
     pub statements: Vec<Statement>,
     pub location: Location,
+}
+
+/// A `for in` statement
+#[derive(Debug, Eq, PartialEq)]
+pub struct ForIn {
+    pub name: Identifier,
+    pub values: Expression,
+    pub statements: Vec<Statement>,
+    pub location: Location,
+}
+
+impl From<ForIn> for Statement {
+    fn from(statement: ForIn) -> Statement {
+        Statement::ForIn(statement)
+    }
+}
+
+impl DisplayWithContext for ForIn {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        write!(
+            f,
+            "for {} in {} {{ ... }} at {}",
+            self.name.display_with(ctx),
+            self.values.display_with(ctx),
+            self.location,
+        )
+    }
 }
 
 /// A reference to a variable

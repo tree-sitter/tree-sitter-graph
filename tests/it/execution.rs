@@ -389,3 +389,47 @@ fn skip_if_without_true_conditions() {
         "#},
     );
 }
+
+#[test]
+fn can_execute_for_in_nonempty_list() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            var n = 0
+            for x in [1, 2, 3] {
+              set n = (plus n x)
+            }
+            node node0
+            attr (node0) val = n
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            val: 6
+        "#},
+    );
+}
+
+#[test]
+fn can_execute_for_in_empty_list() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            var n = 0
+            for x in [] {
+              set n = (plus n x)
+            }
+            node node0
+            attr (node0) val = n
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            val: 0
+        "#},
+    );
+}
