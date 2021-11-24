@@ -59,6 +59,9 @@ impl File {
         globals: &mut Variables,
     ) -> Result<Graph<'tree>, ExecutionError> {
         let mut graph = Graph::new();
+        if tree.root_node().has_error() {
+            return Err(ExecutionError::ParseTreeHasErrors);
+        }
         let mut locals = Variables::new();
         let mut scoped = ScopedVariables::new();
         let mut current_regex_matches = Vec::new();
@@ -118,6 +121,8 @@ pub enum ExecutionError {
     UndefinedEdge(String),
     #[error("Undefined variable {0}")]
     UndefinedVariable(String),
+    #[error("Parse tree has errors")]
+    ParseTreeHasErrors,
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
