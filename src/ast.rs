@@ -9,6 +9,7 @@
 
 use regex::Regex;
 use std::fmt;
+use tree_sitter::CaptureQuantifier;
 use tree_sitter::Language;
 use tree_sitter::Query;
 
@@ -478,6 +479,8 @@ impl DisplayWithContext for Call {
 pub struct Capture {
     /// The index of this capture in the block's tree-sitter query
     pub index: usize,
+    /// The suffix of the capture
+    pub quantifier: CaptureQuantifier,
     /// The name of the capture
     pub name: Identifier,
 }

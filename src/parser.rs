@@ -609,8 +609,14 @@ impl Parser<'_> {
                 ))
             }
         };
+        let quantifier = current_query.capture_quantifiers(0)[index];
         let name = self.ctx.add_identifier(&self.source[start..end]);
-        Ok(ast::Capture { index, name }.into())
+        Ok(ast::Capture {
+            index,
+            quantifier,
+            name,
+        }
+        .into())
     }
 
     fn parse_integer_constant(&mut self) -> Result<ast::Expression, ParseError> {

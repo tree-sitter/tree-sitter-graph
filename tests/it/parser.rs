@@ -5,6 +5,8 @@
 // Please see the LICENSE-APACHE or LICENSE-MIT files in this distribution for license details.
 // ------------------------------------------------------------------------------------------------
 
+use tree_sitter::CaptureQuantifier::*;
+
 use tree_sitter_graph::ast::*;
 use tree_sitter_graph::Context;
 use tree_sitter_graph::Location;
@@ -58,6 +60,7 @@ fn can_parse_blocks() {
                     scope: Box::new(
                         Capture {
                             index: 1,
+                            quantifier: One,
                             name: cap2
                         }
                         .into()
@@ -74,6 +77,7 @@ fn can_parse_blocks() {
                     scope: Box::new(
                         Capture {
                             index: 1,
+                            quantifier: One,
                             name: cap2
                         }
                         .into()
@@ -95,6 +99,7 @@ fn can_parse_blocks() {
                     scope: Box::new(
                         Capture {
                             index: 1,
+                            quantifier: One,
                             name: cap2
                         }
                         .into()
@@ -120,6 +125,7 @@ fn can_parse_blocks() {
                     scope: Box::new(
                         Capture {
                             index: 1,
+                            quantifier: One,
                             name: cap2
                         }
                         .into()
@@ -146,6 +152,7 @@ fn can_parse_blocks() {
                     scope: Box::new(
                         Capture {
                             index: 1,
+                            quantifier: One,
                             name: cap2
                         }
                         .into()
@@ -167,6 +174,7 @@ fn can_parse_blocks() {
                     scope: Box::new(
                         Capture {
                             index: 1,
+                            quantifier: One,
                             name: cap2
                         }
                         .into()
@@ -498,4 +506,256 @@ fn cannot_parse_nullable_regex() {
     if let Ok(_) = file.parse(&mut ctx, source) {
         panic!("Parse succeeded unexpectedly");
     }
+}
+
+#[test]
+fn can_parse_star_capture() {
+    let mut ctx = Context::new();
+    let source = r#"
+        (module (_)* @stmts)
+        {
+          print @stmts
+        }
+    "#;
+    let mut file = File::new(tree_sitter_python::language());
+    file.parse(&mut ctx, source).expect("Cannot parse file");
+
+    let stmts = ctx.add_identifier("@stmts");
+
+    let statements = file
+        .stanzas
+        .into_iter()
+        .map(|s| s.statements)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        statements,
+        vec![vec![Print {
+            values: vec![Capture {
+                index: 0,
+                quantifier: ZeroOrMore,
+                name: stmts,
+            }
+            .into()],
+            location: Location { row: 3, column: 10 },
+        }
+        .into()]]
+    );
+}
+
+#[test]
+fn can_parse_star_multiple_capture() {
+    let mut ctx = Context::new();
+    let source = r#"
+        (module (_) @stmt * @stmts)
+        {
+          print @stmt
+          print @stmts
+        }
+    "#;
+    let mut file = File::new(tree_sitter_python::language());
+    file.parse(&mut ctx, source).expect("Cannot parse file");
+
+    let stmt = ctx.add_identifier("@stmt");
+    let stmts = ctx.add_identifier("@stmts");
+
+    let statements = file
+        .stanzas
+        .into_iter()
+        .map(|s| s.statements)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        statements,
+        vec![vec![
+            Print {
+                values: vec![Capture {
+                    index: 0,
+                    quantifier: ZeroOrMore,
+                    name: stmt,
+                }
+                .into()],
+                location: Location { row: 3, column: 10 },
+            }
+            .into(),
+            Print {
+                values: vec![Capture {
+                    index: 1,
+                    quantifier: ZeroOrMore,
+                    name: stmts,
+                }
+                .into()],
+                location: Location { row: 4, column: 10 },
+            }
+            .into()
+        ]]
+    );
+}
+
+#[test]
+fn can_parse_plus_capture() {
+    let mut ctx = Context::new();
+    let source = r#"
+        (module (_)+ @stmts)
+        {
+          print @stmts
+        }
+    "#;
+    let mut file = File::new(tree_sitter_python::language());
+    file.parse(&mut ctx, source).expect("Cannot parse file");
+
+    let stmts = ctx.add_identifier("@stmts");
+
+    let statements = file
+        .stanzas
+        .into_iter()
+        .map(|s| s.statements)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        statements,
+        vec![vec![Print {
+            values: vec![Capture {
+                index: 0,
+                quantifier: OneOrMore,
+                name: stmts,
+            }
+            .into()],
+            location: Location { row: 3, column: 10 },
+        }
+        .into()]]
+    );
+}
+
+#[test]
+fn can_parse_optional_capture() {
+    let mut ctx = Context::new();
+    let source = r#"
+        (module (_)? @stmt)
+        {
+          print @stmt
+        }
+    "#;
+    let mut file = File::new(tree_sitter_python::language());
+    file.parse(&mut ctx, source).expect("Cannot parse file");
+
+    let stmt = ctx.add_identifier("@stmt");
+
+    let statements = file
+        .stanzas
+        .into_iter()
+        .map(|s| s.statements)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        statements,
+        vec![vec![Print {
+            values: vec![Capture {
+                index: 0,
+                quantifier: ZeroOrOne,
+                name: stmt,
+            }
+            .into()],
+            location: Location { row: 3, column: 10 },
+        }
+        .into()]]
+    );
+}
+
+#[test]
+fn can_parse_parent_optional_capture() {
+    let mut ctx = Context::new();
+    let source = r#"
+        (module (_) @stmt) ?
+        {
+          print @stmt
+        }
+    "#;
+    let mut file = File::new(tree_sitter_python::language());
+    file.parse(&mut ctx, source).expect("Cannot parse file");
+
+    let stmt = ctx.add_identifier("@stmt");
+
+    let statements = file
+        .stanzas
+        .into_iter()
+        .map(|s| s.statements)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        statements,
+        vec![vec![Print {
+            values: vec![Capture {
+                index: 0,
+                quantifier: ZeroOrOne,
+                name: stmt,
+            }
+            .into()],
+            location: Location { row: 3, column: 10 },
+        }
+        .into()]]
+    );
+}
+
+#[test]
+fn can_parse_alternative_capture() {
+    let mut ctx = Context::new();
+    let source = r#"
+        (module [(_) (_) @stmt])
+        {
+          print @stmt
+        }
+    "#;
+    let mut file = File::new(tree_sitter_python::language());
+    file.parse(&mut ctx, source).expect("Cannot parse file");
+
+    let stmt = ctx.add_identifier("@stmt");
+
+    let statements = file
+        .stanzas
+        .into_iter()
+        .map(|s| s.statements)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        statements,
+        vec![vec![Print {
+            values: vec![Capture {
+                index: 0,
+                quantifier: ZeroOrOne,
+                name: stmt,
+            }
+            .into()],
+            location: Location { row: 3, column: 10 },
+        }
+        .into()]]
+    );
+}
+
+#[test]
+fn can_parse_nested_plus_and_optional_capture() {
+    let mut ctx = Context::new();
+    let source = r#"
+        (module (_)+ @stmt) ?
+        {
+          print @stmt
+        }
+    "#;
+    let mut file = File::new(tree_sitter_python::language());
+    file.parse(&mut ctx, source).expect("Cannot parse file");
+
+    let stmt = ctx.add_identifier("@stmt");
+
+    let statements = file
+        .stanzas
+        .into_iter()
+        .map(|s| s.statements)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        statements,
+        vec![vec![Print {
+            values: vec![Capture {
+                index: 0,
+                quantifier: ZeroOrMore,
+                name: stmt,
+            }
+            .into()],
+            location: Location { row: 3, column: 10 },
+        }
+        .into()]]
+    );
 }
