@@ -19,6 +19,7 @@ use crate::ast::AddGraphNodeAttribute;
 use crate::ast::Assign;
 use crate::ast::Call;
 use crate::ast::Capture;
+use crate::ast::Conditional;
 use crate::ast::CreateEdge;
 use crate::ast::CreateGraphNode;
 use crate::ast::DeclareImmutable;
@@ -288,6 +289,7 @@ impl Statement {
             Statement::AddEdgeAttribute(statement) => statement.execute(exec),
             Statement::Scan(statement) => statement.execute(exec),
             Statement::Print(statement) => statement.execute(exec),
+            Statement::Conditional(statement) => statement.execute(exec),
         }
     }
 }
@@ -464,6 +466,20 @@ impl Print {
             }
         }
         eprintln!();
+        Ok(())
+    }
+}
+
+impl Conditional {
+    fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        for arm in &self.arms {
+            if arm.condition.evaluate(exec)?.into_bool(exec.graph)? {
+                for stmt in &arm.statements {
+                    stmt.execute(exec)?;
+                }
+                return Ok(());
+            }
+        }
         Ok(())
     }
 }

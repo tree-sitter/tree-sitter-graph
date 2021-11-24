@@ -89,6 +89,7 @@ struct Parser<'a> {
     attr_keyword: Identifier,
     edge_keyword: Identifier,
     false_keyword: Identifier,
+    if_keyword: Identifier,
     let_keyword: Identifier,
     node_keyword: Identifier,
     null_keyword: Identifier,
@@ -113,6 +114,7 @@ impl<'a> Parser<'a> {
         let attr_keyword = ctx.add_identifier("attr");
         let edge_keyword = ctx.add_identifier("edge");
         let false_keyword = ctx.add_identifier("false");
+        let if_keyword = ctx.add_identifier("if");
         let let_keyword = ctx.add_identifier("let");
         let node_keyword = ctx.add_identifier("node");
         let null_keyword = ctx.add_identifier("null");
@@ -131,6 +133,7 @@ impl<'a> Parser<'a> {
             edge_keyword,
             false_keyword,
             let_keyword,
+            if_keyword,
             node_keyword,
             null_keyword,
             print_keyword,
@@ -441,6 +444,58 @@ impl Parser<'_> {
             self.consume_token("}")?;
             Ok(ast::Scan {
                 value,
+                arms,
+                location: keyword_location,
+            }
+            .into())
+        } else if keyword == self.if_keyword {
+            let mut arms = Vec::new();
+
+            // if
+            let location = keyword_location;
+            let condition = self.parse_expression(current_query)?;
+            self.consume_whitespace();
+            let statements = self.parse_statements(current_query)?;
+            self.consume_whitespace();
+            arms.push(ast::ConditionalArm {
+                condition,
+                statements,
+                location,
+            });
+
+            // elif
+            let mut location = self.location;
+            while let Ok(_) = self.consume_token("elif") {
+                self.consume_whitespace();
+                let condition = self.parse_expression(current_query)?;
+                self.consume_whitespace();
+                let statements = self.parse_statements(current_query)?;
+                self.consume_whitespace();
+                arms.push(ast::ConditionalArm {
+                    condition,
+                    statements,
+                    location,
+                });
+                self.consume_whitespace();
+                location = self.location;
+            }
+
+            // else
+            let location = self.location;
+            if let Ok(_) = self.consume_token("else") {
+                let condition = ast::Expression::TrueLiteral;
+                self.consume_whitespace();
+                let statements = self.parse_statements(current_query)?;
+                self.consume_whitespace();
+                arms.push(ast::ConditionalArm {
+                    condition,
+                    statements,
+                    location,
+                });
+                self.consume_whitespace();
+            }
+
+            Ok(ast::Conditional {
                 arms,
                 location: keyword_location,
             }

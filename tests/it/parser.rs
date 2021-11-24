@@ -759,3 +759,227 @@ fn can_parse_nested_plus_and_optional_capture() {
         .into()]]
     );
 }
+
+#[test]
+fn can_parse_if() {
+    let mut ctx = Context::new();
+    let source = r#"
+        (module)
+        {
+          let x = #null
+          if (is-null x) {
+            print "x is null"
+          }
+        }
+    "#;
+    let mut file = File::new(tree_sitter_python::language());
+    file.parse(&mut ctx, source).expect("Cannot parse file");
+
+    let x = ctx.add_identifier("x");
+    let is_null = ctx.add_identifier("is-null");
+
+    let statements = file
+        .stanzas
+        .into_iter()
+        .map(|s| s.statements)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        statements,
+        vec![vec![
+            DeclareImmutable {
+                variable: UnscopedVariable {
+                    name: x,
+                    location: Location { row: 3, column: 14 },
+                }
+                .into(),
+                value: Expression::NullLiteral,
+                location: Location { row: 3, column: 10 },
+            }
+            .into(),
+            Conditional {
+                arms: vec![ConditionalArm {
+                    condition: Call {
+                        function: is_null,
+                        parameters: vec![UnscopedVariable {
+                            name: x,
+                            location: Location { row: 4, column: 22 },
+                        }
+                        .into()],
+                    }
+                    .into(),
+                    statements: vec![Print {
+                        values: vec![StringConstant {
+                            value: "x is null".into()
+                        }
+                        .into()],
+                        location: Location { row: 5, column: 12 }
+                    }
+                    .into()],
+                    location: Location { row: 4, column: 10 }
+                }],
+                location: Location { row: 4, column: 10 }
+            }
+            .into()
+        ]]
+    );
+}
+
+#[test]
+fn can_parse_if_elif() {
+    let mut ctx = Context::new();
+    let source = r#"
+        (module)
+        {
+          let x = #null
+          if (is-null x) {
+            print "x is null"
+          } elif #true {
+            print "x is not null"
+          }
+        }
+    "#;
+    let mut file = File::new(tree_sitter_python::language());
+    file.parse(&mut ctx, source).expect("Cannot parse file");
+
+    let x = ctx.add_identifier("x");
+    let is_null = ctx.add_identifier("is-null");
+
+    let statements = file
+        .stanzas
+        .into_iter()
+        .map(|s| s.statements)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        statements,
+        vec![vec![
+            DeclareImmutable {
+                variable: UnscopedVariable {
+                    name: x,
+                    location: Location { row: 3, column: 14 },
+                }
+                .into(),
+                value: Expression::NullLiteral,
+                location: Location { row: 3, column: 10 },
+            }
+            .into(),
+            Conditional {
+                arms: vec![
+                    ConditionalArm {
+                        condition: Call {
+                            function: is_null,
+                            parameters: vec![UnscopedVariable {
+                                name: x,
+                                location: Location { row: 4, column: 22 },
+                            }
+                            .into()],
+                        }
+                        .into(),
+                        statements: vec![Print {
+                            values: vec![StringConstant {
+                                value: "x is null".into()
+                            }
+                            .into()],
+                            location: Location { row: 5, column: 12 }
+                        }
+                        .into()],
+                        location: Location { row: 4, column: 10 }
+                    },
+                    ConditionalArm {
+                        condition: Expression::TrueLiteral,
+                        statements: vec![Print {
+                            values: vec![StringConstant {
+                                value: "x is not null".into()
+                            }
+                            .into()],
+                            location: Location { row: 7, column: 12 }
+                        }
+                        .into()],
+                        location: Location { row: 6, column: 12 }
+                    }
+                ],
+                location: Location { row: 4, column: 10 }
+            }
+            .into()
+        ]]
+    );
+}
+
+#[test]
+fn can_parse_if_else() {
+    let mut ctx = Context::new();
+    let source = r#"
+        (module)
+        {
+          let x = #null
+          if (is-null x) {
+            print "x is null"
+          } else {
+            print "x is not null"
+          }
+        }
+    "#;
+    let mut file = File::new(tree_sitter_python::language());
+    file.parse(&mut ctx, source).expect("Cannot parse file");
+
+    let x = ctx.add_identifier("x");
+    let is_null = ctx.add_identifier("is-null");
+
+    let statements = file
+        .stanzas
+        .into_iter()
+        .map(|s| s.statements)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        statements,
+        vec![vec![
+            DeclareImmutable {
+                variable: UnscopedVariable {
+                    name: x,
+                    location: Location { row: 3, column: 14 },
+                }
+                .into(),
+                value: Expression::NullLiteral,
+                location: Location { row: 3, column: 10 },
+            }
+            .into(),
+            Conditional {
+                arms: vec![
+                    ConditionalArm {
+                        condition: Call {
+                            function: is_null,
+                            parameters: vec![UnscopedVariable {
+                                name: x,
+                                location: Location { row: 4, column: 22 },
+                            }
+                            .into()],
+                        }
+                        .into(),
+                        statements: vec![Print {
+                            values: vec![StringConstant {
+                                value: "x is null".into()
+                            }
+                            .into()],
+                            location: Location { row: 5, column: 12 }
+                        }
+                        .into()],
+                        location: Location { row: 4, column: 10 }
+                    },
+                    ConditionalArm {
+                        condition: Expression::TrueLiteral,
+                        statements: vec![Print {
+                            values: vec![StringConstant {
+                                value: "x is not null".into()
+                            }
+                            .into()],
+                            location: Location { row: 7, column: 12 }
+                        }
+                        .into()],
+                        location: Location { row: 6, column: 12 }
+                    }
+                ],
+                location: Location { row: 4, column: 10 }
+            }
+            .into()
+        ]]
+    );
+}

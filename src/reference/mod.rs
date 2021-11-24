@@ -419,6 +419,25 @@
 //! }
 //! ```
 //!
+//! # Conditionals
+//!
+//! You can use `if` statements to make blocks of statements conditional. This is particularly
+//! useful when queries have optional captures. The condition can any expression that evaluates
+//! to a boolean value:
+//!
+//! ``` tsg
+//! (lexical_declaration type:(_)? @type value:(_)? @value)
+//! {
+//!   if (and @type? @value?) {
+//!     ; ...
+//!   } elif @value? {
+//!     ; ...
+//!   } else {
+//!     ; ...
+//!   }
+//! }
+//! ```
+//!
 //! # Debugging
 //!
 //! To support members of the Ancient and Harmonious Order of Printf Debuggers, you can use `print`

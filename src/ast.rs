@@ -62,6 +62,8 @@ pub enum Statement {
     Scan(Scan),
     // Debugging
     Print(Print),
+    // Conditional
+    Conditional(Conditional),
 }
 
 impl DisplayWithContext for Statement {
@@ -76,6 +78,7 @@ impl DisplayWithContext for Statement {
             Statement::AddEdgeAttribute(stmt) => stmt.fmt(f, ctx),
             Statement::Scan(stmt) => stmt.fmt(f, ctx),
             Statement::Print(stmt) => stmt.fmt(f, ctx),
+            Statement::Conditional(stmt) => stmt.fmt(f, ctx),
         }
     }
 }
@@ -348,6 +351,42 @@ impl DisplayWithContext for ScanArm {
     fn fmt(&self, f: &mut fmt::Formatter, _ctx: &Context) -> fmt::Result {
         write!(f, "{:?} {{ ... }}", self.regex.as_str())
     }
+}
+
+/// A `cond` conditional statement that selects the first branch with a matching condition
+#[derive(Debug, Eq, PartialEq)]
+pub struct Conditional {
+    pub arms: Vec<ConditionalArm>,
+    pub location: Location,
+}
+
+impl From<Conditional> for Statement {
+    fn from(statement: Conditional) -> Statement {
+        Statement::Conditional(statement)
+    }
+}
+
+impl DisplayWithContext for Conditional {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        let mut first = true;
+        for arm in &self.arms {
+            if first {
+                first = false;
+                write!(f, "if {} {{ ... }}", arm.condition.display_with(ctx))?;
+            } else {
+                write!(f, " elif {} {{ ... }}", arm.condition.display_with(ctx))?;
+            }
+        }
+        write!(f, " at {}", self.location)
+    }
+}
+
+/// One arm of a `cond` statement
+#[derive(Debug, PartialEq, Eq)]
+pub struct ConditionalArm {
+    pub condition: Expression,
+    pub statements: Vec<Statement>,
+    pub location: Location,
 }
 
 /// A reference to a variable
