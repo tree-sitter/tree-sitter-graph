@@ -413,6 +413,13 @@ pub enum Value {
 }
 
 impl Value {
+    /// Check if this value is null
+    pub fn is_null(self) -> bool {
+        match self {
+            Value::Null => true,
+            _ => false,
+        }
+    }
     /// Coerces this value into a boolean, returning an error if it's some other type of value.
     pub fn into_bool(self, graph: &Graph) -> Result<bool, ExecutionError> {
         match self {

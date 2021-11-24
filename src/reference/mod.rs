@@ -423,6 +423,26 @@
 //! }
 //! ```
 //!
+//! # Conditionals
+//!
+//! You can use `if` statements to make blocks of statements conditional on the result of
+//! optional captures in queries.  Conditions are comma-separated lists of `some @capture`,
+//! indicating the capture must be present, and `none @capture` clauses, indicating the
+//! capture must be absent.
+//!
+//! ``` tsg
+//! (lexical_declaration type:(_)? @type value:(_)? @value)
+//! {
+//!   if some @type, none @value {
+//!     ; ...
+//!   } elif some @value {
+//!     ; ...
+//!   } else {
+//!     ; ...
+//!   }
+//! }
+//! ```
+//!
 //! # Debugging
 //!
 //! To support members of the Ancient and Harmonious Order of Printf Debuggers, you can use `print`

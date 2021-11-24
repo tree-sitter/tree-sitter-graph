@@ -759,3 +759,194 @@ fn can_parse_nested_plus_and_optional_capture() {
         .into()]]
     );
 }
+
+#[test]
+fn can_parse_if() {
+    let mut ctx = Context::new();
+    let source = r#"
+        (module (pass_statement)? @x)
+        {
+          if some @x {
+            print "x is not null"
+          }
+        }
+    "#;
+    let mut file = File::new(tree_sitter_python::language());
+    file.parse(&mut ctx, source).expect("Cannot parse file");
+
+    let x = ctx.add_identifier("@x");
+
+    let statements = file
+        .stanzas
+        .into_iter()
+        .map(|s| s.statements)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        statements,
+        vec![vec![If {
+            arms: vec![IfArm {
+                conditions: vec![Condition::Some(vec![Capture {
+                    index: 0,
+                    quantifier: ZeroOrOne,
+                    name: x,
+                }])],
+                statements: vec![Print {
+                    values: vec![StringConstant {
+                        value: "x is not null".into()
+                    }
+                    .into()],
+                    location: Location { row: 4, column: 12 }
+                }
+                .into()],
+                location: Location { row: 3, column: 10 }
+            }],
+            location: Location { row: 3, column: 10 }
+        }
+        .into()]]
+    );
+}
+
+#[test]
+fn can_parse_if_elif() {
+    let mut ctx = Context::new();
+    let source = r#"
+        (module (pass_statement)? @x)
+        {
+          if none @x {
+            print "x is null"
+          } elif some @x {
+            print "x is not null"
+          }
+        }
+    "#;
+    let mut file = File::new(tree_sitter_python::language());
+    file.parse(&mut ctx, source).expect("Cannot parse file");
+
+    let x = ctx.add_identifier("@x");
+
+    let statements = file
+        .stanzas
+        .into_iter()
+        .map(|s| s.statements)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        statements,
+        vec![vec![If {
+            arms: vec![
+                IfArm {
+                    conditions: vec![Condition::None(vec![Capture {
+                        index: 0,
+                        quantifier: ZeroOrOne,
+                        name: x,
+                    }])],
+                    statements: vec![Print {
+                        values: vec![StringConstant {
+                            value: "x is null".into()
+                        }
+                        .into()],
+                        location: Location { row: 4, column: 12 }
+                    }
+                    .into()],
+                    location: Location { row: 3, column: 10 }
+                },
+                IfArm {
+                    conditions: vec![Condition::Some(vec![Capture {
+                        index: 0,
+                        quantifier: ZeroOrOne,
+                        name: x,
+                    }])],
+                    statements: vec![Print {
+                        values: vec![StringConstant {
+                            value: "x is not null".into()
+                        }
+                        .into()],
+                        location: Location { row: 6, column: 12 }
+                    }
+                    .into()],
+                    location: Location { row: 5, column: 12 }
+                }
+            ],
+            location: Location { row: 3, column: 10 }
+        }
+        .into()]]
+    );
+}
+
+#[test]
+fn can_parse_if_else() {
+    let mut ctx = Context::new();
+    let source = r#"
+        (module (pass_statement)? @x)
+        {
+          if none @x {
+            print "x is null"
+          } else {
+            print "x is not null"
+          }
+        }
+    "#;
+    let mut file = File::new(tree_sitter_python::language());
+    file.parse(&mut ctx, source).expect("Cannot parse file");
+
+    let x = ctx.add_identifier("@x");
+
+    let statements = file
+        .stanzas
+        .into_iter()
+        .map(|s| s.statements)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        statements,
+        vec![vec![If {
+            arms: vec![
+                IfArm {
+                    conditions: vec![Condition::None(vec![Capture {
+                        index: 0,
+                        quantifier: ZeroOrOne,
+                        name: x,
+                    }])],
+                    statements: vec![Print {
+                        values: vec![StringConstant {
+                            value: "x is null".into()
+                        }
+                        .into()],
+                        location: Location { row: 4, column: 12 }
+                    }
+                    .into()],
+                    location: Location { row: 3, column: 10 }
+                },
+                IfArm {
+                    conditions: vec![],
+                    statements: vec![Print {
+                        values: vec![StringConstant {
+                            value: "x is not null".into()
+                        }
+                        .into()],
+                        location: Location { row: 6, column: 12 }
+                    }
+                    .into()],
+                    location: Location { row: 5, column: 12 }
+                }
+            ],
+            location: Location { row: 3, column: 10 }
+        }
+        .into()]]
+    );
+}
+
+#[test]
+fn cannot_parse_if_list_capture() {
+    let mut ctx = Context::new();
+    let source = r#"
+        (module (_)+ @xs) @root
+        {
+          if @xs {
+            node n
+          }
+        }
+    "#;
+    let mut file = File::new(tree_sitter_python::language());
+    if let Ok(_) = file.parse(&mut ctx, source) {
+        panic!("Parse succeeded unexpectedly");
+    }
+}

@@ -62,6 +62,8 @@ pub enum Statement {
     Scan(Scan),
     // Debugging
     Print(Print),
+    // If
+    If(If),
 }
 
 impl DisplayWithContext for Statement {
@@ -76,6 +78,7 @@ impl DisplayWithContext for Statement {
             Statement::AddEdgeAttribute(stmt) => stmt.fmt(f, ctx),
             Statement::Scan(stmt) => stmt.fmt(f, ctx),
             Statement::Print(stmt) => stmt.fmt(f, ctx),
+            Statement::If(stmt) => stmt.fmt(f, ctx),
         }
     }
 }
@@ -347,6 +350,86 @@ impl PartialEq for ScanArm {
 impl DisplayWithContext for ScanArm {
     fn fmt(&self, f: &mut fmt::Formatter, _ctx: &Context) -> fmt::Result {
         write!(f, "{:?} {{ ... }}", self.regex.as_str())
+    }
+}
+
+/// A `cond` conditional statement that selects the first branch with a matching condition
+#[derive(Debug, Eq, PartialEq)]
+pub struct If {
+    pub arms: Vec<IfArm>,
+    pub location: Location,
+}
+
+impl From<If> for Statement {
+    fn from(statement: If) -> Statement {
+        Statement::If(statement)
+    }
+}
+
+impl DisplayWithContext for If {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        let mut first = true;
+        for arm in &self.arms {
+            if first {
+                first = false;
+                write!(f, "if {} {{ ... }}", arm.conditions.display_with(ctx))?;
+            } else {
+                if !arm.conditions.is_empty() {
+                    write!(f, " elif {} {{ ... }}", arm.conditions.display_with(ctx))?;
+                } else {
+                    write!(f, " else {{ ... }}")?;
+                }
+            }
+        }
+        write!(f, " at {}", self.location)
+    }
+}
+
+/// One arm of a `cond` statement
+#[derive(Debug, PartialEq, Eq)]
+pub struct IfArm {
+    pub conditions: Vec<Condition>,
+    pub statements: Vec<Statement>,
+    pub location: Location,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum Condition {
+    Some(Vec<Capture>),
+    None(Vec<Capture>),
+}
+
+impl DisplayWithContext for Vec<Condition> {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        let mut first = true;
+        for condition in self.iter() {
+            if first {
+                first = false;
+                write!(f, "{}", condition.display_with(ctx))?;
+            } else {
+                write!(f, ", {}", condition.display_with(ctx))?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl DisplayWithContext for Condition {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        let captures = match self {
+            Condition::Some(captures) => {
+                write!(f, "some")?;
+                Ok(captures)
+            }
+            Condition::None(captures) => {
+                write!(f, "none")?;
+                Ok(captures)
+            }
+        }?;
+        for capture in captures {
+            write!(f, " {}", capture.display_with(ctx))?;
+        }
+        Ok(())
     }
 }
 
