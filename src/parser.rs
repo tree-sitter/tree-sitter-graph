@@ -19,6 +19,8 @@ use crate::ast;
 use crate::Context;
 use crate::Identifier;
 
+pub const FULL_MATCH: &str = "__tsg__full_match";
+
 impl ast::File {
     /// Parses a graph DSL file, adding its content to an existing `File` instance.
     pub fn parse(&mut self, ctx: &mut Context, content: &str) -> Result<(), ParseError> {
@@ -242,8 +244,8 @@ impl Parser<'_> {
         let query_start = self.offset;
         self.skip_query()?;
         let query_end = self.offset;
-        let query_source = &self.source[query_start..query_end];
-        Ok(Query::new(language, query_source)?)
+        let query_source = self.source[query_start..query_end].to_owned() + "@" + FULL_MATCH;
+        Ok(Query::new(language, &query_source)?)
     }
 
     fn skip_query(&mut self) -> Result<(), ParseError> {

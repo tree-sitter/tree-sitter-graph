@@ -7,6 +7,7 @@
 
 use anyhow::Context as _;
 
+use tree_sitter::Query;
 use tree_sitter::QueryCursor;
 use tree_sitter::QueryMatch;
 use tree_sitter::Tree;
@@ -39,6 +40,7 @@ use crate::execution::query_capture_value;
 use crate::execution::ExecutionError;
 use crate::graph::Graph;
 use crate::graph::Value;
+use crate::parser::FULL_MATCH;
 use crate::Context;
 use crate::DisplayWithContext;
 use crate::Identifier;
@@ -50,6 +52,14 @@ use super::variables::LoopVariables;
 use super::variables::Mutability;
 use super::variables::VariableContext;
 use super::variables::Variables;
+
+pub fn full_match_capture_index(query: &Query) -> usize {
+    query
+        .capture_names()
+        .iter()
+        .position(|c| c == FULL_MATCH)
+        .unwrap()
+}
 
 pub struct ExecutionContext<'a, 'tree> {
     ctx: &'a mut Context,
