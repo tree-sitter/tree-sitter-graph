@@ -29,6 +29,7 @@ use crate::ast::File;
 use crate::ast::ForIn;
 use crate::ast::IntegerConstant;
 use crate::ast::ListComprehension;
+use crate::ast::NotNull;
 use crate::ast::Print;
 use crate::ast::RegexCapture;
 use crate::ast::Scan;
@@ -523,6 +524,7 @@ impl Expression {
             Expression::Variable(expr) => expr.evaluate(exec),
             Expression::Call(expr) => expr.evaluate(exec),
             Expression::RegexCapture(expr) => expr.evaluate(exec),
+            Expression::NotNull(expr) => expr.evaluate(exec),
         }
     }
 
@@ -611,6 +613,17 @@ impl RegexCapture {
             ExecutionError::UndefinedRegexCapture(format!("{}", self.display_with(exec.ctx))),
         )?;
         Ok(Value::String(capture.clone()))
+    }
+}
+
+impl NotNull {
+    fn evaluate(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+        let value = self.value.evaluate(exec)?;
+        let result = match value {
+            Value::Null => false,
+            _ => true,
+        };
+        Ok(result.into())
     }
 }
 

@@ -600,6 +600,12 @@ impl Parser<'_> {
             }
             .into();
         }
+        if self.try_peek() == Some('?') {
+            self.skip().unwrap();
+            self.consume_whitespace();
+            let value = Box::new(expression);
+            expression = ast::NotNull { value }.into();
+        }
         Ok(expression)
     }
 

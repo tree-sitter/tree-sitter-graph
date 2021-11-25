@@ -121,6 +121,7 @@
 //!   - a reference to a graph node
 //!   - an ordered list of values
 //!   - an unordered set of values
+//!   - a null check
 //!
 //! The null value is spelled `#null`.
 //!
@@ -162,6 +163,13 @@
 //!   #true,
 //!   @id,
 //! ]
+//! ```
+//!
+//! Null checks are written as a question mark following an expression. They are used to check if
+//! an optional query capture is present or not:
+//!
+//! ``` tsg
+//!  @some_capture?
 //! ```
 //!
 //! # Syntax nodes

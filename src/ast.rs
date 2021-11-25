@@ -500,6 +500,8 @@ pub enum Expression {
     Call(Call),
     // Regular expression
     RegexCapture(RegexCapture),
+    // built-in null check
+    NotNull(NotNull),
 }
 
 impl DisplayWithContext for Expression {
@@ -516,6 +518,7 @@ impl DisplayWithContext for Expression {
             Expression::Variable(expr) => expr.fmt(f, ctx),
             Expression::Call(expr) => expr.fmt(f, ctx),
             Expression::RegexCapture(expr) => expr.fmt(f, ctx),
+            Expression::NotNull(expr) => expr.fmt(f, ctx),
         }
     }
 }
@@ -679,6 +682,24 @@ impl DisplayWithContext for StringConstant {
 impl From<String> for Expression {
     fn from(value: String) -> Expression {
         Expression::StringConstant(StringConstant { value }.into())
+    }
+}
+
+/// A null check
+#[derive(Debug, Eq, PartialEq)]
+pub struct NotNull {
+    pub value: Box<Expression>,
+}
+
+impl From<NotNull> for Expression {
+    fn from(expr: NotNull) -> Expression {
+        Expression::NotNull(expr)
+    }
+}
+
+impl DisplayWithContext for NotNull {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        write!(f, "{}?", self.value.display_with(ctx))
     }
 }
 

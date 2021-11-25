@@ -506,3 +506,50 @@ fn can_execute_optional_capture() {
         "#},
     );
 }
+
+#[test]
+fn can_execute_null_check_on_nonempty_capture() {
+    check_execution(
+        indoc! {r#"
+          pass
+        "#},
+        indoc! {r#"
+          (module (_)? @stmt)
+          {
+            node node0
+            if @stmt? {
+              attr (node0) val = 1
+            } else {
+              attr (node0) val = 0
+            }
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            val: 1
+        "#},
+    );
+}
+
+#[test]
+fn can_execute_null_check_on_empty_capture() {
+    check_execution(
+        indoc! {r#"
+        "#},
+        indoc! {r#"
+          (module (_)? @stmt)
+          {
+            node node0
+            if @stmt? {
+              attr (node0) val = 1
+            } else {
+              attr (node0) val = 0
+            }
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            val: 0
+        "#},
+    );
+}
