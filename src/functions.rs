@@ -105,8 +105,8 @@ impl Functions {
         functions.add(ctx.add_identifier("is-null"), stdlib::IsNull);
         // tree functions
         functions.add(
-            ctx.add_identifier("child-index"),
-            stdlib::syntax::ChildIndex,
+            ctx.add_identifier("named-child-index"),
+            stdlib::syntax::NamedChildIndex,
         );
         functions.add(
             ctx.add_identifier("source-text"),
@@ -201,11 +201,11 @@ pub mod stdlib {
     pub mod syntax {
         use super::*;
 
-        /// The implementation of the standard [`child-index`][`crate::reference::functions#child-index`]
+        /// The implementation of the standard [`named-child-index`][`crate::reference::functions#named-child-index`]
         /// function.
-        pub struct ChildIndex;
+        pub struct NamedChildIndex;
 
-        impl Function for ChildIndex {
+        impl Function for NamedChildIndex {
             fn call(
                 &mut self,
                 graph: &mut Graph,
@@ -216,13 +216,15 @@ pub mod stdlib {
                 parameters.finish()?;
                 let parent = match node.parent() {
                     Some(parent) => parent,
-                    None => return Err(anyhow!("Cannot call child-index on the root node").into()),
+                    None => {
+                        return Err(anyhow!("Cannot call named-child-index on the root node").into())
+                    }
                 };
                 let mut tree_cursor = parent.walk();
                 let index = parent
                     .named_children(&mut tree_cursor)
                     .position(|child| child == *node)
-                    .ok_or(anyhow!("Called child-index on a non-named child"))?;
+                    .ok_or(anyhow!("Called named-child-index on a non-named child"))?;
                 Ok(Value::Integer(index as u32))
             }
         }

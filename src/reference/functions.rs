@@ -85,9 +85,9 @@
 //!
 //! # Syntax manipulation functions
 //!
-//! ## `child-index`
+//! ## `named-child-index`
 //!
-//! Returns the "named child index" of a syntax node within its parent.
+//! Returns the index of a "named child" within its parent.
 //!
 //!   - Input parameters:
 //!     - `node`: A syntax node
