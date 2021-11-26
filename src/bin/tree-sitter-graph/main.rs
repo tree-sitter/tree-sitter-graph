@@ -30,6 +30,7 @@ fn main() -> Result<()> {
         .arg(Arg::with_name("tsg").index(1).required(true))
         .arg(Arg::with_name("source").index(2).required(true))
         .arg(Arg::with_name("scope").long("scope").takes_value(true))
+        .arg(Arg::with_name("json").long("json").takes_value(false))
         .get_matches();
 
     let tsg_path = Path::new(matches.value_of("tsg").unwrap());
