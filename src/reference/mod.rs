@@ -357,6 +357,8 @@
 //! earliest matching regular expression in each iteration, until we have exhausted the entire
 //! string, or none of the regular expressions match.
 //!
+//! Note that a regular expression that matches an empty string results in an error.
+//!
 //! Within each regular expression's block, you can use `$0`, `$1`, etc., to refer to any capture
 //! groups in the regular expression.
 //!
