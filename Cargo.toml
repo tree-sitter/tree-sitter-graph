@@ -17,6 +17,7 @@ test = false
 
 [dependencies]
 anyhow = "1.0"
+log = "0.4"
 regex = "1"
 smallvec = { version="1.6", features=["union"] }
 thiserror = "1.0"
@@ -28,6 +29,7 @@ default-features = false
 features = ["std", "inline-more", "backends"]
 
 [dev-dependencies]
+env_logger = "0.9"
 indoc = "1.0"
 tree-sitter-python = "0.19.1"
 

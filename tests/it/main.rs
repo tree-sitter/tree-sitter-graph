@@ -7,4 +7,5 @@
 
 mod execution;
 mod graph;
+mod lazy_execution;
 mod parser;

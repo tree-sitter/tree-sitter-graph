@@ -36,6 +36,12 @@ fn main() -> Result<()> {
                 .long("quiet")
                 .help("Suppress console output"),
         )
+        .arg(
+            Arg::with_name("lazy")
+                .short("z")
+                .long("lazy")
+                .help("Use lazy evaluation (experimental)"),
+        )
         .arg(Arg::with_name("scope").long("scope").takes_value(true))
         .get_matches();
 
@@ -43,6 +49,7 @@ fn main() -> Result<()> {
     let source_path = Path::new(matches.value_of("source").unwrap());
     let current_dir = std::env::current_dir().unwrap();
     let quiet = matches.is_present("quiet");
+    let lazy = matches.is_present("lazy");
     let config = Config::load()?;
     let mut loader = Loader::new()?;
     let loader_config = config.get()?;
@@ -66,14 +73,25 @@ fn main() -> Result<()> {
     let mut functions = Functions::stdlib(&mut ctx);
     let mut globals = Variables::new();
     let mut graph = Graph::new();
-    file.execute(
-        &mut ctx,
-        &tree,
-        &source,
-        &mut functions,
-        &mut globals,
-        &mut graph,
-    )
+    if lazy {
+        file.execute_lazy(
+            &mut ctx,
+            &tree,
+            &source,
+            &mut functions,
+            &mut globals,
+            &mut graph,
+        )
+    } else {
+        file.execute(
+            &mut ctx,
+            &tree,
+            &source,
+            &mut functions,
+            &mut globals,
+            &mut graph,
+        )
+    }
     .with_context(|| anyhow!("Could not execute TSG file {}", tsg_path.display()))?;
     if !quiet {
         print!("{}", graph.display_with(&ctx));

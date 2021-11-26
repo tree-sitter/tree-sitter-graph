@@ -33,9 +33,12 @@ fn execute(python_source: &str, dsl_source: &str) -> Result<String, ExecutionErr
     file.parse(&mut ctx, dsl_source).expect("Cannot parse file");
     let mut functions = Functions::stdlib(&mut ctx);
     let mut globals = Variables::new();
+    globals
+        .add_immutable(ctx.add_identifier("filename"), "test.py".into())
+        .map_err(|_| ExecutionError::DuplicateVariable("filename".into()))?;
     let mut graph = Graph::new();
-    file.execute(
-        &ctx,
+    file.execute_lazy(
+        &mut ctx,
         &tree,
         python_source,
         &mut functions,
@@ -68,7 +71,7 @@ fn can_build_simple_graph() {
           {
             node node0
             attr (node0) name = "node0", source = @root
-            var node1 = (node)
+            let node1 = (node)
             attr (node1) name = "node1"
             edge node0 -> node1
             attr (node0 -> node1) precedence = 14
@@ -80,13 +83,13 @@ fn can_build_simple_graph() {
           node 0
             name: "node0"
             source: [syntax node module (1, 1)]
-          edge 0 -> 1
+          edge 0 -> 2
             precedence: 14
           node 1
-            name: "node1"
-          node 2
             name: "node2"
-            parent: [graph node 1]
+            parent: [graph node 2]
+          node 2
+            name: "node1"
         "#},
     );
 }
@@ -121,18 +124,18 @@ fn can_scan_strings() {
         "#},
         indoc! {r#"
           node 0
-          edge 0 -> 1
+            name: "delta"
           node 1
-            name: "alpha"
-          edge 1 -> 2
+            name: "gamma"
+          edge 1 -> 0
           node 2
             name: "beta"
-          edge 2 -> 3
+          edge 2 -> 1
           node 3
-            name: "gamma"
-          edge 3 -> 4
+            name: "alpha"
+          edge 3 -> 2
           node 4
-            name: "delta"
+          edge 4 -> 3
         "#},
     );
 }
@@ -245,330 +248,513 @@ fn cannot_use_nullable_regex() {
 }
 
 #[test]
-fn can_create_present_optional_capture() {
+fn can_use_global_variable() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module (_)? @stmts)
+          (module) @root
           {
             node n
-            attr (n) stmts = @stmts
+            attr (n) filename = filename
           }
         "#},
         indoc! {r#"
           node 0
-            stmts: [syntax node pass_statement (1, 1)]
+            filename: "test.py"
+    "#},
+    );
+}
+
+#[test]
+fn can_use_variable_multiple_times() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            let x = (node)
+            let y = x
+            let z = x
+          }
+        "#},
+        indoc! {r#""#},
+    );
+}
+
+#[test]
+fn can_build_node() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node node0
+          }
+        "#},
+        indoc! {r#"
+          node 0
         "#},
     );
 }
 
 #[test]
-fn can_create_missing_optional_capture() {
+fn can_build_node_with_attrs() {
     check_execution(
+        "pass",
         indoc! {r#"
+          (module) @root
+          {
+            node node0
+            attr (node0) name = "node0", source = @root
+          }
         "#},
         indoc! {r#"
-          (module (_)? @stmts)
+          node 0
+            name: "node0"
+            source: [syntax node module (1, 1)]
+        "#},
+    );
+}
+
+#[test]
+fn can_build_edge() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node node0
+            node node1
+            edge node0 -> node1
+          }
+        "#},
+        indoc! {r#"
+          node 0
+          edge 0 -> 1
+          node 1
+        "#},
+    );
+}
+
+#[test]
+fn can_build_edges() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node node0
+            node node1
+            edge node0 -> node1
+            node node2
+            edge node1 -> node2
+            edge node2 -> node0
+          }
+        "#},
+        indoc! {r#"
+          node 0
+          edge 0 -> 1
+          node 1
+          edge 1 -> 2
+          node 2
+          edge 2 -> 0
+        "#},
+    );
+}
+
+#[test]
+fn can_set_mutable_local_variables() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            var node = #null
+
+            set node = (node)
+
+            let new_node = (node)
+            edge new_node -> node
+            set node = new_node
+          }
+        "#},
+        indoc! {r#"
+          node 0
+          edge 0 -> 1
+          node 1
+        "#},
+    );
+}
+
+#[test]
+fn scoped_variables_can_appear_out_of_order() {
+    check_execution(
+        indoc! {r#"
+          import a
+          from b import c
+          print(a.d.f)
+        "#},
+        indoc! {r#"
+          (identifier) @id
+          {
+            attr (@id.node) name = (source-text @id)
+          }
+
+          (identifier) @id
+          {
+            let @id.node = (node)
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            name: "a"
+          node 1
+            name: "b"
+          node 2
+            name: "c"
+          node 3
+            name: "print"
+          node 4
+            name: "a"
+          node 5
+            name: "d"
+          node 6
+            name: "f"
+        "#},
+    );
+}
+
+#[test]
+fn variables_can_be_scoped_in_arbitrary_expressions() {
+    check_execution(
+        indoc! {r#"
+          import a
+          from b import c
+          print(a.d.f)
+        "#},
+        indoc! {r#"
+          (call function:(_)@fun arguments: (argument_list (_)@arg)) {
+          ; let @arg.no_object.lala = 3 ; error
+            let @arg.object.lala = 3
+            let @arg.object.object.lala = 12
+          ; let @arg.object.object = 42 ; error
+          }
+          (attribute object:(_)@obj)@attr {
+            let @attr.object = @obj
+            let @attr.no_object = 7
+          }
+        "#},
+        indoc! {r#""#},
+    );
+}
+
+#[test]
+fn can_mutate_inside_scan_no_branch_simple() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
           {
             node n
-            attr (n) stmts = @stmts
+
+            var x = 0
+
+            scan "b" {
+               "c" {
+                 set x = (plus x 1)
+               }
+            }
+
+            attr (n) len = x
           }
         "#},
         indoc! {r#"
           node 0
-            stmts: #null
+            len: 0
         "#},
     );
 }
 
 #[test]
-fn can_create_empty_list_capture() {
+fn can_mutate_inside_scan_once_first_branch_simple() {
     check_execution(
+        "pass",
         indoc! {r#"
-        "#},
-        indoc! {r#"
-          (module (_)* @stmts)
+          (module) @root
           {
             node n
-            attr (n) stmts = @stmts
+
+            var x = 0
+
+            scan "b" {
+               "b" {
+                 set x = (plus x 1)
+               }
+            }
+
+            attr (n) len = x
           }
         "#},
         indoc! {r#"
           node 0
-            stmts: []
+            len: 1
         "#},
     );
 }
 
 #[test]
-fn can_create_nonempty_list_capture() {
+fn can_mutate_inside_scan_once_first_branch() {
     check_execution(
+        "pass",
         indoc! {r#"
-          pass
-          pass
-        "#},
-        indoc! {r#"
-          (module (_)+ @stmts)
+          (module) @root
           {
             node n
-            attr (n) stmts = @stmts
+
+            var x = 0
+            var y = 0
+            var s = ""
+
+            scan "b" {
+               "b" { ; it's a "b"
+                 attr (n) fst = #null
+                 set x = (plus x 1)
+                 set s = $0
+               }
+               "(.)" { ; it's something else
+                 attr (n) snd = #null
+                 let local_y = (plus y 1)
+                 set y = local_y
+                 set s = $1
+               }
+            }
+
+            attr (n) len = (plus x y)
+            attr (n) str = s
           }
         "#},
         indoc! {r#"
           node 0
-            stmts: [[syntax node pass_statement (1, 1)], [syntax node pass_statement (2, 1)]]
+            fst: #null
+            len: 1
+            str: "b"
         "#},
     );
 }
 
 #[test]
-fn can_execute_if() {
+fn can_mutate_inside_scan_once_second_branch() {
     check_execution(
         "pass",
         indoc! {r#"
           (module) @root
           {
-            node node0
-            if #true {
-                attr (node0) val = 0
-            } else {
-              attr (node0) val = 1
+            node n
+
+            var x = 0
+            var y = 0
+            var s = ""
+
+            scan "a" {
+               "b" { ; it's a "b"
+                 attr (n) fst = #null
+                 set x = (plus x 1)
+                 set s = $0
+               }
+               "(.)" { ; it's something else
+                 attr (n) snd = #null
+                 let local_y = (plus y 1)
+                 set y = local_y
+                 set s = $1
+               }
             }
+
+            attr (n) len = (plus x y)
+            attr (n) str = s
           }
         "#},
         indoc! {r#"
           node 0
-            val: 0
+            snd: #null
+            len: 1
+            str: "a"
         "#},
     );
 }
 
 #[test]
-fn can_execute_elif() {
+fn can_mutate_inside_scan_once_no_branch() {
     check_execution(
         "pass",
         indoc! {r#"
           (module) @root
           {
-            node node0
-            if #false {
-              attr (node0) val = 0
-            } elif #true {
-              attr (node0) val = 1
+            node n
+
+            var x = 0
+            var y = 0
+            var s = ""
+
+            scan "a" {
+               "b" { ; it's a "b"
+                 attr (n) fst = #null
+                 set x = (plus x 1)
+                 set s = $0
+               }
+               "(c)" { ; it's something else
+                 attr (n) snd = #null
+                 let local_y = (plus y 1)
+                 set y = local_y
+                 set s = $1
+               }
             }
+
+            attr (n) len = (plus x y)
+            attr (n) str = s
           }
         "#},
         indoc! {r#"
           node 0
-            val: 1
+            len: 0
+            str: ""
         "#},
     );
 }
 
 #[test]
-fn can_execute_else() {
+fn can_mutate_inside_scan_multiple_times_simple() {
     check_execution(
         "pass",
         indoc! {r#"
           (module) @root
           {
-            node node0
-            if #false {
-              attr (node0) val = 0
-            } else {
-              attr (node0) val = 1
+            var x = 0
+            var y = 0
+
+            scan "ab" {
+               "b" { ; count "b"s
+                  set x = (plus x 1)
+               }
+               "(.)" { ; count the rest
+                  set y = (plus y 1)
+               }
             }
+
+            node n
+            attr (n) len = (plus x y)
           }
         "#},
         indoc! {r#"
           node 0
-            val: 1
+            len: 2
         "#},
     );
 }
 
 #[test]
-fn skip_if_without_true_conditions() {
+fn can_mutate_inside_scan_multiple_times() {
     check_execution(
         "pass",
         indoc! {r#"
           (module) @root
           {
-            let x = #false
-            node node0
-            if x {
-              attr (node0) val = 0
-            } elif #false {
-              attr (node0) val = 1
+            var x = 0
+            var y = 0
+            var s = ""
+
+            scan "abcd" {
+               "b" { ; count "b"s
+                 set x = (plus x 1)
+                 set s = $0
+               }
+               "(.)" { ; count the rest
+                 let local_y = (plus y 1)
+                 set y = local_y
+                 set s = $1
+               }
             }
+
+            node n
+            attr (n) len = (plus x y)
+            attr (n) str = s
           }
         "#},
         indoc! {r#"
           node 0
+            len: 4
+            str: "d"
         "#},
     );
 }
 
 #[test]
-fn can_execute_for_in_nonempty_list() {
+fn can_mutate_inside_nested_scan_multiple_times_simple() {
     check_execution(
         "pass",
         indoc! {r#"
           (module) @root
           {
-            var n = 0
-            for x in [1, 2, 3] {
-              set n = (plus n x)
+            var x = 0
+
+            scan "ab|c|d" {
+              "\\|" {}
+              "[^|]+" {
+                scan $0 {
+                  "(.)" { ; count the rest
+                    set x = (plus x 1)
+                  }
+                }
+              }
             }
-            node node0
-            attr (node0) val = n
+
+            node n
+            attr (n) len = x
           }
         "#},
         indoc! {r#"
           node 0
-            val: 6
+            len: 4
         "#},
     );
 }
 
 #[test]
-fn can_execute_for_in_empty_list() {
+fn can_mutate_inside_nested_scan_multiple_times() {
     check_execution(
         "pass",
         indoc! {r#"
           (module) @root
           {
-            var n = 0
-            for x in [] {
-              set n = (plus n x)
-            }
-            node node0
-            attr (node0) val = n
-          }
-        "#},
-        indoc! {r#"
-          node 0
-            val: 0
-        "#},
-    );
-}
+            var x = 0
+            var y = 0
+            var s = ""
 
-#[test]
-fn can_execute_star_capture() {
-    check_execution(
-        indoc! {r#"
-          pass
-          pass
-        "#},
-        indoc! {r#"
-          (module (_)* @stmts)
-          {
-            var n = 0
-            for x in @stmts {
-              set n = (plus n 1)
+            scan "ab|c|d" {
+              "\\|" {}
+              "[^|]+" {
+                scan $0 {
+                  "b" { ; count "b"s
+                    set x = (plus x 1)
+                    set s = $0
+                  }
+                  "(.)" { ; count the rest
+                    let local_y = (plus y 1)
+                    set y = local_y
+                    set s = $1
+                  }
+                }
+              }
             }
-            node node0
-            attr (node0) val = n
-          }
-        "#},
-        indoc! {r#"
-          node 0
-            val: 2
-        "#},
-    );
-}
 
-#[test]
-fn can_execute_plus_capture() {
-    check_execution(
-        indoc! {r#"
-          pass
-          pass
-        "#},
-        indoc! {r#"
-          (module (_)+ @stmts)
-          {
-            var n = 0
-            for x in @stmts {
-              set n = (plus n 1)
-            }
-            node node0
-            attr (node0) val = n
+            node n
+            attr (n) len = (plus x y)
+            attr (n) str = s
           }
         "#},
         indoc! {r#"
           node 0
-            val: 2
-        "#},
-    );
-}
-
-#[test]
-fn can_execute_optional_capture() {
-    check_execution(
-        indoc! {r#"
-        "#},
-        indoc! {r#"
-          (module (_)? @stmt)
-          {
-            node node0
-            if (is-null @stmt) {
-              attr (node0) val = 0
-            } else {
-              attr (node0) val = 1
-            }
-          }
-        "#},
-        indoc! {r#"
-          node 0
-            val: 0
-        "#},
-    );
-}
-
-#[test]
-fn can_execute_null_check_on_nonempty_capture() {
-    check_execution(
-        indoc! {r#"
-          pass
-        "#},
-        indoc! {r#"
-          (module (_)? @stmt)
-          {
-            node node0
-            if @stmt? {
-              attr (node0) val = 1
-            } else {
-              attr (node0) val = 0
-            }
-          }
-        "#},
-        indoc! {r#"
-          node 0
-            val: 1
-        "#},
-    );
-}
-
-#[test]
-fn can_execute_null_check_on_empty_capture() {
-    check_execution(
-        indoc! {r#"
-        "#},
-        indoc! {r#"
-          (module (_)? @stmt)
-          {
-            node node0
-            if @stmt? {
-              attr (node0) val = 1
-            } else {
-              attr (node0) val = 0
-            }
-          }
-        "#},
-        indoc! {r#"
-          node 0
-            val: 0
+            len: 4
+            str: "d"
         "#},
     );
 }
