@@ -486,7 +486,7 @@ impl Conditional {
                 for stmt in &arm.statements {
                     stmt.execute(exec)?;
                 }
-                return Ok(());
+                break;
             }
         }
         Ok(())
