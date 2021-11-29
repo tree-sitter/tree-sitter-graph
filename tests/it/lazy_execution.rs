@@ -380,6 +380,126 @@ fn can_execute_for_in_empty_list() {
 }
 
 #[test]
+fn can_execute_star_capture() {
+    check_execution(
+        indoc! {r#"
+          pass
+          pass
+        "#},
+        indoc! {r#"
+          (module (_)* @stmts)
+          {
+            var n = 0
+            for x in @stmts {
+              set n = (plus n 1)
+            }
+            node node0
+            attr (node0) val = n
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            val: 2
+        "#},
+    );
+}
+
+#[test]
+fn can_execute_plus_capture() {
+    check_execution(
+        indoc! {r#"
+          pass
+          pass
+        "#},
+        indoc! {r#"
+          (module (_)+ @stmts)
+          {
+            var n = 0
+            for x in @stmts {
+              set n = (plus n 1)
+            }
+            node node0
+            attr (node0) val = n
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            val: 2
+        "#},
+    );
+}
+
+#[test]
+fn can_execute_optional_capture() {
+    check_execution(
+        indoc! {r#"
+        "#},
+        indoc! {r#"
+          (module (_)? @stmt)
+          {
+            node node0
+            if (is-null @stmt) {
+              attr (node0) val = 0
+            } else {
+              attr (node0) val = 1
+            }
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            val: 0
+        "#},
+    );
+}
+
+#[test]
+fn can_execute_null_check_on_nonempty_capture() {
+    check_execution(
+        indoc! {r#"
+          pass
+        "#},
+        indoc! {r#"
+          (module (_)? @stmt)
+          {
+            node node0
+            if @stmt? {
+              attr (node0) val = 1
+            } else {
+              attr (node0) val = 0
+            }
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            val: 1
+        "#},
+    );
+}
+
+#[test]
+fn can_execute_null_check_on_empty_capture() {
+    check_execution(
+        indoc! {r#"
+        "#},
+        indoc! {r#"
+          (module (_)? @stmt)
+          {
+            node node0
+            if @stmt? {
+              attr (node0) val = 1
+            } else {
+              attr (node0) val = 0
+            }
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            val: 0
+        "#},
+    );
+}
+
+#[test]
 fn can_use_global_variable() {
     check_execution(
         "pass",
