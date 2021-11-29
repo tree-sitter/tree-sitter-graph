@@ -26,6 +26,7 @@ use crate::ast::CreateGraphNode;
 use crate::ast::DeclareImmutable;
 use crate::ast::DeclareMutable;
 use crate::ast::Expression;
+use crate::ast::ForIn;
 use crate::ast::IntegerConstant;
 use crate::ast::ListComprehension;
 use crate::ast::NotNull;
@@ -136,7 +137,7 @@ impl Statement {
             Statement::Scan(statement) => statement.execute_lazy(exec),
             Statement::Print(statement) => statement.execute_lazy(exec),
             Statement::Conditional(statement) => statement.execute_lazy(exec),
-            Statement::ForIn(_) => Ok(()),
+            Statement::ForIn(statement) => statement.execute_lazy(exec),
         }
     }
 }
@@ -338,6 +339,46 @@ impl Conditional {
         let arms_statement =
             lazy::BranchStatement::new(arm_index, lazy_graph_branches, self.location.into()).into();
         exec.lazy_graph.push(arms_statement);
+
+        Ok(())
+    }
+}
+
+impl ForIn {
+    fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        let loop_values = self.values.evaluate_lazy(exec)?;
+
+        let mut loop_variables =
+            LoopVariables::new(exec.variables, loop_values.clone(), self.location.into());
+        loop_variables.add(
+            self.name,
+            loop_variables.iteration_value().clone(),
+            Mutability::Immutable,
+            &mut VariableContext {
+                ctx: exec.ctx,
+                graph: exec.graph,
+                store: exec.store,
+            },
+        )?;
+
+        let mut lazy_graph = Vec::new();
+        let mut loop_exec = ExecutionContext {
+            ctx: exec.ctx,
+            graph: exec.graph,
+            variables: &mut loop_variables,
+            mat: exec.mat,
+            store: exec.store,
+            scoped_store: exec.scoped_store,
+            lazy_graph: &mut lazy_graph,
+            regex_captures_identifier: exec.regex_captures_identifier,
+        };
+        for stmt in &self.statements {
+            stmt.execute_lazy(&mut loop_exec)?;
+        }
+
+        let loop_statement =
+            lazy::LoopStatement::new(loop_values, lazy_graph, self.location.into()).into();
+        exec.lazy_graph.push(loop_statement);
 
         Ok(())
     }
