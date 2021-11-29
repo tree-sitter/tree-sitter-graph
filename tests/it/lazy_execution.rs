@@ -248,6 +248,94 @@ fn cannot_use_nullable_regex() {
 }
 
 #[test]
+fn can_execute_if() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node node0
+            if #true {
+                attr (node0) val = 0
+            } else {
+              attr (node0) val = 1
+            }
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            val: 0
+        "#},
+    );
+}
+
+#[test]
+fn can_execute_elif() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node node0
+            if #false {
+              attr (node0) val = 0
+            } elif #true {
+              attr (node0) val = 1
+            }
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            val: 1
+        "#},
+    );
+}
+
+#[test]
+fn can_execute_else() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node node0
+            if #false {
+              attr (node0) val = 0
+            } else {
+              attr (node0) val = 1
+            }
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            val: 1
+        "#},
+    );
+}
+
+#[test]
+fn skip_if_without_true_conditions() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            let x = #false
+            node node0
+            if x {
+              attr (node0) val = 0
+            } elif #false {
+              attr (node0) val = 1
+            }
+          }
+        "#},
+        indoc! {r#"
+          node 0
+        "#},
+    );
+}
+
+#[test]
 fn can_use_global_variable() {
     check_execution(
         "pass",

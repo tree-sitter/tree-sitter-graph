@@ -20,6 +20,7 @@ use crate::ast::Assign;
 use crate::ast::Attribute;
 use crate::ast::Call;
 use crate::ast::Capture;
+use crate::ast::Conditional;
 use crate::ast::CreateEdge;
 use crate::ast::CreateGraphNode;
 use crate::ast::DeclareImmutable;
@@ -134,7 +135,7 @@ impl Statement {
             Statement::AddEdgeAttribute(statement) => statement.execute_lazy(exec),
             Statement::Scan(statement) => statement.execute_lazy(exec),
             Statement::Print(statement) => statement.execute_lazy(exec),
-            Statement::Conditional(_) => Ok(()),
+            Statement::Conditional(statement) => statement.execute_lazy(exec),
             Statement::ForIn(_) => Ok(()),
         }
     }
@@ -290,6 +291,54 @@ impl Print {
         }
         let stmt = lazy::Print::new(arguments, self.location.into());
         exec.lazy_graph.push(stmt.into());
+        Ok(())
+    }
+}
+
+impl Conditional {
+    fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        let conditions = self
+            .arms
+            .iter()
+            .map(|e| e.condition.evaluate_lazy(exec))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let arm_index: lazy::Value = exec
+            .store
+            .add(
+                lazy::FindFirst::new(conditions.into()).into(),
+                self.location.into(),
+                exec.ctx,
+                exec.graph,
+            )
+            .into();
+
+        let mut arm_variables = BranchVariables::new(exec.variables, arm_index.clone());
+        let mut lazy_graph_branches = Vec::new();
+        for arm in self.arms.iter() {
+            let mut lazy_graph = Vec::new();
+            let mut arm_exec = ExecutionContext {
+                ctx: exec.ctx,
+                graph: exec.graph,
+                variables: &mut arm_variables,
+                mat: exec.mat,
+                store: exec.store,
+                scoped_store: exec.scoped_store,
+                lazy_graph: &mut lazy_graph,
+                regex_captures_identifier: exec.regex_captures_identifier,
+            };
+            for stmt in &arm.statements {
+                stmt.execute_lazy(&mut arm_exec)?;
+            }
+            lazy_graph_branches.push(lazy_graph);
+
+            arm_variables.next();
+        }
+
+        let arms_statement =
+            lazy::BranchStatement::new(arm_index, lazy_graph_branches, self.location.into()).into();
+        exec.lazy_graph.push(arms_statement);
+
         Ok(())
     }
 }

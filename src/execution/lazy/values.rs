@@ -382,6 +382,7 @@ pub enum Value {
     Call(Call),
     Scan(Scan),
     ListIndex(ListIndex),
+    FindFirst(FindFirst),
     Branch(BranchValue),
     CurrentLoopElement(CurrentLoopListElementValue),
     EnterLoop(EnterLoopValue),
@@ -487,6 +488,12 @@ impl From<ListIndex> for Value {
     }
 }
 
+impl From<FindFirst> for Value {
+    fn from(value: FindFirst) -> Self {
+        Value::FindFirst(value)
+    }
+}
+
 impl From<BranchValue> for Value {
     fn from(value: BranchValue) -> Self {
         Value::Branch(value)
@@ -541,6 +548,7 @@ impl Value {
             Value::Call(expr) => expr.evaluate(exec),
             Value::Scan(expr) => expr.evaluate(exec),
             Value::ListIndex(expr) => expr.evaluate(exec),
+            Value::FindFirst(expr) => expr.evaluate(exec),
             Value::Branch(expr) => expr.evaluate(exec),
             Value::CurrentLoopElement(expr) => expr.evaluate(exec),
             Value::EnterLoop(expr) => expr.evaluate(exec),
@@ -598,6 +606,7 @@ impl DisplayWithContextAndGraph for Value {
             Value::Call(expr) => expr.fmt(f, ctx, graph),
             Value::Scan(expr) => expr.fmt(f, ctx, graph),
             Value::ListIndex(expr) => expr.fmt(f, ctx, graph),
+            Value::FindFirst(expr) => expr.fmt(f, ctx, graph),
             Value::Branch(expr) => expr.fmt(f, ctx, graph),
             Value::CurrentLoopElement(expr) => expr.fmt(f, ctx, graph),
             Value::EnterLoop(expr) => expr.fmt(f, ctx, graph),
@@ -917,6 +926,42 @@ impl DisplayWithContextAndGraph for ListIndex {
             self.index.display_with(ctx, graph),
             self.values.display_with(ctx, graph),
         )
+    }
+}
+
+// FindFirst
+#[derive(Clone, Debug)]
+pub struct FindFirst {
+    values: Box<Value>,
+}
+
+impl FindFirst {
+    pub fn new(values: Value) -> Self {
+        Self {
+            values: values.into(),
+        }
+    }
+
+    pub fn evaluate(&self, exec: &mut EvaluationContext) -> Result<graph::Value, ExecutionError> {
+        let values = self
+            .values
+            .evaluate(exec)?
+            .into_list(exec.graph)?
+            .iter()
+            .map(|v| v.clone().into_bool(exec.graph))
+            .collect::<Result<Vec<_>, _>>()?;
+        let result = values
+            .iter()
+            .position(|v| *v)
+            .map(|i| (i as u32).into())
+            .unwrap_or_else(|| graph::Value::Null.into());
+        Ok(result)
+    }
+}
+
+impl DisplayWithContextAndGraph for FindFirst {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context, graph: &Graph) -> fmt::Result {
+        write!(f, "(find-first {})", self.values.display_with(ctx, graph),)
     }
 }
 
