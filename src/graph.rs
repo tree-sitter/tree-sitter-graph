@@ -16,6 +16,9 @@ use std::ops::IndexMut;
 use smallvec::SmallVec;
 use tree_sitter::Node;
 
+use serde_json;
+use serde::ser;
+
 use crate::execution::ExecutionError;
 use crate::Context;
 use crate::Identifier;
@@ -85,6 +88,20 @@ impl<'tree> Graph<'tree> {
         }
 
         DisplayGraph(self, ctx)
+    }
+
+    pub fn display_json<'a>(&'a self, ctx: &'a Context) -> () {
+        struct JSONGraph<'a, 'tree>(&'a Graph<'tree>, &'a Context);
+        impl<'a, 'tree> ser::Serialize for JSONGraph<'a, 'tree> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                    S: serde::Serializer {
+                serializer.serialize_bool(true)
+            }
+        }
+        let json_graph = JSONGraph(self, ctx);
+        let s = serde_json::to_string(&json_graph).unwrap();
+        print!("{}", s)
     }
 }
 
