@@ -18,6 +18,7 @@ use tree_sitter::Node;
 
 use serde_json;
 use serde::ser;
+use serde::ser::SerializeSeq;
 
 use crate::execution::ExecutionError;
 use crate::Context;
@@ -97,12 +98,13 @@ impl<'tree> Graph<'tree> {
                 where S: serde::Serializer {
                 let graph = self.0;
                 let ctx = self.1;
+                let mut nodes = serializer.serialize_seq(Some(graph.graph_nodes.len()))?;
                 for (node_index, node) in graph.graph_nodes.iter().enumerate() {
                     for (sink, edge) in &node.outgoing_edges {
                         // )?;
                     }
                 }
-                serializer.serialize_bool(true)
+                nodes.end()
             }
         }
         let json_graph = JSONGraph(self, ctx);
