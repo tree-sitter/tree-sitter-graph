@@ -94,7 +94,7 @@ impl<'tree> Graph<'tree> {
         struct JSONGraph<'a, 'tree>(&'a Graph<'tree>, &'a Context);
         impl<'a, 'tree> ser::Serialize for JSONGraph<'a, 'tree> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-            where S: serde::Serializer {
+                where S: serde::Serializer {
                 let graph = self.0;
                 let ctx = self.1;
                 for (node_index, node) in graph.graph_nodes.iter().enumerate() {
