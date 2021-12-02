@@ -61,6 +61,11 @@ fn main() -> Result<()> {
     let graph = file
         .execute(&ctx, &tree, &source, &mut functions, &mut globals)
         .with_context(|| format!("Could not execute TSG file {}", tsg_path.display()))?;
-    print!("{}", graph.display_with(&ctx));
+    let json = matches.is_present("json");
+    if json {
+        graph.display_json(&ctx);
+    } else {
+        print!("{}", graph.display_with(&ctx));
+    }
     Ok(())
 }
