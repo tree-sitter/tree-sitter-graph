@@ -18,7 +18,7 @@ use tree_sitter::Node;
 
 use serde_json;
 use serde::ser;
-use serde::ser::SerializeSeq;
+use serde::ser::SerializeMap;
 
 use crate::execution::ExecutionError;
 use crate::Context;
@@ -93,20 +93,51 @@ impl<'tree> Graph<'tree> {
 
     pub fn display_json<'a>(&'a self, ctx: &'a Context) -> () {
         struct JSONGraph<'a, 'tree>(&'a Graph<'tree>, &'a Context);
+        struct JSONNode<'a>(usize, &'a GraphNode, &'a Context);
+        struct JSONEdge<'a>(usize, &'a u32, &'a Edge, &'a Context);
+
         impl<'a, 'tree> ser::Serialize for JSONGraph<'a, 'tree> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
                 where S: serde::Serializer {
                 let graph = self.0;
                 let ctx = self.1;
-                let mut nodes = serializer.serialize_seq(Some(graph.graph_nodes.len()))?;
+                let mut map = serializer.serialize_map(Some(graph.graph_nodes.len()))?;
                 for (node_index, node) in graph.graph_nodes.iter().enumerate() {
-                    for (sink, edge) in &node.outgoing_edges {
-                        // )?;
-                    }
+                    map.serialize_entry(&node_index, &JSONNode(node_index, node, ctx))?;
                 }
-                nodes.end()
+                map.end()
             }
         }
+
+        impl<'a> ser::Serialize for JSONNode<'a> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+                where S: serde::Serializer {
+                let node_index = self.0;
+                let node = self.1;
+                let ctx = self.2;
+                // serializing as a map instead of a struct so we don't have to encode a struct name
+                let mut map = serializer.serialize_map(None)?;
+                // TODO: node attrs
+                for (sink, edge) in &node.outgoing_edges {
+                    map.serialize_entry(sink, &JSONEdge(node_index, sink, edge, ctx))?;
+                }
+                map.end()
+            }
+        }
+
+        impl<'a> ser::Serialize for JSONEdge<'a> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+                where  S: serde::Serializer {
+                let node_index = self.0;
+                let sink = self.1;
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("source", &node_index)?;
+                map.serialize_entry("sink", &sink)?;
+                // TODO: edge attributes
+                map.end()
+            }
+        }
+
         let json_graph = JSONGraph(self, ctx);
         let s = serde_json::to_string(&json_graph).unwrap();
         print!("{}", s)
