@@ -185,6 +185,7 @@ impl<'tree> Graph<'tree> {
                     // FIXME: there's no way to distinguish sets and lists, so we can't roundtrip accurately
                     Value::List(list) => serializer.collect_seq(list.iter().map(|value| JSONValue(value, ctx))),
                     Value::Set(set) => serializer.collect_seq(set.iter().map(|value| JSONValue(value, ctx))),
+                    // FIXME: we don't distinguish between syntax tree node IDs, graph node IDs, and integers
                     Value::SyntaxNode(node) => serializer.serialize_u32(node.0),
                     Value::GraphNode(node) => serializer.serialize_u32(node.0)
                 }
