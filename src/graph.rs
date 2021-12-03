@@ -94,6 +94,7 @@ impl<'tree> Graph<'tree> {
     }
 
     pub fn display_json<'a>(&'a self, ctx: &'a Context) -> () {
+        // TODO: move this all into a new module
         struct JSONGraph<'a, 'tree>(&'a Graph<'tree>, &'a Context);
         struct JSONNode<'a>(usize, &'a GraphNode, &'a Context);
         struct JSONEdge<'a>(&'a u32, &'a Edge, &'a Context);
