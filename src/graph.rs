@@ -14,7 +14,6 @@ use std::iter::FromIterator;
 use std::ops::Index;
 use std::ops::IndexMut;
 
-use serde::Serializer;
 use smallvec::SmallVec;
 use tree_sitter::Node;
 
