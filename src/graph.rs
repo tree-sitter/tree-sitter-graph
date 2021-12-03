@@ -121,8 +121,8 @@ impl<'tree> Graph<'tree> {
                 // serializing as a map instead of a struct so we don't have to encode a struct name
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("index", &node_index)?;
-                let edges = Vec::from_iter(node.outgoing_edges.iter().map(|(sink, edge)| JSONEdge(sink, edge, ctx)));
-                if !edges.is_empty() {
+                if !node.outgoing_edges.is_empty() {
+                    let edges = Vec::from_iter(node.outgoing_edges.iter().map(|(sink, edge)| JSONEdge(sink, edge, ctx)));
                     map.serialize_entry("edges", &edges)?;
                 }
                 // TODO: node attrs
