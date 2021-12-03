@@ -10,15 +10,18 @@
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::fmt;
+use std::iter::FromIterator;
 use std::ops::Index;
 use std::ops::IndexMut;
 
+use serde::Serializer;
 use smallvec::SmallVec;
 use tree_sitter::Node;
 
 use serde_json;
 use serde::ser;
 use serde::ser::SerializeMap;
+use serde::ser::SerializeSeq;
 
 use crate::execution::ExecutionError;
 use crate::Context;
@@ -94,18 +97,18 @@ impl<'tree> Graph<'tree> {
     pub fn display_json<'a>(&'a self, ctx: &'a Context) -> () {
         struct JSONGraph<'a, 'tree>(&'a Graph<'tree>, &'a Context);
         struct JSONNode<'a>(usize, &'a GraphNode, &'a Context);
-        struct JSONEdge<'a>(usize, &'a u32, &'a Edge, &'a Context);
+        struct JSONEdge<'a>(&'a u32, &'a Edge, &'a Context);
 
         impl<'a, 'tree> ser::Serialize for JSONGraph<'a, 'tree> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
                 where S: serde::Serializer {
                 let graph = self.0;
                 let ctx = self.1;
-                let mut map = serializer.serialize_map(Some(graph.graph_nodes.len()))?;
+                let mut seq = serializer.serialize_seq(Some(graph.graph_nodes.len()))?;
                 for (node_index, node) in graph.graph_nodes.iter().enumerate() {
-                    map.serialize_entry(&node_index, &JSONNode(node_index, node, ctx))?;
+                    seq.serialize_element(&JSONNode(node_index, node, ctx))?;
                 }
-                map.end()
+                seq.end()
             }
         }
 
@@ -117,10 +120,10 @@ impl<'tree> Graph<'tree> {
                 let ctx = self.2;
                 // serializing as a map instead of a struct so we don't have to encode a struct name
                 let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("index", &node_index)?;
+                let edges = Vec::from_iter(node.outgoing_edges.iter().map(|(sink, edge)| JSONEdge(sink, edge, ctx)));
+                map.serialize_entry("edges", &edges)?;
                 // TODO: node attrs
-                for (sink, edge) in &node.outgoing_edges {
-                    map.serialize_entry(sink, &JSONEdge(node_index, sink, edge, ctx))?;
-                }
                 map.end()
             }
         }
@@ -128,10 +131,8 @@ impl<'tree> Graph<'tree> {
         impl<'a> ser::Serialize for JSONEdge<'a> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
                 where  S: serde::Serializer {
-                let node_index = self.0;
-                let sink = self.1;
+                let sink = self.0;
                 let mut map = serializer.serialize_map(None)?;
-                map.serialize_entry("source", &node_index)?;
                 map.serialize_entry("sink", &sink)?;
                 // TODO: edge attributes
                 map.end()
