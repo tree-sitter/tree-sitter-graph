@@ -104,7 +104,9 @@ impl<'tree> Graph<'tree> {
 
         impl<'a, 'tree> ser::Serialize for JSONGraph<'a, 'tree> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-                where S: serde::Serializer {
+            where
+                S: serde::Serializer,
+            {
                 let graph = self.0;
                 let ctx = self.1;
                 let mut seq = serializer.serialize_seq(Some(graph.graph_nodes.len()))?;
@@ -117,7 +119,9 @@ impl<'tree> Graph<'tree> {
 
         impl<'a> ser::Serialize for JSONNode<'a> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-                where S: serde::Serializer {
+            where
+                S: serde::Serializer,
+            {
                 let node_index = self.0;
                 let node = self.1;
                 let ctx = self.2;
@@ -125,7 +129,11 @@ impl<'tree> Graph<'tree> {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("index", &node_index)?;
                 if !node.outgoing_edges.is_empty() {
-                    let edges = Vec::from_iter(node.outgoing_edges.iter().map(|(sink, edge)| JSONEdge(sink, edge, ctx)));
+                    let edges = Vec::from_iter(
+                        node.outgoing_edges
+                            .iter()
+                            .map(|(sink, edge)| JSONEdge(sink, edge, ctx)),
+                    );
                     map.serialize_entry("edges", &edges)?;
                 }
                 if !node.attributes.values.is_empty() {
@@ -137,7 +145,9 @@ impl<'tree> Graph<'tree> {
 
         impl<'a> ser::Serialize for JSONEdge<'a> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-                where  S: serde::Serializer {
+            where
+                S: serde::Serializer,
+            {
                 let sink = self.0;
                 let edge = self.1;
                 let ctx = self.2;
@@ -152,7 +162,9 @@ impl<'tree> Graph<'tree> {
 
         impl<'a> ser::Serialize for JSONAttributes<'a> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-                where  S: serde::Serializer {
+            where
+                S: serde::Serializer,
+            {
                 let attrs = self.0;
                 let ctx = self.1;
                 let mut map = serializer.serialize_map(None)?;
@@ -165,7 +177,9 @@ impl<'tree> Graph<'tree> {
 
         impl<'a> ser::Serialize for JSONIdentifier<'a> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-                where  S: serde::Serializer {
+            where
+                S: serde::Serializer,
+            {
                 let identifier = self.0;
                 let ctx = self.1;
                 let symbol = ctx.identifiers.resolve(identifier.0).unwrap();
@@ -175,7 +189,9 @@ impl<'tree> Graph<'tree> {
 
         impl<'a> ser::Serialize for JSONValue<'a> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-                where  S: serde::Serializer {
+            where
+                S: serde::Serializer,
+            {
                 let value = self.0;
                 let ctx = self.1;
                 match value {
@@ -184,11 +200,15 @@ impl<'tree> Graph<'tree> {
                     Value::Integer(integer) => serializer.serialize_u32(*integer),
                     Value::String(string) => serializer.serialize_str(string),
                     // FIXME: there's no way to distinguish sets and lists, so we can't roundtrip accurately
-                    Value::List(list) => serializer.collect_seq(list.iter().map(|value| JSONValue(value, ctx))),
-                    Value::Set(set) => serializer.collect_seq(set.iter().map(|value| JSONValue(value, ctx))),
+                    Value::List(list) => {
+                        serializer.collect_seq(list.iter().map(|value| JSONValue(value, ctx)))
+                    }
+                    Value::Set(set) => {
+                        serializer.collect_seq(set.iter().map(|value| JSONValue(value, ctx)))
+                    }
                     // FIXME: we don't distinguish between syntax tree node IDs, graph node IDs, and integers
                     Value::SyntaxNode(node) => serializer.serialize_u32(node.0),
-                    Value::GraphNode(node) => serializer.serialize_u32(node.0)
+                    Value::GraphNode(node) => serializer.serialize_u32(node.0),
                 }
             }
         }
