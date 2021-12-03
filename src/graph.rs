@@ -140,7 +140,7 @@ impl<'tree> Graph<'tree> {
         }
 
         let json_graph = JSONGraph(self, ctx);
-        let s = serde_json::to_string(&json_graph).unwrap();
+        let s = serde_json::to_string_pretty(&json_graph).unwrap();
         print!("{}", s)
     }
 }
