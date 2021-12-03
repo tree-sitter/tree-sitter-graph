@@ -176,6 +176,7 @@ impl<'tree> Graph<'tree> {
                     Value::Boolean(bool) => serializer.serialize_bool(*bool),
                     Value::Integer(integer) => serializer.serialize_u32(*integer),
                     Value::String(string) => serializer.serialize_str(string),
+                    // FIXME: there's no way to distinguish sets and lists, so we can't roundtrip accurately
                     Value::List(list) => serializer.collect_seq(list.iter().map(|value| JSONValue(value, ctx))),
                     Value::Set(set) => serializer.collect_seq(set.iter().map(|value| JSONValue(value, ctx))),
                     Value::SyntaxNode(node) => serializer.serialize_u32(node.0),
