@@ -17,10 +17,10 @@ use std::ops::IndexMut;
 use smallvec::SmallVec;
 use tree_sitter::Node;
 
-use serde_json;
 use serde::ser;
 use serde::ser::SerializeMap;
 use serde::ser::SerializeSeq;
+use serde_json;
 
 use crate::execution::ExecutionError;
 use crate::Context;
