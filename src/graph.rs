@@ -98,6 +98,9 @@ impl<'tree> Graph<'tree> {
         struct JSONGraph<'a, 'tree>(&'a Graph<'tree>, &'a Context);
         struct JSONNode<'a>(usize, &'a GraphNode, &'a Context);
         struct JSONEdge<'a>(&'a u32, &'a Edge, &'a Context);
+        struct JSONAttributes<'a>(&'a Attributes, &'a Context);
+        struct JSONIdentifier<'a>(&'a Identifier, &'a Context);
+        struct JSONValue<'a>(&'a Value, &'a Context);
 
         impl<'a, 'tree> ser::Serialize for JSONGraph<'a, 'tree> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -125,7 +128,7 @@ impl<'tree> Graph<'tree> {
                     let edges = Vec::from_iter(node.outgoing_edges.iter().map(|(sink, edge)| JSONEdge(sink, edge, ctx)));
                     map.serialize_entry("edges", &edges)?;
                 }
-                // TODO: node attrs
+                map.serialize_entry("attrs", &JSONAttributes(&node.attributes, ctx))?;
                 map.end()
             }
         }
@@ -138,6 +141,49 @@ impl<'tree> Graph<'tree> {
                 map.serialize_entry("sink", &sink)?;
                 // TODO: edge attributes
                 map.end()
+            }
+        }
+
+        impl<'a> ser::Serialize for JSONAttributes<'a> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+                where  S: serde::Serializer {
+                let attrs = self.0;
+                let ctx = self.1;
+                let mut map = serializer.serialize_map(None)?;
+                for (_, (key, value)) in attrs.values.iter().enumerate() {
+                    map.serialize_entry(&JSONIdentifier(key, ctx), &JSONValue(value, ctx))?;
+                }
+                map.end()
+            }
+        }
+
+        impl<'a> ser::Serialize for JSONIdentifier<'a> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+                where  S: serde::Serializer {
+                let identifier = self.0;
+                let ctx = self.1;
+                let symbol = ctx.identifiers.resolve(identifier.0).unwrap();
+                serializer.serialize_str(symbol)
+            }
+        }
+
+        impl<'a> ser::Serialize for JSONValue<'a> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+                where  S: serde::Serializer {
+                let value = self.0;
+                let ctx = self.1;
+                match value {
+                    Value::Null => serializer.serialize_none(),
+                    Value::Boolean(bool) => serializer.serialize_bool(*bool),
+                    Value::Integer(integer) => serializer.serialize_u32(*integer),
+                    Value::String(string) => serializer.serialize_str(string),
+                    // Compound
+                    Value::List(list) => serializer.collect_seq(list.iter().map(|value| JSONValue(value, ctx))),
+                    Value::Set(set) => serializer.collect_seq(set.iter().map(|value| JSONValue(value, ctx))),
+                    // References
+                    Value::SyntaxNode(node) => serializer.serialize_u32(node.0),
+                    Value::GraphNode(node) => serializer.serialize_u32(node.0)
+                }
             }
         }
 
