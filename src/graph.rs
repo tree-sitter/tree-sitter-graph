@@ -176,10 +176,8 @@ impl<'tree> Graph<'tree> {
                     Value::Boolean(bool) => serializer.serialize_bool(*bool),
                     Value::Integer(integer) => serializer.serialize_u32(*integer),
                     Value::String(string) => serializer.serialize_str(string),
-                    // Compound
                     Value::List(list) => serializer.collect_seq(list.iter().map(|value| JSONValue(value, ctx))),
                     Value::Set(set) => serializer.collect_seq(set.iter().map(|value| JSONValue(value, ctx))),
-                    // References
                     Value::SyntaxNode(node) => serializer.serialize_u32(node.0),
                     Value::GraphNode(node) => serializer.serialize_u32(node.0)
                 }
