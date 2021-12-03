@@ -138,9 +138,13 @@ impl<'tree> Graph<'tree> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
                 where  S: serde::Serializer {
                 let sink = self.0;
+                let edge = self.1;
+                let ctx = self.2;
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("sink", &sink)?;
-                // TODO: edge attributes
+                if !edge.attributes.values.is_empty() {
+                    map.serialize_entry("attrs", &JSONAttributes(&edge.attributes, &ctx))?;
+                }
                 map.end()
             }
         }
