@@ -122,7 +122,9 @@ impl<'tree> Graph<'tree> {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("index", &node_index)?;
                 let edges = Vec::from_iter(node.outgoing_edges.iter().map(|(sink, edge)| JSONEdge(sink, edge, ctx)));
-                map.serialize_entry("edges", &edges)?;
+                if !edges.is_empty() {
+                    map.serialize_entry("edges", &edges)?;
+                }
                 // TODO: node attrs
                 map.end()
             }
