@@ -127,7 +127,9 @@ impl<'tree> Graph<'tree> {
                     let edges = Vec::from_iter(node.outgoing_edges.iter().map(|(sink, edge)| JSONEdge(sink, edge, ctx)));
                     map.serialize_entry("edges", &edges)?;
                 }
-                map.serialize_entry("attrs", &JSONAttributes(&node.attributes, ctx))?;
+                if !node.attributes.values.is_empty() {
+                    map.serialize_entry("attrs", &JSONAttributes(&node.attributes, ctx))?;
+                }
                 map.end()
             }
         }
