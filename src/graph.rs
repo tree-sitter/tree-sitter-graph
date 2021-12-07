@@ -95,9 +95,9 @@ impl<'tree> Graph<'tree> {
 
     pub fn display_json<'a>(&'a self, ctx: &'a Context) -> () {
         // TODO: move this all into a new module
-        struct JSONContext<'a, T>(&'a T, &'a Context);
+        struct InContext<'a, T>(&'a T, &'a Context);
 
-        impl<'a, 'tree> ser::Serialize for JSONContext<'a, Graph<'tree>> {
+        impl<'a, 'tree> ser::Serialize for InContext<'a, Graph<'tree>> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where
                 S: serde::Serializer,
@@ -106,13 +106,13 @@ impl<'tree> Graph<'tree> {
                 let ctx = self.1;
                 let mut seq = serializer.serialize_seq(Some(graph.graph_nodes.len()))?;
                 for (node_index, node) in graph.graph_nodes.iter().enumerate() {
-                    seq.serialize_element(&JSONContext(&(node_index, node), ctx))?;
+                    seq.serialize_element(&InContext(&(node_index, node), ctx))?;
                 }
                 seq.end()
             }
         }
 
-        impl<'a> ser::Serialize for JSONContext<'a, (usize, &'a GraphNode)> {
+        impl<'a> ser::Serialize for InContext<'a, (usize, &'a GraphNode)> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where
                 S: serde::Serializer,
@@ -123,13 +123,13 @@ impl<'tree> Graph<'tree> {
                 // serializing as a map instead of a struct so we don't have to encode a struct name
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("index", &node_index)?;
-                map.serialize_entry("edges", &JSONContext(&node.outgoing_edges, ctx))?;
-                map.serialize_entry("attrs", &JSONContext(&node.attributes, ctx))?;
+                map.serialize_entry("edges", &InContext(&node.outgoing_edges, ctx))?;
+                map.serialize_entry("attrs", &InContext(&node.attributes, ctx))?;
                 map.end()
             }
         }
 
-        impl<'a> ser::Serialize for JSONContext<'a, SmallVec<[(GraphNodeID, Edge); 8]>> {
+        impl<'a> ser::Serialize for InContext<'a, SmallVec<[(GraphNodeID, Edge); 8]>> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where
                 S: serde::Serializer,
@@ -138,13 +138,13 @@ impl<'tree> Graph<'tree> {
                 let ctx = self.1;
                 let mut seq = serializer.serialize_seq(Some(elems.len()))?;
                 for (_, (id, edge)) in elems.iter().enumerate() {
-                    seq.serialize_element(&JSONContext(&(id, edge), ctx))?;
+                    seq.serialize_element(&InContext(&(id, edge), ctx))?;
                 }
                 seq.end()
             }
         }
 
-        impl<'a> ser::Serialize for JSONContext<'a, (&'a u32, &'a Edge)> {
+        impl<'a> ser::Serialize for InContext<'a, (&'a u32, &'a Edge)> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where
                 S: serde::Serializer,
@@ -154,12 +154,12 @@ impl<'tree> Graph<'tree> {
                 let ctx = self.1;
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("sink", &sink)?;
-                map.serialize_entry("attrs", &JSONContext(&edge.attributes, &ctx))?;
+                map.serialize_entry("attrs", &InContext(&edge.attributes, &ctx))?;
                 map.end()
             }
         }
 
-        impl<'a> ser::Serialize for JSONContext<'a, Attributes> {
+        impl<'a> ser::Serialize for InContext<'a, Attributes> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where
                 S: serde::Serializer,
@@ -168,13 +168,13 @@ impl<'tree> Graph<'tree> {
                 let ctx = self.1;
                 let mut map = serializer.serialize_map(None)?;
                 for (_, (key, value)) in attrs.values.iter().enumerate() {
-                    map.serialize_entry(&JSONContext(key, ctx), &JSONContext(value, ctx))?;
+                    map.serialize_entry(&InContext(key, ctx), &InContext(value, ctx))?;
                 }
                 map.end()
             }
         }
 
-        impl<'a> ser::Serialize for JSONContext<'a, Identifier> {
+        impl<'a> ser::Serialize for InContext<'a, Identifier> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where
                 S: serde::Serializer,
@@ -186,7 +186,7 @@ impl<'tree> Graph<'tree> {
             }
         }
 
-        impl<'a> ser::Serialize for JSONContext<'a, Value> {
+        impl<'a> ser::Serialize for InContext<'a, Value> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where
                 S: serde::Serializer,
@@ -200,10 +200,10 @@ impl<'tree> Graph<'tree> {
                     Value::String(string) => serializer.serialize_str(string),
                     // FIXME: there's no way to distinguish sets and lists, so we can't roundtrip accurately
                     Value::List(list) => {
-                        serializer.collect_seq(list.iter().map(|value| JSONContext(value, ctx)))
+                        serializer.collect_seq(list.iter().map(|value| InContext(value, ctx)))
                     }
                     Value::Set(set) => {
-                        serializer.collect_seq(set.iter().map(|value| JSONContext(value, ctx)))
+                        serializer.collect_seq(set.iter().map(|value| InContext(value, ctx)))
                     }
                     // FIXME: we don't distinguish between syntax tree node IDs, graph node IDs, and integers
                     Value::SyntaxNode(node) => serializer.serialize_u32(node.0),
@@ -212,7 +212,7 @@ impl<'tree> Graph<'tree> {
             }
         }
 
-        let json_graph = JSONContext(self, ctx);
+        let json_graph = InContext(self, ctx);
         let s = serde_json::to_string_pretty(&json_graph).unwrap();
         print!("{}", s)
     }
