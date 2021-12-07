@@ -95,7 +95,6 @@ impl<'tree> Graph<'tree> {
 
     pub fn display_json<'a>(&'a self, ctx: &'a Context) -> () {
         // TODO: move this all into a new module
-        struct JSONEdge<'a>(&'a u32, &'a Edge, &'a Context);
         struct JSONContext<'a, T>(&'a T, &'a Context);
 
         impl<'a, 'tree> ser::Serialize for JSONContext<'a, Graph<'tree>> {
@@ -124,25 +123,35 @@ impl<'tree> Graph<'tree> {
                 // serializing as a map instead of a struct so we don't have to encode a struct name
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("index", &node_index)?;
-                let edges = Vec::from_iter(
-                    node.outgoing_edges
-                        .iter()
-                        .map(|(sink, edge)| JSONEdge(sink, edge, ctx)),
-                );
-                map.serialize_entry("edges", &edges)?;
+                map.serialize_entry("edges", &JSONContext(&node.outgoing_edges, ctx))?;
                 map.serialize_entry("attrs", &JSONContext(&node.attributes, ctx))?;
                 map.end()
             }
         }
 
-        impl<'a> ser::Serialize for JSONEdge<'a> {
+        impl<'a> ser::Serialize for JSONContext<'a, SmallVec<[(GraphNodeID, Edge); 8]>> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where
                 S: serde::Serializer,
             {
-                let sink = self.0;
-                let edge = self.1;
-                let ctx = self.2;
+                let elems = self.0;
+                let ctx = self.1;
+                let mut seq = serializer.serialize_seq(Some(elems.len()))?;
+                for (_, (id, edge)) in elems.iter().enumerate() {
+                    seq.serialize_element(&JSONContext(&(id, edge), ctx))?;
+                }
+                seq.end()
+            }
+        }
+
+        impl<'a> ser::Serialize for JSONContext<'a, (&'a u32, &'a Edge)> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                let sink = self.0 .0;
+                let edge = self.0 .1;
+                let ctx = self.1;
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("sink", &sink)?;
                 map.serialize_entry("attrs", &JSONContext(&edge.attributes, &ctx))?;
