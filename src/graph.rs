@@ -95,7 +95,6 @@ impl<'tree> Graph<'tree> {
 
     pub fn display_json<'a>(&'a self, ctx: &'a Context) -> () {
         // TODO: move this all into a new module
-        struct JSONNode<'a>(usize, &'a GraphNode, &'a Context);
         struct JSONEdge<'a>(&'a u32, &'a Edge, &'a Context);
         struct JSONContext<'a, T>(&'a T, &'a Context);
 
@@ -108,20 +107,20 @@ impl<'tree> Graph<'tree> {
                 let ctx = self.1;
                 let mut seq = serializer.serialize_seq(Some(graph.graph_nodes.len()))?;
                 for (node_index, node) in graph.graph_nodes.iter().enumerate() {
-                    seq.serialize_element(&JSONNode(node_index, node, ctx))?;
+                    seq.serialize_element(&JSONContext(&(node_index, node), ctx))?;
                 }
                 seq.end()
             }
         }
 
-        impl<'a> ser::Serialize for JSONNode<'a> {
+        impl<'a> ser::Serialize for JSONContext<'a, (usize, &'a GraphNode)> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where
                 S: serde::Serializer,
             {
-                let node_index = self.0;
-                let node = self.1;
-                let ctx = self.2;
+                let node_index = self.0 .0;
+                let node = self.0 .1;
+                let ctx = self.1;
                 // serializing as a map instead of a struct so we don't have to encode a struct name
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("index", &node_index)?;
