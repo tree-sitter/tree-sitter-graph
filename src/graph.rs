@@ -95,12 +95,11 @@ impl<'tree> Graph<'tree> {
 
     pub fn display_json<'a>(&'a self, ctx: &'a Context) -> () {
         // TODO: move this all into a new module
-        struct JSONGraph<'a, 'tree>(&'a Graph<'tree>, &'a Context);
         struct JSONNode<'a>(usize, &'a GraphNode, &'a Context);
         struct JSONEdge<'a>(&'a u32, &'a Edge, &'a Context);
         struct JSONContext<'a, T>(&'a T, &'a Context);
 
-        impl<'a, 'tree> ser::Serialize for JSONGraph<'a, 'tree> {
+        impl<'a, 'tree> ser::Serialize for JSONContext<'a, Graph<'tree>> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where
                 S: serde::Serializer,
@@ -205,7 +204,7 @@ impl<'tree> Graph<'tree> {
             }
         }
 
-        let json_graph = JSONGraph(self, ctx);
+        let json_graph = JSONContext(self, ctx);
         let s = serde_json::to_string_pretty(&json_graph).unwrap();
         print!("{}", s)
     }
