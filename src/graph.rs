@@ -98,7 +98,6 @@ impl<'tree> Graph<'tree> {
         struct JSONGraph<'a, 'tree>(&'a Graph<'tree>, &'a Context);
         struct JSONNode<'a>(usize, &'a GraphNode, &'a Context);
         struct JSONEdge<'a>(&'a u32, &'a Edge, &'a Context);
-        struct JSONAttributes<'a>(&'a Attributes, &'a Context);
         struct JSONIdentifier<'a>(&'a Identifier, &'a Context);
         struct JSONContext<'a, T>(&'a T, &'a Context);
 
@@ -134,7 +133,7 @@ impl<'tree> Graph<'tree> {
                         .map(|(sink, edge)| JSONEdge(sink, edge, ctx)),
                 );
                 map.serialize_entry("edges", &edges)?;
-                map.serialize_entry("attrs", &JSONAttributes(&node.attributes, ctx))?;
+                map.serialize_entry("attrs", &JSONContext(&node.attributes, ctx))?;
                 map.end()
             }
         }
@@ -149,12 +148,12 @@ impl<'tree> Graph<'tree> {
                 let ctx = self.2;
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("sink", &sink)?;
-                map.serialize_entry("attrs", &JSONAttributes(&edge.attributes, &ctx))?;
+                map.serialize_entry("attrs", &JSONContext(&edge.attributes, &ctx))?;
                 map.end()
             }
         }
 
-        impl<'a> ser::Serialize for JSONAttributes<'a> {
+        impl<'a> ser::Serialize for JSONContext<'a, Attributes> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where
                 S: serde::Serializer,
