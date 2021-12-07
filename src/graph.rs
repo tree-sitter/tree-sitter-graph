@@ -98,7 +98,6 @@ impl<'tree> Graph<'tree> {
         struct JSONGraph<'a, 'tree>(&'a Graph<'tree>, &'a Context);
         struct JSONNode<'a>(usize, &'a GraphNode, &'a Context);
         struct JSONEdge<'a>(&'a u32, &'a Edge, &'a Context);
-        struct JSONIdentifier<'a>(&'a Identifier, &'a Context);
         struct JSONContext<'a, T>(&'a T, &'a Context);
 
         impl<'a, 'tree> ser::Serialize for JSONGraph<'a, 'tree> {
@@ -162,13 +161,13 @@ impl<'tree> Graph<'tree> {
                 let ctx = self.1;
                 let mut map = serializer.serialize_map(None)?;
                 for (_, (key, value)) in attrs.values.iter().enumerate() {
-                    map.serialize_entry(&JSONIdentifier(key, ctx), &JSONContext(value, ctx))?;
+                    map.serialize_entry(&JSONContext(key, ctx), &JSONContext(value, ctx))?;
                 }
                 map.end()
             }
         }
 
-        impl<'a> ser::Serialize for JSONIdentifier<'a> {
+        impl<'a> ser::Serialize for JSONContext<'a, Identifier> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where
                 S: serde::Serializer,
