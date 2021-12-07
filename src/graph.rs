@@ -100,7 +100,7 @@ impl<'tree> Graph<'tree> {
         struct JSONEdge<'a>(&'a u32, &'a Edge, &'a Context);
         struct JSONAttributes<'a>(&'a Attributes, &'a Context);
         struct JSONIdentifier<'a>(&'a Identifier, &'a Context);
-        struct JSONValue<'a>(&'a Value, &'a Context);
+        struct JSONContext<'a, T>(&'a T, &'a Context);
 
         impl<'a, 'tree> ser::Serialize for JSONGraph<'a, 'tree> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -163,7 +163,7 @@ impl<'tree> Graph<'tree> {
                 let ctx = self.1;
                 let mut map = serializer.serialize_map(None)?;
                 for (_, (key, value)) in attrs.values.iter().enumerate() {
-                    map.serialize_entry(&JSONIdentifier(key, ctx), &JSONValue(value, ctx))?;
+                    map.serialize_entry(&JSONIdentifier(key, ctx), &JSONContext(value, ctx))?;
                 }
                 map.end()
             }
@@ -181,7 +181,7 @@ impl<'tree> Graph<'tree> {
             }
         }
 
-        impl<'a> ser::Serialize for JSONValue<'a> {
+        impl<'a> ser::Serialize for JSONContext<'a, Value> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where
                 S: serde::Serializer,
@@ -195,10 +195,10 @@ impl<'tree> Graph<'tree> {
                     Value::String(string) => serializer.serialize_str(string),
                     // FIXME: there's no way to distinguish sets and lists, so we can't roundtrip accurately
                     Value::List(list) => {
-                        serializer.collect_seq(list.iter().map(|value| JSONValue(value, ctx)))
+                        serializer.collect_seq(list.iter().map(|value| JSONContext(value, ctx)))
                     }
                     Value::Set(set) => {
-                        serializer.collect_seq(set.iter().map(|value| JSONValue(value, ctx)))
+                        serializer.collect_seq(set.iter().map(|value| JSONContext(value, ctx)))
                     }
                     // FIXME: we don't distinguish between syntax tree node IDs, graph node IDs, and integers
                     Value::SyntaxNode(node) => serializer.serialize_u32(node.0),
