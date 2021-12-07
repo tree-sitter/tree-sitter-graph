@@ -10,7 +10,6 @@
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::fmt;
-use std::iter::FromIterator;
 use std::ops::Index;
 use std::ops::IndexMut;
 
