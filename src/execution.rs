@@ -5,7 +5,7 @@
 // Please see the LICENSE-APACHE or LICENSE-MIT files in this distribution for license details.
 // ------------------------------------------------------------------------------------------------
 
-use std::collections::HashMap;
+mod variables;
 
 use anyhow::Context as ErrorContext;
 use thiserror::Error;
@@ -36,15 +36,17 @@ use crate::ast::Statement;
 use crate::ast::StringConstant;
 use crate::ast::UnscopedVariable;
 use crate::ast::Variable;
+pub use crate::execution::variables::Globals;
+use crate::execution::variables::ScopedVariables;
+use crate::execution::variables::VariableMap;
+use crate::execution::variables::Variables;
 use crate::functions::Functions;
 use crate::graph::DisplayWithGraph;
 use crate::graph::Graph;
 use crate::graph::GraphNodeRef;
-use crate::graph::SyntaxNodeRef;
 use crate::graph::Value;
 use crate::Context;
 use crate::DisplayWithContext;
-use crate::Identifier;
 
 impl File {
     /// Executes this graph DSL file against a source file.  You must provide the parsed syntax
@@ -56,13 +58,13 @@ impl File {
         tree: &'tree Tree,
         source: &'tree str,
         functions: &mut Functions,
-        globals: &mut Variables,
+        globals: &Globals,
     ) -> Result<Graph<'tree>, ExecutionError> {
         let mut graph = Graph::new();
         if tree.root_node().has_error() {
             return Err(ExecutionError::ParseTreeHasErrors);
         }
-        let mut locals = Variables::new();
+        let mut locals = VariableMap::new();
         let mut scoped = ScopedVariables::new();
         let current_regex_captures = Vec::new();
         let mut function_parameters = Vec::new();
@@ -141,111 +143,30 @@ impl ExecutionError {
     }
 }
 
-struct ExecutionContext<'a, 'tree> {
+struct ExecutionContext<'a, 'g, 's, 'tree> {
     ctx: &'a Context,
     source: &'tree str,
     graph: &'a mut Graph<'tree>,
     functions: &'a mut Functions,
-    globals: &'a mut Variables,
-    locals: &'a mut Variables,
-    scoped: &'a mut ScopedVariables,
+    globals: &'a Globals<'g>,
+    locals: &'a mut dyn Variables,
+    scoped: &'a mut ScopedVariables<'s>,
     current_regex_captures: &'a Vec<String>,
     function_parameters: &'a mut Vec<Value>,
     mat: &'a QueryMatch<'a, 'tree>,
 }
 
-/// An environment of named variables
-#[derive(Default)]
-pub struct Variables {
-    values: Vec<NamedVariable>,
-}
-
-struct NamedVariable {
-    name: Identifier,
-    value: Value,
-    mutable: bool,
-}
-
-impl Variables {
-    /// Creates a new, empty environment of variables.
-    pub fn new() -> Variables {
-        Variables::default()
-    }
-
-    /// Adds a new mutable variable to an environment, returning an error if the variable already
-    /// exists.
-    pub fn add_mutable(&mut self, name: Identifier, value: Value) -> Result<(), ()> {
-        self.add(name, value, true)
-    }
-
-    /// Adds a new immutable variable to an environment, returning an error if the variable already
-    /// exists.
-    pub fn add_immutable(&mut self, name: Identifier, value: Value) -> Result<(), ()> {
-        self.add(name, value, false)
-    }
-
-    fn add(&mut self, name: Identifier, value: Value, mutable: bool) -> Result<(), ()> {
-        match self.values.binary_search_by_key(&name, |v| v.name) {
-            Ok(_) => Err(()),
-            Err(index) => {
-                let variable = NamedVariable {
-                    name,
-                    value,
-                    mutable,
-                };
-                self.values.insert(index, variable);
-                Ok(())
-            }
-        }
-    }
-
-    /// Returns the value of a variable, if it exists in this environment.
-    pub fn get(&self, name: Identifier) -> Option<&Value> {
-        self.values
-            .binary_search_by_key(&name, |v| v.name)
-            .ok()
-            .map(|index| &self.values[index].value)
-    }
-
-    fn resolve(&mut self, name: Identifier) -> Option<&mut NamedVariable> {
-        self.values
-            .binary_search_by_key(&name, |v| v.name)
-            .ok()
-            .map(move |index| &mut self.values[index])
-    }
-
-    /// Clears this list of variables.
-    pub fn clear(&mut self) {
-        self.values.clear();
-    }
-}
-
-#[derive(Default)]
-struct ScopedVariables {
-    scopes: HashMap<SyntaxNodeRef, Variables>,
-}
-
-impl ScopedVariables {
-    fn new() -> ScopedVariables {
-        ScopedVariables::default()
-    }
-
-    fn get(&mut self, scope: SyntaxNodeRef) -> &mut Variables {
-        self.scopes.entry(scope).or_default()
-    }
-}
-
 impl Stanza {
-    fn execute<'tree>(
+    fn execute<'l, 's, 'tree>(
         &self,
         ctx: &Context,
         tree: &'tree Tree,
         source: &'tree str,
         graph: &mut Graph<'tree>,
         functions: &mut Functions,
-        globals: &mut Variables,
-        locals: &mut Variables,
-        scoped: &mut ScopedVariables,
+        globals: &Globals,
+        locals: &mut VariableMap<'l>,
+        scoped: &mut ScopedVariables<'s>,
         current_regex_captures: &Vec<String>,
         function_parameters: &mut Vec<Value>,
         cursor: &mut QueryCursor,
@@ -308,16 +229,7 @@ impl DeclareMutable {
 impl Assign {
     fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
         let value = self.value.evaluate(exec)?;
-        let variable = self.variable.resolve(exec)?;
-        if !variable.mutable {
-            return Err(ExecutionError::CannotAssignImmutableVariable(format!(
-                " {} in {}",
-                self.variable.display_with(exec.ctx),
-                self.display_with(exec.ctx)
-            )));
-        }
-        variable.value = value;
-        Ok(())
+        self.variable.set(exec, value)
     }
 }
 
@@ -435,13 +347,14 @@ impl Scan {
                     .push(regex_capture.map(|m| m.as_str()).unwrap_or("").to_string());
             }
 
+            let mut arm_locals = VariableMap::new_child(exec.locals);
             let mut arm_exec = ExecutionContext {
                 ctx: exec.ctx,
                 source: exec.source,
                 graph: exec.graph,
                 functions: exec.functions,
                 globals: exec.globals,
-                locals: exec.locals,
+                locals: &mut arm_locals,
                 scoped: exec.scoped,
                 current_regex_captures: &current_regex_captures,
                 function_parameters: exec.function_parameters,
@@ -593,19 +506,16 @@ impl RegexCapture {
 
 impl Variable {
     fn evaluate(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
-        let variable = self.resolve(exec)?;
-        Ok(variable.value.clone())
+        let value = self.get(exec)?;
+        Ok(value.clone())
     }
 }
 
 impl Variable {
-    fn resolve<'a>(
-        &self,
-        exec: &'a mut ExecutionContext,
-    ) -> Result<&'a mut NamedVariable, ExecutionError> {
+    fn get<'a>(&self, exec: &'a mut ExecutionContext) -> Result<&'a Value, ExecutionError> {
         match self {
-            Variable::Scoped(variable) => variable.resolve(exec),
-            Variable::Unscoped(variable) => variable.resolve(exec),
+            Variable::Scoped(variable) => variable.get(exec),
+            Variable::Unscoped(variable) => variable.get(exec),
         }
     }
 
@@ -620,13 +530,17 @@ impl Variable {
             Variable::Unscoped(variable) => variable.add(exec, value, mutable),
         }
     }
+
+    fn set(&self, exec: &mut ExecutionContext, value: Value) -> Result<(), ExecutionError> {
+        match self {
+            Variable::Scoped(variable) => variable.set(exec, value),
+            Variable::Unscoped(variable) => variable.set(exec, value),
+        }
+    }
 }
 
 impl ScopedVariable {
-    fn resolve<'a>(
-        &self,
-        exec: &'a mut ExecutionContext,
-    ) -> Result<&'a mut NamedVariable, ExecutionError> {
+    fn get<'a>(&self, exec: &'a mut ExecutionContext) -> Result<&'a Value, ExecutionError> {
         let scope = self.scope.evaluate(exec)?;
         let scope = match scope {
             Value::SyntaxNode(scope) => scope,
@@ -638,13 +552,15 @@ impl ScopedVariable {
             }
         };
         let variables = exec.scoped.get(scope);
-        variables
-            .resolve(self.name)
-            .ok_or(ExecutionError::UndefinedVariable(format!(
+        if let Some(value) = variables.get(self.name) {
+            Ok(value)
+        } else {
+            Err(ExecutionError::UndefinedVariable(format!(
                 "{} on node {}",
                 self.display_with(exec.ctx),
                 scope.display_with(exec.graph)
             )))
+        }
     }
 
     fn add(
@@ -668,23 +584,35 @@ impl ScopedVariable {
             ExecutionError::DuplicateVariable(format!(" {}", self.display_with(exec.ctx)))
         })
     }
+
+    fn set(&self, exec: &mut ExecutionContext, value: Value) -> Result<(), ExecutionError> {
+        let scope = self.scope.evaluate(exec)?;
+        let scope = match scope {
+            Value::SyntaxNode(scope) => scope,
+            _ => {
+                return Err(ExecutionError::InvalidVariableScope(format!(
+                    " got {}",
+                    scope.display_with(exec.graph)
+                )))
+            }
+        };
+        let variables = exec.scoped.get(scope);
+        variables.set(self.name, value).map_err(|_| {
+            ExecutionError::DuplicateVariable(format!(" {}", self.display_with(exec.ctx)))
+        })
+    }
 }
 
 impl UnscopedVariable {
-    fn resolve<'a>(
-        &self,
-        exec: &'a mut ExecutionContext,
-    ) -> Result<&'a mut NamedVariable, ExecutionError> {
-        if let Some(variable) = exec.globals.resolve(self.name) {
-            return Ok(variable);
+    fn get<'a>(&self, exec: &'a mut ExecutionContext) -> Result<&'a Value, ExecutionError> {
+        if let Some(value) = exec.globals.get(self.name) {
+            Some(value)
+        } else {
+            exec.locals.get(self.name)
         }
-        if let Some(variable) = exec.locals.resolve(self.name) {
-            return Ok(variable);
-        }
-        Err(ExecutionError::UndefinedVariable(format!(
-            "{}",
-            self.display_with(exec.ctx)
-        )))
+        .ok_or_else(|| {
+            ExecutionError::UndefinedVariable(format!("{}", self.display_with(exec.ctx)))
+        })
     }
 
     fn add(
@@ -701,6 +629,25 @@ impl UnscopedVariable {
         }
         exec.locals.add(self.name, value, mutable).map_err(|_| {
             ExecutionError::DuplicateVariable(format!(" local {}", self.display_with(exec.ctx)))
+        })
+    }
+
+    fn set(&self, exec: &mut ExecutionContext, value: Value) -> Result<(), ExecutionError> {
+        if exec.globals.get(self.name).is_some() {
+            return Err(ExecutionError::CannotAssignImmutableVariable(format!(
+                " global {}",
+                self.display_with(exec.ctx)
+            )));
+        }
+        exec.locals.set(self.name, value).map_err(|_| {
+            if exec.locals.get(self.name).is_some() {
+                ExecutionError::CannotAssignImmutableVariable(format!(
+                    "{}",
+                    self.display_with(exec.ctx)
+                ))
+            } else {
+                ExecutionError::UndefinedVariable(format!("{}", self.display_with(exec.ctx)))
+            }
         })
     }
 }

@@ -22,6 +22,9 @@ fn execute(python_source: &str, dsl_source: &str) -> Result<String, ExecutionErr
     file.parse(&mut ctx, dsl_source).expect("Cannot parse file");
     let mut functions = Functions::stdlib(&mut ctx);
     let mut globals = Variables::new();
+    globals
+        .add(ctx.add_identifier("filename"), "test.py".into())
+        .map_err(|_| ExecutionError::DuplicateVariable("filename".into()))?;
     let graph = file.execute(&ctx, &tree, python_source, &mut functions, &mut globals)?;
     let result = graph.display_with(&ctx).to_string();
     Ok(result)
@@ -119,6 +122,51 @@ fn can_scan_strings() {
 }
 
 #[test]
+fn variables_in_scan_arms_are_local() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            var current_node = (node)
+
+            scan "alpha/beta/gamma/delta.py" {
+               "([^/]+)/"
+               {
+                 let new_node = (node)
+                 attr (new_node) name = $1
+                 edge current_node -> new_node
+                 set current_node = new_node
+               }
+
+               "([^/]+)\\.py$"
+               {
+                 let new_node = (node)
+                 attr (new_node) name = $1
+                 edge current_node -> new_node
+               }
+            }
+          }
+        "#},
+        indoc! {r#"
+          node 0
+          edge 0 -> 1
+          node 1
+            name: "alpha"
+          edge 1 -> 2
+          node 2
+            name: "beta"
+          edge 2 -> 3
+          node 3
+            name: "gamma"
+          edge 3 -> 4
+          node 4
+            name: "delta"
+        "#},
+    );
+}
+
+#[test]
 fn scoped_variables_carry_across_stanzas() {
     check_execution(
         indoc! {r#"
@@ -186,6 +234,42 @@ fn can_match_stanza_multiple_times() {
             name: "d"
           node 6
             name: "f"
+        "#},
+    );
+}
+
+#[test]
+fn can_use_global_variable() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node n
+            attr (n) filename = filename
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            filename: "test.py"
+    "#},
+    );
+}
+
+#[test]
+fn can_use_variable_multiple_times() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            let x = (node)
+            let y = x
+            let z = x
+          }
+        "#},
+        indoc! {r#"
+          node 0
         "#},
     );
 }
