@@ -64,7 +64,7 @@ impl File {
         }
         let mut locals = Variables::new();
         let mut scoped = ScopedVariables::new();
-        let mut current_regex_matches = Vec::new();
+        let current_regex_captures = Vec::new();
         let mut function_parameters = Vec::new();
         let mut cursor = QueryCursor::new();
         for stanza in &self.stanzas {
@@ -77,7 +77,7 @@ impl File {
                 globals,
                 &mut locals,
                 &mut scoped,
-                &mut current_regex_matches,
+                &current_regex_captures,
                 &mut function_parameters,
                 &mut cursor,
             )?;
@@ -149,7 +149,7 @@ struct ExecutionContext<'a, 'tree> {
     globals: &'a mut Variables,
     locals: &'a mut Variables,
     scoped: &'a mut ScopedVariables,
-    current_regex_matches: &'a mut Vec<String>,
+    current_regex_captures: &'a Vec<String>,
     function_parameters: &'a mut Vec<Value>,
     mat: &'a QueryMatch<'a, 'tree>,
 }
@@ -246,7 +246,7 @@ impl Stanza {
         globals: &mut Variables,
         locals: &mut Variables,
         scoped: &mut ScopedVariables,
-        current_regex_matches: &mut Vec<String>,
+        current_regex_captures: &Vec<String>,
         function_parameters: &mut Vec<Value>,
         cursor: &mut QueryCursor,
     ) -> Result<(), ExecutionError> {
@@ -261,7 +261,7 @@ impl Stanza {
                 globals,
                 locals,
                 scoped,
-                current_regex_matches,
+                current_regex_captures,
                 function_parameters,
                 mat: &mat,
             };
@@ -428,15 +428,30 @@ impl Scan {
 
             let (regex_captures, block_index) = &matches[0];
             let arm = &self.arms[*block_index];
+
+            let mut current_regex_captures = Vec::new();
+            for regex_capture in regex_captures.iter() {
+                current_regex_captures
+                    .push(regex_capture.map(|m| m.as_str()).unwrap_or("").to_string());
+            }
+
+            let mut arm_exec = ExecutionContext {
+                ctx: exec.ctx,
+                source: exec.source,
+                graph: exec.graph,
+                functions: exec.functions,
+                globals: exec.globals,
+                locals: exec.locals,
+                scoped: exec.scoped,
+                current_regex_captures: &current_regex_captures,
+                function_parameters: exec.function_parameters,
+                mat: exec.mat,
+            };
+
             for statement in &arm.statements {
-                exec.current_regex_matches.clear();
-                for regex_capture in regex_captures.iter() {
-                    exec.current_regex_matches
-                        .push(regex_capture.map(|m| m.as_str()).unwrap_or("").to_string());
-                }
                 statement
-                    .execute(exec)
-                    .with_context(|| format!("Executing {}", statement.display_with(exec.ctx)))
+                    .execute(&mut arm_exec)
+                    .with_context(|| format!("Executing {}", statement.display_with(arm_exec.ctx)))
                     .with_context(|| {
                         format!(
                             "Matching {} with arm \"{}\" {{ ... }}",
@@ -569,7 +584,7 @@ impl Call {
 
 impl RegexCapture {
     fn evaluate(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
-        let capture = exec.current_regex_matches.get(self.match_index).ok_or(
+        let capture = exec.current_regex_captures.get(self.match_index).ok_or(
             ExecutionError::UndefinedRegexCapture(format!("{}", self.display_with(exec.ctx))),
         )?;
         Ok(Value::String(capture.clone()))
