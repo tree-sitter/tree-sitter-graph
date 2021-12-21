@@ -420,7 +420,7 @@ impl Parser<'_> {
             }
             .into())
         } else if keyword == self.scan_keyword {
-            let value = self.parse_expression(current_query)?;
+            let value = self.parse_scan_expression(current_query)?;
             self.consume_whitespace();
             self.consume_token("{")?;
             self.consume_whitespace();
@@ -586,6 +586,31 @@ impl Parser<'_> {
         Ok(c(captures))
     }
 
+    fn parse_scan_expression(
+        &mut self,
+        current_query: &Query,
+    ) -> Result<ast::ScanExpression, ParseError> {
+        let expression = match self.peek()? {
+            '"' => self.parse_string()?.into(),
+            '@' => self.parse_capture(current_query)?.into(),
+            '$' => self.parse_regex_capture()?.into(),
+            ch if is_ident_start(ch) => {
+                let location = self.location;
+                let name = self.parse_identifier("variable name")?;
+                ast::UnscopedVariable { name, location }.into()
+            }
+            ch => {
+                return Err(ParseError::UnexpectedCharacter(
+                    ch,
+                    "expression",
+                    self.location,
+                ))
+            }
+        };
+        self.consume_whitespace();
+        Ok(expression)
+    }
+
     fn parse_identifier(&mut self, within: &'static str) -> Result<Identifier, ParseError> {
         let start = self.offset;
         let ch = self.next()?;
@@ -627,7 +652,7 @@ impl Parser<'_> {
             '#' => self.parse_literal()?,
             '"' => self.parse_string()?.into(),
             '@' => self.parse_capture(current_query)?.into(),
-            '$' => self.parse_regex_capture()?,
+            '$' => self.parse_regex_capture()?.into(),
             '(' => self.parse_call(current_query)?,
             '[' => self.parse_list(current_query)?,
             '{' => self.parse_set(current_query)?,
@@ -779,7 +804,7 @@ impl Parser<'_> {
         }
     }
 
-    fn parse_regex_capture(&mut self) -> Result<ast::Expression, ParseError> {
+    fn parse_regex_capture(&mut self) -> Result<ast::RegexCapture, ParseError> {
         let regex_capture_location = self.location;
         self.consume_token("$")?;
         let start = self.offset;

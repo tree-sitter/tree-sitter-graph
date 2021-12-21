@@ -312,7 +312,7 @@ impl DisplayWithContext for Print {
 /// A `scan` statement that matches regular expressions against a string
 #[derive(Debug, Eq, PartialEq)]
 pub struct Scan {
-    pub value: Expression,
+    pub value: ScanExpression,
     pub arms: Vec<ScanArm>,
     pub location: Location,
 }
@@ -331,6 +331,61 @@ impl DisplayWithContext for Scan {
             self.value.display_with(ctx),
             self.location
         )
+    }
+}
+
+/// Subset of expressions that are allowed in scan
+#[derive(Debug, Eq, PartialEq)]
+pub enum ScanExpression {
+    StringConstant(StringConstant),
+    Capture(Capture),
+    Variable(UnscopedVariable),
+    RegexCapture(RegexCapture),
+}
+
+impl From<String> for ScanExpression {
+    fn from(value: String) -> Self {
+        Self::StringConstant(StringConstant { value }.into())
+    }
+}
+
+impl From<Capture> for ScanExpression {
+    fn from(value: Capture) -> Self {
+        Self::Capture(value)
+    }
+}
+
+impl From<UnscopedVariable> for ScanExpression {
+    fn from(value: UnscopedVariable) -> Self {
+        Self::Variable(value.into())
+    }
+}
+
+impl From<RegexCapture> for ScanExpression {
+    fn from(value: RegexCapture) -> Self {
+        Self::RegexCapture(value)
+    }
+}
+
+impl From<ScanExpression> for Expression {
+    fn from(value: ScanExpression) -> Self {
+        match value {
+            ScanExpression::StringConstant(value) => Self::StringConstant(value),
+            ScanExpression::Capture(value) => Self::Capture(value),
+            ScanExpression::Variable(value) => Self::Variable(value.into()),
+            ScanExpression::RegexCapture(value) => Self::RegexCapture(value),
+        }
+    }
+}
+
+impl DisplayWithContext for ScanExpression {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        match self {
+            Self::StringConstant(value) => value.fmt(f, ctx),
+            Self::Capture(value) => value.fmt(f, ctx),
+            Self::Variable(value) => value.fmt(f, ctx),
+            Self::RegexCapture(value) => value.fmt(f, ctx),
+        }
     }
 }
 
