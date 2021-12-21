@@ -950,3 +950,70 @@ fn cannot_parse_if_list_capture() {
         panic!("Parse succeeded unexpectedly");
     }
 }
+
+#[test]
+fn can_parse_for_in() {
+    let mut ctx = Context::new();
+    let source = r#"
+        (module (_)* @xs)
+        {
+          for x in @xs {
+            print x
+          }
+        }
+    "#;
+    let mut file = File::new(tree_sitter_python::language());
+    file.parse(&mut ctx, source).expect("Cannot parse file");
+
+    let xs = ctx.add_identifier("@xs");
+    let x = ctx.add_identifier("x");
+
+    let statements = file
+        .stanzas
+        .into_iter()
+        .map(|s| s.statements)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        statements,
+        vec![vec![ForIn {
+            variable: UnscopedVariable {
+                name: x,
+                location: Location { row: 3, column: 14 }
+            },
+            capture: Capture {
+                index: 0,
+                quantifier: ZeroOrMore,
+                name: xs,
+            }
+            .into(),
+            statements: vec![Print {
+                values: vec![UnscopedVariable {
+                    name: x,
+                    location: Location { row: 4, column: 18 },
+                }
+                .into()],
+                location: Location { row: 4, column: 12 }
+            }
+            .into()],
+            location: Location { row: 3, column: 10 }
+        }
+        .into()]]
+    );
+}
+
+#[test]
+fn cannot_parse_for_in_optional_capture() {
+    let mut ctx = Context::new();
+    let source = r#"
+        (module (_)? @xs) @root
+        {
+          for x in @xs {
+            node n
+          }
+        }
+    "#;
+    let mut file = File::new(tree_sitter_python::language());
+    if let Ok(_) = file.parse(&mut ctx, source) {
+        panic!("Parse succeeded unexpectedly");
+    }
+}

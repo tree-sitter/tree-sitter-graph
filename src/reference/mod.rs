@@ -443,6 +443,20 @@
 //! }
 //! ```
 //!
+//! # List iteration
+//!
+//! You can use a `for` statement to execute blocks of statements for every element in list
+//! captures in queries.
+//!
+//! ```tsg
+//! (module (_)* @stmts)
+//! {
+//!   for stmt in @stmts {
+//!     print stmt
+//!   }
+//! }
+//! ```
+//!
 //! # Debugging
 //!
 //! To support members of the Ancient and Harmonious Order of Printf Debuggers, you can use `print`

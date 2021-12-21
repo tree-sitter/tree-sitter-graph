@@ -26,6 +26,7 @@ use crate::ast::DeclareImmutable;
 use crate::ast::DeclareMutable;
 use crate::ast::Expression;
 use crate::ast::File;
+use crate::ast::ForIn;
 use crate::ast::If;
 use crate::ast::IntegerConstant;
 use crate::ast::ListComprehension;
@@ -230,6 +231,7 @@ impl Statement {
             Statement::Scan(statement) => statement.execute(exec),
             Statement::Print(statement) => statement.execute(exec),
             Statement::If(statement) => statement.execute(exec),
+            Statement::ForIn(statement) => statement.execute(exec),
         }
     }
 }
@@ -464,6 +466,33 @@ impl Condition {
             }
         }
         Ok(result)
+    }
+}
+
+impl ForIn {
+    fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        let values = self.capture.evaluate(exec)?.into_list(exec.graph)?;
+        let mut loop_locals = VariableMap::new_child(exec.locals);
+        for value in values {
+            loop_locals.clear();
+            let mut loop_exec = ExecutionContext {
+                ctx: exec.ctx,
+                source: exec.source,
+                graph: exec.graph,
+                functions: exec.functions,
+                globals: exec.globals,
+                locals: &mut loop_locals,
+                scoped: exec.scoped,
+                current_regex_captures: exec.current_regex_captures,
+                function_parameters: exec.function_parameters,
+                mat: exec.mat,
+            };
+            self.variable.add(&mut loop_exec, value, false)?;
+            for stmt in &self.statements {
+                stmt.execute(&mut loop_exec)?;
+            }
+        }
+        Ok(())
     }
 }
 

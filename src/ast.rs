@@ -64,6 +64,8 @@ pub enum Statement {
     Print(Print),
     // If
     If(If),
+    // ForIn
+    ForIn(ForIn),
 }
 
 impl DisplayWithContext for Statement {
@@ -79,6 +81,7 @@ impl DisplayWithContext for Statement {
             Statement::Scan(stmt) => stmt.fmt(f, ctx),
             Statement::Print(stmt) => stmt.fmt(f, ctx),
             Statement::If(stmt) => stmt.fmt(f, ctx),
+            Statement::ForIn(stmt) => stmt.fmt(f, ctx),
         }
     }
 }
@@ -430,6 +433,33 @@ impl DisplayWithContext for Condition {
             write!(f, " {}", capture.display_with(ctx))?;
         }
         Ok(())
+    }
+}
+
+/// A `for in` statement
+#[derive(Debug, Eq, PartialEq)]
+pub struct ForIn {
+    pub variable: UnscopedVariable,
+    pub capture: Capture,
+    pub statements: Vec<Statement>,
+    pub location: Location,
+}
+
+impl From<ForIn> for Statement {
+    fn from(statement: ForIn) -> Statement {
+        Statement::ForIn(statement)
+    }
+}
+
+impl DisplayWithContext for ForIn {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        write!(
+            f,
+            "for {} in {} {{ ... }} at {}",
+            self.variable.display_with(ctx),
+            self.capture.display_with(ctx),
+            self.location,
+        )
     }
 }
 
