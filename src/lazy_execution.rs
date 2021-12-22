@@ -7,6 +7,7 @@
 
 mod store;
 mod values;
+mod variables;
 
 use std::collections::HashMap;
 use std::fmt;
@@ -25,6 +26,8 @@ use crate::Context;
 use crate::Identifier;
 
 use store::*;
+use values::*;
+use variables::*;
 
 impl ast::File {
     /// Executes this graph DSL file against a source file.  You must provide the parsed syntax
