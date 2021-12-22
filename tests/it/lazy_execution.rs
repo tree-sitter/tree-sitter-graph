@@ -12,8 +12,17 @@ use tree_sitter_graph::Context;
 use tree_sitter_graph::ExecutionError;
 use tree_sitter_graph::Variables;
 
-#[allow(unused)]
+fn init_log() {
+    let _ = env_logger::builder()
+        .is_test(true)
+        .format_level(false)
+        .format_target(false)
+        .format_timestamp(None)
+        .try_init(); // try, because earlier test may have already initialized it
+}
+
 fn execute(python_source: &str, dsl_source: &str) -> Result<String, ExecutionError> {
+    init_log();
     let mut parser = Parser::new();
     parser.set_language(tree_sitter_python::language()).unwrap();
     let tree = parser.parse(python_source, None).unwrap();
