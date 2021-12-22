@@ -5,6 +5,7 @@
 // Please see the LICENSE-APACHE or LICENSE-MIT files in this distribution for license details.
 // ------------------------------------------------------------------------------------------------
 
+mod statements;
 mod store;
 mod values;
 mod variables;
@@ -25,6 +26,7 @@ use crate::parser::FULL_MATCH;
 use crate::Context;
 use crate::Identifier;
 
+use statements::*;
 use store::*;
 use values::*;
 use variables::*;
