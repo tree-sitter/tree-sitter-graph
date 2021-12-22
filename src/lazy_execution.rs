@@ -10,20 +10,29 @@ mod store;
 mod values;
 mod variables;
 
+use anyhow::Context as _;
+use log::{debug, trace};
+
 use std::collections::HashMap;
 use std::fmt;
 
+use tree_sitter::CaptureQuantifier::One;
 use tree_sitter::Query;
+use tree_sitter::QueryCursor;
+use tree_sitter::QueryMatch;
 use tree_sitter::Tree;
 
 use crate::ast;
+use crate::execution::query_capture_value;
 use crate::execution::ExecutionError;
 use crate::execution::Globals;
 use crate::functions::Functions;
 use crate::graph;
+use crate::graph::DisplayWithGraph as _;
 use crate::graph::Graph;
 use crate::parser::FULL_MATCH;
 use crate::Context;
+use crate::DisplayWithContext as _;
 use crate::Identifier;
 
 use statements::*;
@@ -37,18 +46,66 @@ impl ast::File {
     /// provide the set of functions and global variables that are available during execution.
     pub fn execute_lazy<'tree>(
         &self,
-        _ctx: &Context,
+        ctx: &Context,
         tree: &'tree Tree,
-        _source: &'tree str,
-        _functions: &mut Functions,
-        _globals: &Globals,
+        source: &'tree str,
+        functions: &mut Functions,
+        globals: &Globals,
     ) -> Result<Graph<'tree>, ExecutionError> {
-        let graph = Graph::new();
+        let mut graph = Graph::new();
         if tree.root_node().has_error() {
             return Err(ExecutionError::ParseTreeHasErrors);
         }
+        let mut locals = VariableMap::new();
+        let mut cursor = QueryCursor::new();
+        let mut store = Store::new();
+        let mut scoped_store = ScopedVariables::new();
+        let mut lazy_graph = Vec::new();
+        for stanza in &self.stanzas {
+            stanza.execute_lazy(
+                ctx,
+                tree,
+                source,
+                &mut graph,
+                globals,
+                &mut locals,
+                &mut cursor,
+                &mut store,
+                &mut scoped_store,
+                &mut lazy_graph,
+            )?;
+        }
+        let mut function_parameters = Vec::new();
+        let mut prev_element_debug_info = HashMap::new();
+        for graph_stmt in &lazy_graph {
+            graph_stmt
+                .evaluate(&mut EvaluationContext {
+                    ctx,
+                    source,
+                    graph: &mut graph,
+                    functions,
+                    store: &mut store,
+                    scoped_store: &mut scoped_store,
+                    function_parameters: &mut function_parameters,
+                    prev_element_debug_info: &mut prev_element_debug_info,
+                })
+                .with_context(|| format!("Executing {}", graph_stmt.display_with(ctx, &graph)))?;
+        }
         Ok(graph)
     }
+}
+
+/// Context for execution, which executes stanzas to build the lazy graph
+struct ExecutionContext<'a, 'g, 'tree> {
+    ctx: &'a Context,
+    graph: &'a mut Graph<'tree>,
+    globals: &'a Globals<'g>,
+    locals: &'a mut dyn Variables,
+    current_regex_captures: &'a Vec<String>,
+    mat: &'a QueryMatch<'a, 'tree>,
+    store: &'a mut Store,
+    scoped_store: &'a mut ScopedVariables,
+    lazy_graph: &'a mut Vec<Statement>,
 }
 
 /// Context for evaluation, which evalautes the lazy graph to build the actual graph
@@ -70,7 +127,62 @@ pub(super) enum GraphElementKey {
     EdgeAttribute(graph::GraphNodeRef, graph::GraphNodeRef, Identifier),
 }
 
-#[allow(unused)]
+impl ast::Stanza {
+    fn execute_lazy<'l, 'g, 'tree>(
+        &self,
+        ctx: &Context,
+        tree: &'tree Tree,
+        source: &'tree str,
+        graph: &mut Graph<'tree>,
+        globals: &Globals<'g>,
+        locals: &mut VariableMap<'l>,
+        cursor: &mut QueryCursor,
+        store: &mut Store,
+        scoped_store: &mut ScopedVariables,
+        lazy_graph: &mut Vec<Statement>,
+    ) -> Result<(), ExecutionError> {
+        let full_match_index = full_match_capture_index(&self.query);
+        let current_regex_captures = vec![];
+        let matches = cursor.matches(&self.query, tree.root_node(), source.as_bytes());
+        for mat in matches {
+            locals.clear();
+            let mut exec = ExecutionContext {
+                ctx,
+                graph,
+                globals,
+                locals,
+                current_regex_captures: &current_regex_captures,
+                mat: &mat,
+                store,
+                scoped_store,
+                lazy_graph,
+            };
+            let node = query_capture_value(full_match_index, One, &mat, exec.graph);
+            debug!(
+                "match {} at {}",
+                node.display_with(exec.graph),
+                self.location
+            );
+            trace!("{{");
+            for statement in &self.statements {
+                statement
+                    .execute_lazy(&mut exec)
+                    .with_context(|| format!("Executing {}", statement.display_with(exec.ctx)))?;
+            }
+            trace!("}}");
+        }
+        Ok(())
+    }
+}
+
+impl ast::Statement {
+    fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        match self {
+            _ => Ok(()),
+        }
+    }
+}
+
 fn full_match_capture_index(query: &Query) -> usize {
     query
         .capture_names()
