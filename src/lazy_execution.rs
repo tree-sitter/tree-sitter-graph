@@ -11,6 +11,7 @@ mod values;
 use std::collections::HashMap;
 use std::fmt;
 
+use tree_sitter::Query;
 use tree_sitter::Tree;
 
 use crate::ast;
@@ -19,6 +20,7 @@ use crate::execution::Globals;
 use crate::functions::Functions;
 use crate::graph;
 use crate::graph::Graph;
+use crate::parser::FULL_MATCH;
 use crate::Context;
 use crate::Identifier;
 
@@ -61,6 +63,15 @@ pub(super) enum GraphElementKey {
     NodeAttribute(graph::GraphNodeRef, Identifier),
     Edge(graph::GraphNodeRef, graph::GraphNodeRef),
     EdgeAttribute(graph::GraphNodeRef, graph::GraphNodeRef, Identifier),
+}
+
+#[allow(unused)]
+fn full_match_capture_index(query: &Query) -> usize {
+    query
+        .capture_names()
+        .iter()
+        .position(|c| c == FULL_MATCH)
+        .unwrap()
 }
 
 /// Trait to Display with a given Context and Graph
