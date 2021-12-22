@@ -31,6 +31,7 @@ pub enum Statement {
     AddGraphNodeAttribute(AddGraphNodeAttribute),
     CreateEdge(CreateEdge),
     AddEdgeAttribute(AddEdgeAttribute),
+    Print(Print),
 }
 
 impl Statement {
@@ -41,6 +42,7 @@ impl Statement {
             Statement::AddGraphNodeAttribute(stmt) => stmt.evaluate(exec),
             Statement::CreateEdge(stmt) => stmt.evaluate(exec),
             Statement::AddEdgeAttribute(stmt) => stmt.evaluate(exec),
+            Statement::Print(stmt) => stmt.evaluate(exec),
         };
         trace!("}}");
         result
@@ -65,12 +67,19 @@ impl From<CreateEdge> for Statement {
     }
 }
 
+impl From<Print> for Statement {
+    fn from(stmt: Print) -> Self {
+        Statement::Print(stmt)
+    }
+}
+
 impl DisplayWithContextAndGraph for Statement {
     fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context, graph: &Graph) -> fmt::Result {
         match self {
             Statement::AddGraphNodeAttribute(stmt) => stmt.fmt(f, ctx, graph),
             Statement::CreateEdge(stmt) => stmt.fmt(f, ctx, graph),
             Statement::AddEdgeAttribute(stmt) => stmt.fmt(f, ctx, graph),
+            Statement::Print(stmt) => stmt.fmt(f, ctx, graph),
         }
     }
 }
@@ -246,6 +255,61 @@ impl DisplayWithContextAndGraph for AddEdgeAttribute {
         )?;
         for attr in &self.attributes {
             write!(f, " {}", attr.display_with(ctx, graph),)?;
+        }
+        write!(f, " at {}", self.debug_info)
+    }
+}
+
+/// Lazy statement to print values
+#[derive(Debug)]
+pub struct Print {
+    arguments: Vec<PrintArgument>,
+    debug_info: DebugInfo,
+}
+
+#[derive(Debug)]
+pub enum PrintArgument {
+    Text(String),
+    Value(Value),
+}
+
+impl Print {
+    pub fn new(arguments: Vec<PrintArgument>, debug_info: DebugInfo) -> Print {
+        Print {
+            arguments,
+            debug_info,
+        }
+    }
+
+    pub(super) fn evaluate(&self, exec: &mut EvaluationContext) -> Result<(), ExecutionError> {
+        for argument in &self.arguments {
+            match argument {
+                PrintArgument::Text(string) => eprint!("{}", string),
+                PrintArgument::Value(value) => {
+                    let value = value.evaluate(exec)?;
+                    eprint!("{}", value.display_with(exec.graph));
+                }
+            }
+        }
+        eprintln!("");
+        Ok(())
+    }
+}
+
+impl DisplayWithContextAndGraph for Print {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context, graph: &Graph) -> fmt::Result {
+        write!(f, "print")?;
+        let mut first = true;
+        for argument in &self.arguments {
+            if first {
+                first = false;
+            } else {
+                write!(f, ", ")?;
+            }
+            match argument {
+                PrintArgument::Text(string) => write!(f, "\"{}\"", string)?,
+                PrintArgument::Value(value) => write!(f, "{}", value.display_with(ctx, graph))?,
+            };
         }
         write!(f, " at {}", self.debug_info)
     }

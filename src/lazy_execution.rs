@@ -185,6 +185,7 @@ impl ast::Statement {
             Self::AddGraphNodeAttribute(statement) => statement.execute_lazy(exec),
             Self::CreateEdge(statement) => statement.execute_lazy(exec),
             Self::AddEdgeAttribute(statement) => statement.execute_lazy(exec),
+            Self::Print(statement) => statement.execute_lazy(exec),
             _ => Ok(()),
         }
     }
@@ -250,6 +251,23 @@ impl ast::AddEdgeAttribute {
             attributes.push(attribute.evaluate_lazy(exec)?);
         }
         let stmt = AddEdgeAttribute::new(source, sink, attributes, self.location.into());
+        exec.lazy_graph.push(stmt.into());
+        Ok(())
+    }
+}
+
+impl ast::Print {
+    fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        let mut arguments = Vec::new();
+        for value in &self.values {
+            let argument = if let ast::Expression::StringConstant(expr) = value {
+                PrintArgument::Text(expr.value.clone())
+            } else {
+                PrintArgument::Value(value.evaluate_lazy(exec)?)
+            };
+            arguments.push(argument);
+        }
+        let stmt = Print::new(arguments, self.location.into());
         exec.lazy_graph.push(stmt.into());
         Ok(())
     }
