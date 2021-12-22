@@ -187,6 +187,7 @@ impl ast::Statement {
             Self::AddEdgeAttribute(statement) => statement.execute_lazy(exec),
             Self::Scan(statement) => statement.execute_lazy(exec),
             Self::Print(statement) => statement.execute_lazy(exec),
+            Self::If(statement) => statement.execute_lazy(exec),
             _ => Ok(()),
         }
     }
@@ -353,6 +354,55 @@ impl ast::Print {
         let stmt = Print::new(arguments, self.location.into());
         exec.lazy_graph.push(stmt.into());
         Ok(())
+    }
+}
+
+impl ast::If {
+    fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        for arm in &self.arms {
+            let mut result = true;
+            for condition in &arm.conditions {
+                result &= condition.test_strict(exec)?;
+            }
+            if result {
+                let mut arm_locals = VariableMap::new_child(exec.locals);
+                let mut arm_exec = ExecutionContext {
+                    ctx: exec.ctx,
+                    graph: exec.graph,
+                    globals: exec.globals,
+                    locals: &mut arm_locals,
+                    current_regex_captures: exec.current_regex_captures,
+                    mat: exec.mat,
+                    store: exec.store,
+                    scoped_store: exec.scoped_store,
+                    lazy_graph: exec.lazy_graph,
+                };
+                for stmt in &arm.statements {
+                    stmt.execute_lazy(&mut arm_exec)?;
+                }
+                break;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl ast::Condition {
+    fn test_strict(&self, exec: &mut ExecutionContext) -> Result<bool, ExecutionError> {
+        let mut result = true;
+        match self {
+            Self::Some(captures) => {
+                for capture in captures {
+                    result &= !capture.evaluate_strict(exec)?.is_null();
+                }
+            }
+            Self::None(captures) => {
+                for capture in captures {
+                    result &= capture.evaluate_strict(exec)?.is_null();
+                }
+            }
+        }
+        Ok(result)
     }
 }
 
