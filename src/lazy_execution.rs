@@ -185,6 +185,7 @@ impl ast::Statement {
             Self::AddGraphNodeAttribute(statement) => statement.execute_lazy(exec),
             Self::CreateEdge(statement) => statement.execute_lazy(exec),
             Self::AddEdgeAttribute(statement) => statement.execute_lazy(exec),
+            Self::Scan(statement) => statement.execute_lazy(exec),
             Self::Print(statement) => statement.execute_lazy(exec),
             _ => Ok(()),
         }
@@ -256,6 +257,88 @@ impl ast::AddEdgeAttribute {
     }
 }
 
+impl ast::Scan {
+    fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        let match_string = self.value.evaluate_strict(exec)?.into_string(exec.graph)?;
+
+        let mut i = 0;
+        let mut matches = Vec::new();
+        while i < match_string.len() {
+            matches.clear();
+            for (index, arm) in self.arms.iter().enumerate() {
+                let captures = arm.regex.captures(&match_string[i..]);
+                if let Some(captures) = captures {
+                    if captures.get(0).unwrap().range().is_empty() {
+                        return Err(ExecutionError::EmptyRegexCapture(format!(
+                            "for regular expression /{}/",
+                            arm.regex
+                        )));
+                    }
+                    matches.push((captures, index));
+                }
+            }
+
+            if matches.is_empty() {
+                return Ok(());
+            }
+
+            matches.sort_by_key(|(captures, index)| {
+                let range = captures.get(0).unwrap().range();
+                (range.start, *index)
+            });
+
+            let (regex_captures, block_index) = &matches[0];
+            let arm = &self.arms[*block_index];
+
+            let mut current_regex_captures = Vec::new();
+            for regex_capture in regex_captures.iter() {
+                current_regex_captures
+                    .push(regex_capture.map(|m| m.as_str()).unwrap_or("").to_string());
+            }
+
+            let mut arm_locals = VariableMap::new_child(exec.locals);
+            let mut arm_exec = ExecutionContext {
+                ctx: exec.ctx,
+                graph: exec.graph,
+                globals: exec.globals,
+                locals: &mut arm_locals,
+                current_regex_captures: &current_regex_captures,
+                mat: exec.mat,
+                store: exec.store,
+                scoped_store: exec.scoped_store,
+                lazy_graph: exec.lazy_graph,
+            };
+
+            for statement in &arm.statements {
+                statement
+                    .execute_lazy(&mut arm_exec)
+                    .with_context(|| format!("Executing {}", statement.display_with(arm_exec.ctx)))
+                    .with_context(|| {
+                        format!(
+                            "Matching {} with arm \"{}\" {{ ... }}",
+                            match_string, arm.regex,
+                        )
+                    })?;
+            }
+
+            i += regex_captures.get(0).unwrap().range().end;
+        }
+
+        Ok(())
+    }
+}
+
+impl ast::ScanExpression {
+    fn evaluate_strict(&self, exec: &mut ExecutionContext) -> Result<graph::Value, ExecutionError> {
+        match self {
+            Self::StringConstant(expr) => expr.evaluate_strict(exec),
+            Self::Capture(expr) => expr.evaluate_strict(exec),
+            Self::Variable(expr) => expr.evaluate_strict(exec).map(|v| v.clone()),
+            Self::RegexCapture(expr) => expr.evaluate_strict(exec),
+        }
+    }
+}
+
 impl ast::Print {
     fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
         let mut arguments = Vec::new();
@@ -298,6 +381,13 @@ impl ast::IntegerConstant {
 }
 
 impl ast::StringConstant {
+    fn evaluate_strict(
+        &self,
+        _exec: &mut ExecutionContext,
+    ) -> Result<graph::Value, ExecutionError> {
+        Ok(self.value.clone().into())
+    }
+
     fn evaluate_lazy(&self, _exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
         Ok(self.value.clone().into())
     }
@@ -324,6 +414,15 @@ impl ast::SetComprehension {
 }
 
 impl ast::Capture {
+    fn evaluate_strict(&self, exec: &mut ExecutionContext) -> Result<graph::Value, ExecutionError> {
+        Ok(query_capture_value(
+            self.index,
+            self.quantifier,
+            exec.mat,
+            exec.graph,
+        ))
+    }
+
     fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
         Ok(query_capture_value(self.index, self.quantifier, exec.mat, exec.graph).into())
     }
@@ -340,6 +439,11 @@ impl ast::Call {
 }
 
 impl ast::RegexCapture {
+    fn evaluate_strict(&self, exec: &mut ExecutionContext) -> Result<graph::Value, ExecutionError> {
+        let value = exec.current_regex_captures[self.match_index].clone();
+        Ok(value.into())
+    }
+
     fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
         let value = exec.current_regex_captures[self.match_index].clone();
         Ok(value.into())
@@ -417,6 +521,17 @@ impl ast::ScopedVariable {
 }
 
 impl ast::UnscopedVariable {
+    fn evaluate_strict(&self, exec: &mut ExecutionContext) -> Result<graph::Value, ExecutionError> {
+        if let Some(value) = exec.globals.get(self.name) {
+            Ok(value.clone())
+        } else {
+            Err(ExecutionError::UndefinedVariable(format!(
+                "global {}",
+                self.display_with(exec.ctx)
+            )))
+        }
+    }
+
     fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
         if let Some(value) = exec.globals.get(self.name) {
             Some(value.clone().into())

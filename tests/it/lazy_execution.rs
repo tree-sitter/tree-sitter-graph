@@ -47,7 +47,6 @@ fn check_execution(python_source: &str, dsl_source: &str, expected_graph: &str) 
     }
 }
 
-#[allow(unused)]
 fn fail_execution(python_source: &str, dsl_source: &str) {
     if let Ok(_) = execute(python_source, dsl_source) {
         panic!("Execution succeeded unexpectedly");
@@ -82,6 +81,99 @@ fn can_build_simple_graph() {
             parent: [graph node 2]
           node 2
             name: "node1"
+        "#},
+    );
+}
+
+#[test]
+fn can_scan_strings() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            var new_node = #null
+            var current_node = (node)
+
+            scan "alpha/beta/gamma/delta.py" {
+               "([^/]+)/"
+               {
+                 set new_node = (node)
+                 attr (new_node) name = $1
+                 edge current_node -> new_node
+                 set current_node = new_node
+               }
+
+               "([^/]+)\\.py$"
+               {
+                 set new_node = (node)
+                 attr (new_node) name = $1
+                 edge current_node -> new_node
+               }
+            }
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            name: "alpha"
+          edge 0 -> 2
+          node 1
+          edge 1 -> 0
+          node 2
+            name: "beta"
+          edge 2 -> 3
+          node 3
+            name: "gamma"
+          edge 3 -> 4
+          node 4
+            name: "delta"
+        "#},
+    );
+}
+
+#[test]
+fn variables_in_scan_arms_are_local() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            var current_node = (node)
+
+            scan "alpha/beta/gamma/delta.py" {
+               "([^/]+)/"
+               {
+                 let v = $1
+                 node new_node
+                 attr (new_node) name = v
+                 edge current_node -> new_node
+                 set current_node = new_node
+               }
+
+               "([^/]+)\\.py$"
+               {
+                 let v = $1
+                 node new_node
+                 attr (new_node) name = v
+                 edge current_node -> new_node
+               }
+            }
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            name: "alpha"
+          edge 0 -> 1
+          node 1
+            name: "beta"
+          edge 1 -> 2
+          node 2
+            name: "gamma"
+          edge 2 -> 3
+          node 3
+            name: "delta"
+          node 4
+          edge 4 -> 0
         "#},
     );
 }
@@ -213,6 +305,23 @@ fn can_nest_function_calls() {
         indoc! {r#"
           node 0
             val: "bbcbbc"
+        "#},
+    );
+}
+
+#[test]
+fn cannot_use_nullable_regex() {
+    fail_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            scan "abc" {
+              "^\\b" {
+              }
+            }
+            node n
+          }
         "#},
     );
 }
@@ -458,6 +567,317 @@ fn variables_can_be_scoped_in_arbitrary_expressions() {
           }
         "#},
         indoc! {r#""#},
+    );
+}
+
+#[test]
+fn can_mutate_inside_scan_no_branch_simple() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node n
+
+            var x = 0
+
+            scan "b" {
+               "c" {
+                 set x = (plus x 1)
+               }
+            }
+
+            attr (n) len = x
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            len: 0
+        "#},
+    );
+}
+
+#[test]
+fn can_mutate_inside_scan_once_first_branch_simple() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node n
+
+            var x = 0
+
+            scan "b" {
+               "b" {
+                 set x = (plus x 1)
+               }
+            }
+
+            attr (n) len = x
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            len: 1
+        "#},
+    );
+}
+
+#[test]
+fn can_mutate_inside_scan_once_first_branch() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node n
+
+            var x = 0
+            var y = 0
+            var s = ""
+
+            scan "b" {
+               "b" { ; it's a "b"
+                 attr (n) fst = #null
+                 set x = (plus x 1)
+                 set s = $0
+               }
+               "(.)" { ; it's something else
+                 attr (n) snd = #null
+                 let local_y = (plus y 1)
+                 set y = local_y
+                 set s = $1
+               }
+            }
+
+            attr (n) len = (plus x y)
+            attr (n) str = s
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            fst: #null
+            len: 1
+            str: "b"
+        "#},
+    );
+}
+
+#[test]
+fn can_mutate_inside_scan_once_second_branch() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node n
+
+            var x = 0
+            var y = 0
+            var s = ""
+
+            scan "a" {
+               "b" { ; it's a "b"
+                 attr (n) fst = #null
+                 set x = (plus x 1)
+                 set s = $0
+               }
+               "(.)" { ; it's something else
+                 attr (n) snd = #null
+                 let local_y = (plus y 1)
+                 set y = local_y
+                 set s = $1
+               }
+            }
+
+            attr (n) len = (plus x y)
+            attr (n) str = s
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            len: 1
+            snd: #null
+            str: "a"
+        "#},
+    );
+}
+
+#[test]
+fn can_mutate_inside_scan_once_no_branch() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node n
+
+            var x = 0
+            var y = 0
+            var s = ""
+
+            scan "a" {
+               "b" { ; it's a "b"
+                 attr (n) fst = #null
+                 set x = (plus x 1)
+                 set s = $0
+               }
+               "(c)" { ; it's something else
+                 attr (n) snd = #null
+                 let local_y = (plus y 1)
+                 set y = local_y
+                 set s = $1
+               }
+            }
+
+            attr (n) len = (plus x y)
+            attr (n) str = s
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            len: 0
+            str: ""
+        "#},
+    );
+}
+
+#[test]
+fn can_mutate_inside_scan_multiple_times_simple() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            var x = 0
+            var y = 0
+
+            scan "ab" {
+               "b" { ; count "b"s
+                  set x = (plus x 1)
+               }
+               "(.)" { ; count the rest
+                  set y = (plus y 1)
+               }
+            }
+
+            node n
+            attr (n) len = (plus x y)
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            len: 2
+        "#},
+    );
+}
+
+#[test]
+fn can_mutate_inside_scan_multiple_times() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            var x = 0
+            var y = 0
+            var s = ""
+
+            scan "abcd" {
+               "b" { ; count "b"s
+                 set x = (plus x 1)
+                 set s = $0
+               }
+               "(.)" { ; count the rest
+                 let local_y = (plus y 1)
+                 set y = local_y
+                 set s = $1
+               }
+            }
+
+            node n
+            attr (n) len = (plus x y)
+            attr (n) str = s
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            len: 4
+            str: "d"
+        "#},
+    );
+}
+
+#[test]
+fn can_mutate_inside_nested_scan_multiple_times_simple() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            var x = 0
+
+            scan "ab|c|d" {
+              "\\|" {}
+              "[^|]+" {
+                scan $0 {
+                  "(.)" { ; count the rest
+                    set x = (plus x 1)
+                  }
+                }
+              }
+            }
+
+            node n
+            attr (n) len = x
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            len: 4
+        "#},
+    );
+}
+
+#[test]
+fn can_mutate_inside_nested_scan_multiple_times() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            var x = 0
+            var y = 0
+            var s = ""
+
+            scan "ab|c|d" {
+              "\\|" {}
+              "[^|]+" {
+                scan $0 {
+                  "b" { ; count "b"s
+                    set x = (plus x 1)
+                    set s = $0
+                  }
+                  "(.)" { ; count the rest
+                    let local_y = (plus y 1)
+                    set y = local_y
+                    set s = $1
+                  }
+                }
+              }
+            }
+
+            node n
+            attr (n) len = (plus x y)
+            attr (n) str = s
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            len: 4
+            str: "d"
+        "#},
     );
 }
 
