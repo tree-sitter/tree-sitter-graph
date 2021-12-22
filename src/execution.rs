@@ -138,18 +138,26 @@ pub enum ExecutionError {
     InvalidParameters(String),
     #[error("Scoped variables can only be attached to syntax nodes {0}")]
     InvalidVariableScope(String),
+    #[error("Recursively defined scoped variable {0}")]
+    RecursivelyDefinedScopedVariable(String),
+    #[error("Recursively defined variable {0}")]
+    RecursivelyDefinedVariable(String),
     #[error("Undefined capture {0}")]
     UndefinedCapture(String),
     #[error("Undefined function {0}")]
     UndefinedFunction(String),
     #[error("Undefined regex capture {0}")]
     UndefinedRegexCapture(String),
+    #[error("Undefined scoped variable {0}")]
+    UndefinedScopedVariable(String),
     #[error("Empty regex capture {0}")]
     EmptyRegexCapture(String),
     #[error("Undefined edge {0}")]
     UndefinedEdge(String),
     #[error("Undefined variable {0}")]
     UndefinedVariable(String),
+    #[error("Cannot add scoped variable after being forced {0}")]
+    VariableScopesAlreadyForced(String),
     #[error("Parse tree has errors")]
     ParseTreeHasErrors,
     #[error(transparent)]
