@@ -607,6 +607,130 @@ fn variables_are_inherited_in_if_body() {
 }
 
 #[test]
+fn can_execute_for_in_nonempty_list() {
+    check_execution(
+        r#"
+          pass
+          pass
+          pass
+        "#,
+        indoc! {r#"
+          (module (pass_statement)* @xs) @root
+          {
+            var n = 0
+            for x in @xs {
+              set n = (plus n 1)
+            }
+            node node0
+            attr (node0) val = n
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            val: 3
+        "#},
+    );
+}
+
+#[test]
+fn can_execute_for_in_empty_list() {
+    check_execution(
+        r#"
+          pass
+        "#,
+        indoc! {r#"
+          (module (import_statement)* @xs) @root
+          {
+            var n = 0
+            for x in @xs {
+              set n = (plus n 1)
+            }
+            node node0
+            attr (node0) val = n
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            val: 0
+        "#},
+    );
+}
+
+#[test]
+fn variables_are_local_in_for_in_body() {
+    check_execution(
+        r#"
+          pass
+        "#,
+        indoc! {r#"
+          (module (pass_statement)* @xs) @root
+          {
+            let n = 1
+            for x in @xs {
+              let n = 2
+            }
+            node node0
+            attr (node0) val = n
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            val: 1
+        "#},
+    );
+}
+
+#[test]
+fn variables_do_not_escape_for_in_body() {
+    check_execution(
+        r#"
+          pass
+        "#,
+        indoc! {r#"
+          (module (pass_statement)* @xs) @root
+          {
+            var n = 1
+            for x in @xs {
+              var n = 2
+            }
+            node node0
+            attr (node0) val = n
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            val: 1
+        "#},
+    );
+}
+
+#[test]
+fn variables_are_inherited_in_for_in_body() {
+    check_execution(
+        r#"
+          pass
+          pass
+          pass
+        "#,
+        indoc! {r#"
+          (module (pass_statement)+ @xs) @root
+          {
+            var n = 0
+            for x in @xs {
+              set n = (plus n 1)
+            }
+            node node0
+            attr (node0) val = n
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            val: 3
+        "#},
+    );
+}
+
+#[test]
 fn can_build_node() {
     check_execution(
         "pass",

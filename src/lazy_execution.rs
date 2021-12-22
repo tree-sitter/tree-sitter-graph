@@ -188,7 +188,7 @@ impl ast::Statement {
             Self::Scan(statement) => statement.execute_lazy(exec),
             Self::Print(statement) => statement.execute_lazy(exec),
             Self::If(statement) => statement.execute_lazy(exec),
-            _ => Ok(()),
+            Self::ForIn(statement) => statement.execute_lazy(exec),
         }
     }
 }
@@ -403,6 +403,33 @@ impl ast::Condition {
             }
         }
         Ok(result)
+    }
+}
+
+impl ast::ForIn {
+    fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        let values = self.capture.evaluate_strict(exec)?.into_list(exec.graph)?;
+        let mut loop_locals = VariableMap::new_child(exec.locals);
+        for value in values {
+            loop_locals.clear();
+            let mut loop_exec = ExecutionContext {
+                ctx: exec.ctx,
+                graph: exec.graph,
+                globals: exec.globals,
+                locals: &mut loop_locals,
+                current_regex_captures: exec.current_regex_captures,
+                mat: exec.mat,
+                store: exec.store,
+                scoped_store: exec.scoped_store,
+                lazy_graph: exec.lazy_graph,
+            };
+            self.variable
+                .add_lazy(&mut loop_exec, value.into(), false)?;
+            for stmt in &self.statements {
+                stmt.execute_lazy(&mut loop_exec)?;
+            }
+        }
+        Ok(())
     }
 }
 
