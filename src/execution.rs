@@ -116,6 +116,10 @@ impl File {
 pub enum ExecutionError {
     #[error("Cannot assign immutable variable {0}")]
     CannotAssignImmutableVariable(String),
+    #[error("Cannot assign scoped variable {0}")]
+    CannotAssignScopedVariable(String),
+    #[error("Cannot define mutable scoped variable {0}")]
+    CannotDefineMutableScopedVariable(String),
     #[error("Duplicate attribute {0}")]
     DuplicateAttribute(String),
     #[error("Duplicate edge {0}")]

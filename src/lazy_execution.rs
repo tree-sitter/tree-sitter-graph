@@ -178,8 +178,269 @@ impl ast::Stanza {
 impl ast::Statement {
     fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
         match self {
+            Self::DeclareImmutable(statement) => statement.execute_lazy(exec),
+            Self::DeclareMutable(statement) => statement.execute_lazy(exec),
+            Self::Assign(statement) => statement.execute_lazy(exec),
             _ => Ok(()),
         }
+    }
+}
+
+impl ast::DeclareImmutable {
+    fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        let value = self.value.evaluate_lazy(exec)?;
+        self.variable.add_lazy(exec, value, false)
+    }
+}
+
+impl ast::DeclareMutable {
+    fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        let value = self.value.evaluate_lazy(exec)?;
+        self.variable.add_lazy(exec, value, true)
+    }
+}
+
+impl ast::Assign {
+    fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        let value = self.value.evaluate_lazy(exec)?;
+        self.variable.set_lazy(exec, value)
+    }
+}
+
+impl ast::Expression {
+    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+        match self {
+            Self::FalseLiteral => Ok(false.into()),
+            Self::NullLiteral => Ok(graph::Value::Null.into()),
+            Self::TrueLiteral => Ok(true.into()),
+            Self::IntegerConstant(expr) => expr.evaluate_lazy(exec),
+            Self::StringConstant(expr) => expr.evaluate_lazy(exec),
+            Self::List(expr) => expr.evaluate_lazy(exec),
+            Self::Set(expr) => expr.evaluate_lazy(exec),
+            Self::Capture(expr) => expr.evaluate_lazy(exec),
+            Self::Variable(expr) => expr.evaluate_lazy(exec),
+            Self::Call(expr) => expr.evaluate_lazy(exec),
+            Self::RegexCapture(expr) => expr.evaluate_lazy(exec),
+        }
+    }
+}
+
+impl ast::IntegerConstant {
+    fn evaluate_lazy(&self, _exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+        Ok(self.value.into())
+    }
+}
+
+impl ast::StringConstant {
+    fn evaluate_lazy(&self, _exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+        Ok(self.value.clone().into())
+    }
+}
+
+impl ast::ListComprehension {
+    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+        let mut elements = Vec::new();
+        for element in &self.elements {
+            elements.push(element.evaluate_lazy(exec)?);
+        }
+        Ok(elements.into())
+    }
+}
+
+impl ast::SetComprehension {
+    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+        let mut elements = Vec::new();
+        for element in &self.elements {
+            elements.push(element.evaluate_lazy(exec)?);
+        }
+        Ok(Set::new(elements).into())
+    }
+}
+
+impl ast::Capture {
+    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+        Ok(query_capture_value(self.index, self.quantifier, exec.mat, exec.graph).into())
+    }
+}
+
+impl ast::Call {
+    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+        let mut parameters = Vec::new();
+        for parameter in &self.parameters {
+            parameters.push(parameter.evaluate_lazy(exec)?);
+        }
+        Ok(Call::new(self.function, parameters).into())
+    }
+}
+
+impl ast::RegexCapture {
+    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+        let value = exec.current_regex_captures[self.match_index].clone();
+        Ok(value.into())
+    }
+}
+
+impl ast::Variable {
+    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+        match self {
+            Self::Scoped(variable) => variable.evaluate_lazy(exec),
+            Self::Unscoped(variable) => variable.evaluate_lazy(exec),
+        }
+    }
+}
+
+impl ast::Variable {
+    fn add_lazy(
+        &self,
+        exec: &mut ExecutionContext,
+        value: Value,
+        mutable: bool,
+    ) -> Result<(), ExecutionError> {
+        match self {
+            Self::Scoped(variable) => variable.add_lazy(exec, value, mutable),
+            Self::Unscoped(variable) => variable.add_lazy(exec, value, mutable),
+        }
+    }
+
+    fn set_lazy(&self, exec: &mut ExecutionContext, value: Value) -> Result<(), ExecutionError> {
+        match self {
+            Self::Scoped(variable) => variable.set_lazy(exec, value),
+            Self::Unscoped(variable) => variable.set_lazy(exec, value),
+        }
+    }
+}
+
+impl ast::ScopedVariable {
+    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+        let scope = self.scope.evaluate_lazy(exec)?;
+        let value = ScopedVariable::new(scope, self.name);
+        Ok(value.into())
+    }
+
+    fn add_lazy(
+        &self,
+        exec: &mut ExecutionContext,
+        value: Value,
+        mutable: bool,
+    ) -> Result<(), ExecutionError> {
+        if mutable {
+            return Err(ExecutionError::CannotDefineMutableScopedVariable(format!(
+                "{}",
+                self.display_with(exec.ctx)
+            )));
+        }
+        let scope = self.scope.evaluate_lazy(exec)?;
+        let variable = exec
+            .store
+            .add(value, self.location.into(), exec.ctx, exec.graph);
+        exec.scoped_store.add(
+            scope,
+            self.name,
+            variable.into(),
+            self.location.into(),
+            exec.ctx,
+        )
+    }
+
+    fn set_lazy(&self, exec: &mut ExecutionContext, _value: Value) -> Result<(), ExecutionError> {
+        Err(ExecutionError::CannotAssignScopedVariable(format!(
+            "{}",
+            self.display_with(exec.ctx)
+        )))
+    }
+}
+
+impl ast::UnscopedVariable {
+    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+        if let Some(value) = exec.globals.get(self.name) {
+            Some(value.clone().into())
+        } else {
+            exec.locals
+                .get(
+                    self.name,
+                    &VariableContext {
+                        ctx: exec.ctx,
+                        graph: exec.graph,
+                        store: exec.store,
+                    },
+                )
+                .map(|value| value.clone())
+        }
+        .ok_or_else(|| {
+            ExecutionError::UndefinedVariable(format!("{}", self.display_with(exec.ctx)))
+        })
+    }
+}
+
+impl ast::UnscopedVariable {
+    fn add_lazy(
+        &self,
+        exec: &mut ExecutionContext,
+        value: Value,
+        mutable: bool,
+    ) -> Result<(), ExecutionError> {
+        if exec.globals.get(self.name).is_some() {
+            return Err(ExecutionError::DuplicateVariable(format!(
+                " global {}",
+                self.display_with(exec.ctx)
+            )));
+        }
+        exec.locals
+            .add(
+                self.name,
+                value,
+                mutable,
+                self.location.into(),
+                &mut VariableContext {
+                    ctx: exec.ctx,
+                    graph: exec.graph,
+                    store: exec.store,
+                },
+            )
+            .map_err(|_| {
+                ExecutionError::DuplicateVariable(format!(" local {}", self.display_with(exec.ctx)))
+            })
+    }
+
+    fn set_lazy(&self, exec: &mut ExecutionContext, value: Value) -> Result<(), ExecutionError> {
+        if exec.globals.get(self.name).is_some() {
+            return Err(ExecutionError::CannotAssignImmutableVariable(format!(
+                " global {}",
+                self.display_with(exec.ctx)
+            )));
+        }
+        exec.locals
+            .set(
+                self.name,
+                value,
+                self.location.into(),
+                &mut VariableContext {
+                    ctx: exec.ctx,
+                    graph: exec.graph,
+                    store: exec.store,
+                },
+            )
+            .map_err(|_| {
+                if exec
+                    .locals
+                    .get(
+                        self.name,
+                        &VariableContext {
+                            ctx: exec.ctx,
+                            graph: exec.graph,
+                            store: exec.store,
+                        },
+                    )
+                    .is_some()
+                {
+                    ExecutionError::CannotAssignImmutableVariable(format!(
+                        "{}",
+                        self.display_with(exec.ctx)
+                    ))
+                } else {
+                    ExecutionError::UndefinedVariable(format!("{}", self.display_with(exec.ctx)))
+                }
+            })
     }
 }
 
