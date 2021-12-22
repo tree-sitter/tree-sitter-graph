@@ -181,6 +181,10 @@ impl ast::Statement {
             Self::DeclareImmutable(statement) => statement.execute_lazy(exec),
             Self::DeclareMutable(statement) => statement.execute_lazy(exec),
             Self::Assign(statement) => statement.execute_lazy(exec),
+            Self::CreateGraphNode(statement) => statement.execute_lazy(exec),
+            Self::AddGraphNodeAttribute(statement) => statement.execute_lazy(exec),
+            Self::CreateEdge(statement) => statement.execute_lazy(exec),
+            Self::AddEdgeAttribute(statement) => statement.execute_lazy(exec),
             _ => Ok(()),
         }
     }
@@ -204,6 +208,50 @@ impl ast::Assign {
     fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
         let value = self.value.evaluate_lazy(exec)?;
         self.variable.set_lazy(exec, value)
+    }
+}
+
+impl ast::CreateGraphNode {
+    fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        let graph_node = exec.graph.add_graph_node();
+        self.node.add_lazy(exec, graph_node.into(), false)
+    }
+}
+
+impl ast::AddGraphNodeAttribute {
+    fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        let node = self.node.evaluate_lazy(exec)?;
+        let mut attributes = Vec::new();
+        for attribute in &self.attributes {
+            attributes.push(attribute.evaluate_lazy(exec)?);
+        }
+        let stmt = AddGraphNodeAttribute::new(node, attributes, self.location.into());
+        exec.lazy_graph.push(stmt.into());
+        Ok(())
+    }
+}
+
+impl ast::CreateEdge {
+    fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        let source = self.source.evaluate_lazy(exec)?;
+        let sink = self.sink.evaluate_lazy(exec)?;
+        let stmt = CreateEdge::new(source, sink, self.location.into());
+        exec.lazy_graph.push(stmt.into());
+        Ok(())
+    }
+}
+
+impl ast::AddEdgeAttribute {
+    fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        let source = self.source.evaluate_lazy(exec)?;
+        let sink = self.sink.evaluate_lazy(exec)?;
+        let mut attributes = Vec::new();
+        for attribute in &self.attributes {
+            attributes.push(attribute.evaluate_lazy(exec)?);
+        }
+        let stmt = AddEdgeAttribute::new(source, sink, attributes, self.location.into());
+        exec.lazy_graph.push(stmt.into());
+        Ok(())
     }
 }
 
@@ -441,6 +489,14 @@ impl ast::UnscopedVariable {
                     ExecutionError::UndefinedVariable(format!("{}", self.display_with(exec.ctx)))
                 }
             })
+    }
+}
+
+impl ast::Attribute {
+    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<Attribute, ExecutionError> {
+        let value = self.value.evaluate_lazy(exec)?;
+        let attribute = Attribute::new(self.name, value);
+        Ok(attribute)
     }
 }
 
