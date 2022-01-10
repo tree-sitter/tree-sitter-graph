@@ -127,7 +127,7 @@ impl<'tree> Graph<'tree> {
                 let ctx = self.1;
                 // serializing as a map instead of a struct so we don't have to encode a struct name
                 let mut map = serializer.serialize_map(None)?;
-                map.serialize_entry("index", &node_index)?;
+                map.serialize_entry("id", &node_index)?;
                 map.serialize_entry("edges", &ctx.with(&node.outgoing_edges))?;
                 map.serialize_entry("attrs", &ctx.with(&node.attributes))?;
                 map.end()
