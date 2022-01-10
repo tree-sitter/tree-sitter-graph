@@ -96,6 +96,12 @@ impl<'tree> Graph<'tree> {
         // TODO: move this all into a new module
         struct InContext<'a, T>(&'a T, &'a Context);
 
+        impl<'a> Context {
+            fn with<T>(&'a self, t: &'a T) -> InContext<'a, T> {
+                InContext(t, self)
+            }
+        }
+
         impl<'a, 'tree> ser::Serialize for InContext<'a, Graph<'tree>> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where
@@ -105,7 +111,7 @@ impl<'tree> Graph<'tree> {
                 let ctx = self.1;
                 let mut seq = serializer.serialize_seq(Some(graph.graph_nodes.len()))?;
                 for (node_index, node) in graph.graph_nodes.iter().enumerate() {
-                    seq.serialize_element(&InContext(&(node_index, node), ctx))?;
+                    seq.serialize_element(&ctx.with(&(node_index, node)))?;
                 }
                 seq.end()
             }
@@ -122,8 +128,8 @@ impl<'tree> Graph<'tree> {
                 // serializing as a map instead of a struct so we don't have to encode a struct name
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("index", &node_index)?;
-                map.serialize_entry("edges", &InContext(&node.outgoing_edges, ctx))?;
-                map.serialize_entry("attrs", &InContext(&node.attributes, ctx))?;
+                map.serialize_entry("edges", &ctx.with(&node.outgoing_edges))?;
+                map.serialize_entry("attrs", &ctx.with(&node.attributes))?;
                 map.end()
             }
         }
@@ -137,7 +143,7 @@ impl<'tree> Graph<'tree> {
                 let ctx = self.1;
                 let mut seq = serializer.serialize_seq(Some(elems.len()))?;
                 for (_, (id, edge)) in elems.iter().enumerate() {
-                    seq.serialize_element(&InContext(&(id, edge), ctx))?;
+                    seq.serialize_element(&ctx.with(&(id, edge)))?;
                 }
                 seq.end()
             }
@@ -153,7 +159,7 @@ impl<'tree> Graph<'tree> {
                 let ctx = self.1;
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("sink", &sink)?;
-                map.serialize_entry("attrs", &InContext(&edge.attributes, &ctx))?;
+                map.serialize_entry("attrs", &ctx.with(&edge.attributes))?;
                 map.end()
             }
         }
@@ -167,7 +173,7 @@ impl<'tree> Graph<'tree> {
                 let ctx = self.1;
                 let mut map = serializer.serialize_map(None)?;
                 for (_, (key, value)) in attrs.values.iter().enumerate() {
-                    map.serialize_entry(&InContext(key, ctx), &InContext(value, ctx))?;
+                    map.serialize_entry(&ctx.with(key), &ctx.with(value))?;
                 }
                 map.end()
             }
@@ -199,10 +205,10 @@ impl<'tree> Graph<'tree> {
                     Value::String(string) => serializer.serialize_str(string),
                     // FIXME: there's no way to distinguish sets and lists, so we can't roundtrip accurately
                     Value::List(list) => {
-                        serializer.collect_seq(list.iter().map(|value| InContext(value, ctx)))
+                        serializer.collect_seq(list.iter().map(|value| ctx.with(value)))
                     }
                     Value::Set(set) => {
-                        serializer.collect_seq(set.iter().map(|value| InContext(value, ctx)))
+                        serializer.collect_seq(set.iter().map(|value| ctx.with(value)))
                     }
                     // FIXME: we don't distinguish between syntax tree node IDs, graph node IDs, and integers
                     Value::SyntaxNode(node) => serializer.serialize_u32(node.0),
@@ -211,7 +217,7 @@ impl<'tree> Graph<'tree> {
             }
         }
 
-        let json_graph = InContext(self, ctx);
+        let json_graph = ctx.with(self);
         let s = serde_json::to_string_pretty(&json_graph).unwrap();
         print!("{}", s)
     }
