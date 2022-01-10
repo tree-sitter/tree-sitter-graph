@@ -59,9 +59,12 @@ impl File {
         globals: &mut Variables,
     ) -> Result<Graph<'tree>, ExecutionError> {
         let mut graph = Graph::new();
+        if tree.root_node().has_error() {
+            return Err(ExecutionError::ParseTreeHasErrors);
+        }
         let mut locals = Variables::new();
         let mut scoped = ScopedVariables::new();
-        let mut current_regex_matches = Vec::new();
+        let current_regex_captures = Vec::new();
         let mut function_parameters = Vec::new();
         let mut cursor = QueryCursor::new();
         for stanza in &self.stanzas {
@@ -74,7 +77,7 @@ impl File {
                 globals,
                 &mut locals,
                 &mut scoped,
-                &mut current_regex_matches,
+                &current_regex_captures,
                 &mut function_parameters,
                 &mut cursor,
             )?;
@@ -96,6 +99,10 @@ pub enum ExecutionError {
     DuplicateVariable(String),
     #[error("Expected a graph node reference {0}")]
     ExpectedGraphNode(String),
+    #[error("Expected a list {0}")]
+    ExpectedList(String),
+    #[error("Expected a boolean {0}")]
+    ExpectedBoolean(String),
     #[error("Expected an integer {0}")]
     ExpectedInteger(String),
     #[error("Expected a string {0}")]
@@ -118,6 +125,8 @@ pub enum ExecutionError {
     UndefinedEdge(String),
     #[error("Undefined variable {0}")]
     UndefinedVariable(String),
+    #[error("Parse tree has errors")]
+    ParseTreeHasErrors,
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
@@ -140,7 +149,7 @@ struct ExecutionContext<'a, 'tree> {
     globals: &'a mut Variables,
     locals: &'a mut Variables,
     scoped: &'a mut ScopedVariables,
-    current_regex_matches: &'a mut Vec<String>,
+    current_regex_captures: &'a Vec<String>,
     function_parameters: &'a mut Vec<Value>,
     mat: &'a QueryMatch<'a, 'tree>,
 }
@@ -237,7 +246,7 @@ impl Stanza {
         globals: &mut Variables,
         locals: &mut Variables,
         scoped: &mut ScopedVariables,
-        current_regex_matches: &mut Vec<String>,
+        current_regex_captures: &Vec<String>,
         function_parameters: &mut Vec<Value>,
         cursor: &mut QueryCursor,
     ) -> Result<(), ExecutionError> {
@@ -252,7 +261,7 @@ impl Stanza {
                 globals,
                 locals,
                 scoped,
-                current_regex_matches,
+                current_regex_captures,
                 function_parameters,
                 mat: &mat,
             };
@@ -419,15 +428,30 @@ impl Scan {
 
             let (regex_captures, block_index) = &matches[0];
             let arm = &self.arms[*block_index];
+
+            let mut current_regex_captures = Vec::new();
+            for regex_capture in regex_captures.iter() {
+                current_regex_captures
+                    .push(regex_capture.map(|m| m.as_str()).unwrap_or("").to_string());
+            }
+
+            let mut arm_exec = ExecutionContext {
+                ctx: exec.ctx,
+                source: exec.source,
+                graph: exec.graph,
+                functions: exec.functions,
+                globals: exec.globals,
+                locals: exec.locals,
+                scoped: exec.scoped,
+                current_regex_captures: &current_regex_captures,
+                function_parameters: exec.function_parameters,
+                mat: exec.mat,
+            };
+
             for statement in &arm.statements {
-                exec.current_regex_matches.clear();
-                for regex_capture in regex_captures.iter() {
-                    exec.current_regex_matches
-                        .push(regex_capture.map(|m| m.as_str()).unwrap_or("").to_string());
-                }
                 statement
-                    .execute(exec)
-                    .with_context(|| format!("Executing {}", statement.display_with(exec.ctx)))
+                    .execute(&mut arm_exec)
+                    .with_context(|| format!("Executing {}", statement.display_with(arm_exec.ctx)))
                     .with_context(|| {
                         format!(
                             "Matching {} with arm \"{}\" {{ ... }}",
@@ -560,7 +584,7 @@ impl Call {
 
 impl RegexCapture {
     fn evaluate(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
-        let capture = exec.current_regex_matches.get(self.match_index).ok_or(
+        let capture = exec.current_regex_captures.get(self.match_index).ok_or(
             ExecutionError::UndefinedRegexCapture(format!("{}", self.display_with(exec.ctx))),
         )?;
         Ok(Value::String(capture.clone()))

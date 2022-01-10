@@ -29,6 +29,12 @@ fn main() -> Result<()> {
         .about("Generates graph structures from tree-sitter syntax trees")
         .arg(Arg::with_name("tsg").index(1).required(true))
         .arg(Arg::with_name("source").index(2).required(true))
+        .arg(
+            Arg::with_name("quiet")
+                .short("q")
+                .long("quiet")
+                .help("Suppress console output"),
+        )
         .arg(Arg::with_name("scope").long("scope").takes_value(true))
         .arg(Arg::with_name("json").long("json").takes_value(false))
         .get_matches();
@@ -36,6 +42,7 @@ fn main() -> Result<()> {
     let tsg_path = Path::new(matches.value_of("tsg").unwrap());
     let source_path = Path::new(matches.value_of("source").unwrap());
     let current_dir = std::env::current_dir().unwrap();
+    let quiet = matches.is_present("quiet");
     let config = Config::load()?;
     let mut loader = Loader::new()?;
     let loader_config = config.get()?;
@@ -64,7 +71,7 @@ fn main() -> Result<()> {
     let json = matches.is_present("json");
     if json {
         graph.display_json(&ctx);
-    } else {
+    } else if !quiet {
         print!("{}", graph.display_with(&ctx));
     }
     Ok(())
