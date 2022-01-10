@@ -36,6 +36,7 @@ fn main() -> Result<()> {
                 .help("Suppress console output"),
         )
         .arg(Arg::with_name("scope").long("scope").takes_value(true))
+        .arg(Arg::with_name("json").long("json").takes_value(false))
         .get_matches();
 
     let tsg_path = Path::new(matches.value_of("tsg").unwrap());
@@ -67,7 +68,10 @@ fn main() -> Result<()> {
     let graph = file
         .execute(&ctx, &tree, &source, &mut functions, &mut globals)
         .with_context(|| format!("Could not execute TSG file {}", tsg_path.display()))?;
-    if !quiet {
+    let json = matches.is_present("json");
+    if json {
+        graph.display_json(&ctx);
+    } else if !quiet {
         print!("{}", graph.display_with(&ctx));
     }
     Ok(())

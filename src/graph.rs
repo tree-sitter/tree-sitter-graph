@@ -16,6 +16,11 @@ use std::ops::IndexMut;
 use smallvec::SmallVec;
 use tree_sitter::Node;
 
+use serde::ser;
+use serde::ser::SerializeMap;
+use serde::ser::SerializeSeq;
+use serde_json;
+
 use crate::execution::ExecutionError;
 use crate::Context;
 use crate::Identifier;
@@ -85,6 +90,136 @@ impl<'tree> Graph<'tree> {
         }
 
         DisplayGraph(self, ctx)
+    }
+
+    pub fn display_json<'a>(&'a self, ctx: &'a Context) -> () {
+        // TODO: move this all into a new module
+        struct InContext<'a, T>(&'a T, &'a Context);
+
+        impl<'a> Context {
+            fn with<T>(&'a self, t: &'a T) -> InContext<'a, T> {
+                InContext(t, self)
+            }
+        }
+
+        impl<'a, 'tree> ser::Serialize for InContext<'a, Graph<'tree>> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                let graph = self.0;
+                let ctx = self.1;
+                let mut seq = serializer.serialize_seq(Some(graph.graph_nodes.len()))?;
+                for (node_index, node) in graph.graph_nodes.iter().enumerate() {
+                    seq.serialize_element(&ctx.with(&(node_index, node)))?;
+                }
+                seq.end()
+            }
+        }
+
+        impl<'a> ser::Serialize for InContext<'a, (usize, &'a GraphNode)> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                let node_index = self.0 .0;
+                let node = self.0 .1;
+                let ctx = self.1;
+                // serializing as a map instead of a struct so we don't have to encode a struct name
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("id", &node_index)?;
+                map.serialize_entry("edges", &ctx.with(&node.outgoing_edges))?;
+                map.serialize_entry("attrs", &ctx.with(&node.attributes))?;
+                map.end()
+            }
+        }
+
+        impl<'a> ser::Serialize for InContext<'a, SmallVec<[(GraphNodeID, Edge); 8]>> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                let elems = self.0;
+                let ctx = self.1;
+                let mut seq = serializer.serialize_seq(Some(elems.len()))?;
+                for (_, (id, edge)) in elems.iter().enumerate() {
+                    seq.serialize_element(&ctx.with(&(id, edge)))?;
+                }
+                seq.end()
+            }
+        }
+
+        impl<'a> ser::Serialize for InContext<'a, (&'a GraphNodeID, &'a Edge)> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                let sink = self.0 .0;
+                let edge = self.0 .1;
+                let ctx = self.1;
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("sink", &sink)?;
+                map.serialize_entry("attrs", &ctx.with(&edge.attributes))?;
+                map.end()
+            }
+        }
+
+        impl<'a> ser::Serialize for InContext<'a, Attributes> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                let attrs = self.0;
+                let ctx = self.1;
+                let mut map = serializer.serialize_map(None)?;
+                for (_, (key, value)) in attrs.values.iter().enumerate() {
+                    map.serialize_entry(&ctx.with(key), &ctx.with(value))?;
+                }
+                map.end()
+            }
+        }
+
+        impl<'a> ser::Serialize for InContext<'a, Identifier> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                let identifier = self.0;
+                let ctx = self.1;
+                let symbol = ctx.identifiers.resolve(identifier.0).unwrap();
+                serializer.serialize_str(symbol)
+            }
+        }
+
+        impl<'a> ser::Serialize for InContext<'a, Value> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                let value = self.0;
+                let ctx = self.1;
+                match value {
+                    Value::Null => serializer.serialize_none(),
+                    Value::Boolean(bool) => serializer.serialize_bool(*bool),
+                    Value::Integer(integer) => serializer.serialize_u32(*integer),
+                    Value::String(string) => serializer.serialize_str(string),
+                    // FIXME: there's no way to distinguish sets and lists, so we can't roundtrip accurately
+                    Value::List(list) => {
+                        serializer.collect_seq(list.iter().map(|value| ctx.with(value)))
+                    }
+                    Value::Set(set) => {
+                        serializer.collect_seq(set.iter().map(|value| ctx.with(value)))
+                    }
+                    // FIXME: we don't distinguish between syntax tree node IDs, graph node IDs, and integers
+                    Value::SyntaxNode(node) => serializer.serialize_u32(node.0),
+                    Value::GraphNode(node) => serializer.serialize_u32(node.0),
+                }
+            }
+        }
+
+        let json_graph = ctx.with(self);
+        let s = serde_json::to_string_pretty(&json_graph).unwrap();
+        print!("{}", s)
     }
 }
 
