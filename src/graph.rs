@@ -143,7 +143,7 @@ impl<'tree> Graph<'tree> {
             }
         }
 
-        impl<'a> ser::Serialize for InContext<'a, (&'a u32, &'a Edge)> {
+        impl<'a> ser::Serialize for InContext<'a, (&'a GraphNodeID, &'a Edge)> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where
                 S: serde::Serializer,
