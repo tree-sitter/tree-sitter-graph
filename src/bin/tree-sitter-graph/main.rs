@@ -64,9 +64,9 @@ fn main() -> Result<()> {
     file.parse(&mut ctx, &tsg)
         .with_context(|| anyhow!("Error parsing TSG file {}", tsg_path.display()))?;
     let mut functions = Functions::stdlib(&mut ctx);
-    let mut globals = Variables::new();
+    let globals = Variables::new();
     let graph = file
-        .execute(&ctx, &tree, &source, &mut functions, &mut globals)
+        .execute(&ctx, &tree, &source, &mut functions, &globals)
         .with_context(|| format!("Could not execute TSG file {}", tsg_path.display()))?;
     let json = matches.is_present("json");
     if json {

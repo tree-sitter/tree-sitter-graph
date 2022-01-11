@@ -35,7 +35,7 @@ pub mod graph;
 mod parser;
 
 pub use execution::ExecutionError;
-pub use execution::Variables;
+pub use execution::Globals as Variables;
 pub use parser::Location;
 pub use parser::ParseError;
 

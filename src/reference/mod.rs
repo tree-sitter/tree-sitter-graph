@@ -184,6 +184,10 @@
 //! creates an **_immutable variable_**, whose value cannot be changed.  A `var` statement creates
 //! a **_mutable variable_**.  You use a `set` statement to change the value of a mutable variable.
 //!
+//! Local variables are block scoped.  For example, a local variable defined in a `scan` arm is not
+//! visible in other scan arms, or after the `scan` statement.  If you need to persist a value for use
+//! after a block, introduce a mutable variable before the block and assign to it inside the block.
+//!
 //! (All global variables are immutable, and cannot be created by any graph DSL statement; they are
 //! only provided by the external process that executes the graph DSL file.  If you need to create
 //! your own "global" variable from within the graph DSL, create a scoped variable on the root
