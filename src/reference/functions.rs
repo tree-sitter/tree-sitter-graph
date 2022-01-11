@@ -12,6 +12,15 @@
 //! There might be additional functions available, and in rare cases, there might be a completely
 //! different set of functions available!
 //!
+//! # General functions
+//!
+//! ## `is-null`
+//!
+//! Check if an optional value is missing.
+//!
+//!   - Input parameters: one value
+//!   - Output: a boolean indicating whether the value is null or not
+//!
 //! # Graph manipulation functions
 //!
 //! ## `node`
@@ -20,6 +29,31 @@
 //!
 //!   - Input parameters: none
 //!   - Output: a reference to the new graph node
+//!
+//! # Logical functions
+//!
+//! ## `not`
+//!
+//! Negates a boolean value.
+//!
+//!   - Input parameters: one boolean
+//!   - Output: the negation of the input value
+//!
+//! ## `and`
+//!
+//! Computes the conjunction of boolean values:
+//! true if none of the inputs are false, otherwise false.
+//!
+//!   - Input parameters: zero or more booleans
+//!   - Output: the conjunction of all the input booleans
+//!
+//! ## `or`
+//!
+//! Computes the disjunction of boolean values:
+//! true if any of the inputs are true, otherwise false.
+//!
+//!   - Input parameters: zero or more booleans
+//!   - Output: the disjunction of all the input booleans
 //!
 //! # Mathematical functions
 //!
@@ -51,9 +85,9 @@
 //!
 //! # Syntax manipulation functions
 //!
-//! ## `child-index`
+//! ## `named-child-index`
 //!
-//! Returns the "named child index" of a syntax node within its parent.
+//! Returns the index of a "named child" within its parent.
 //!
 //!   - Input parameters:
 //!     - `node`: A syntax node
