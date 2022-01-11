@@ -45,7 +45,11 @@ fn can_parse_blocks() {
         statements,
         vec![vec![
             CreateGraphNode {
-                node: loc1.into(),
+                node: UnscopedVariable {
+                    name: loc1,
+                    location: Location { row: 4, column: 15 }
+                }
+                .into(),
                 location: Location { row: 4, column: 10 }
             }
             .into(),
@@ -59,6 +63,7 @@ fn can_parse_blocks() {
                         .into()
                     ),
                     name: prop1,
+                    location: Location { row: 5, column: 21 }
                 }
                 .into(),
                 location: Location { row: 5, column: 10 },
@@ -73,10 +78,15 @@ fn can_parse_blocks() {
                         }
                         .into()
                     ),
-                    name: prop1
+                    name: prop1,
+                    location: Location { row: 6, column: 21 }
                 }
                 .into(),
-                sink: loc1.into(),
+                sink: UnscopedVariable {
+                    name: loc1,
+                    location: Location { row: 6, column: 30 },
+                }
+                .into(),
                 location: Location { row: 6, column: 10 },
             }
             .into(),
@@ -89,10 +99,15 @@ fn can_parse_blocks() {
                         }
                         .into()
                     ),
-                    name: prop1
+                    name: prop1,
+                    location: Location { row: 7, column: 22 },
                 }
                 .into(),
-                sink: loc1.into(),
+                sink: UnscopedVariable {
+                    name: loc1.into(),
+                    location: Location { row: 7, column: 31 },
+                }
+                .into(),
                 attributes: vec![Attribute {
                     name: precedence,
                     value: Expression::TrueLiteral
@@ -109,7 +124,8 @@ fn can_parse_blocks() {
                         }
                         .into()
                     ),
-                    name: prop1
+                    name: prop1,
+                    location: Location { row: 8, column: 22 },
                 }
                 .into(),
                 attributes: vec![
@@ -135,9 +151,14 @@ fn can_parse_blocks() {
                         .into()
                     ),
                     name: var1,
+                    location: Location { row: 9, column: 20 },
                 }
                 .into(),
-                value: loc1.into(),
+                value: UnscopedVariable {
+                    name: loc1,
+                    location: Location { row: 9, column: 27 },
+                }
+                .into(),
                 location: Location { row: 9, column: 10 },
             }
             .into(),
@@ -151,9 +172,20 @@ fn can_parse_blocks() {
                         .into()
                     ),
                     name: var1,
+                    location: Location {
+                        row: 10,
+                        column: 20
+                    },
                 }
                 .into(),
-                value: loc1.into(),
+                value: UnscopedVariable {
+                    name: loc1,
+                    location: Location {
+                        row: 10,
+                        column: 27
+                    },
+                }
+                .into(),
                 location: Location {
                     row: 10,
                     column: 10
@@ -191,19 +223,31 @@ fn can_parse_literals() {
         statements,
         vec![vec![
             DeclareImmutable {
-                variable: f.into(),
+                variable: UnscopedVariable {
+                    name: f,
+                    location: Location { row: 3, column: 14 }
+                }
+                .into(),
                 value: Expression::FalseLiteral,
                 location: Location { row: 3, column: 10 },
             }
             .into(),
             DeclareImmutable {
-                variable: n.into(),
+                variable: UnscopedVariable {
+                    name: n,
+                    location: Location { row: 4, column: 14 }
+                }
+                .into(),
                 value: Expression::NullLiteral,
                 location: Location { row: 4, column: 10 },
             }
             .into(),
             DeclareImmutable {
-                variable: t.into(),
+                variable: UnscopedVariable {
+                    name: t,
+                    location: Location { row: 5, column: 14 }
+                }
+                .into(),
                 value: Expression::TrueLiteral,
                 location: Location { row: 5, column: 10 },
             }
@@ -234,7 +278,11 @@ fn can_parse_strings() {
     assert_eq!(
         statements,
         vec![vec![DeclareImmutable {
-            variable: loc1.into(),
+            variable: UnscopedVariable {
+                name: loc1,
+                location: Location { row: 3, column: 14 }
+            }
+            .into(),
             value: String::from("\"abc,\ndef\\").into(),
             location: Location { row: 3, column: 10 },
         }
@@ -269,7 +317,11 @@ fn can_parse_lists() {
         statements,
         vec![vec![
             DeclareImmutable {
-                variable: list1.into(),
+                variable: UnscopedVariable {
+                    name: list1,
+                    location: Location { row: 3, column: 14 }
+                }
+                .into(),
                 value: ListComprehension {
                     elements: vec![
                         IntegerConstant { value: 1 }.into(),
@@ -282,13 +334,21 @@ fn can_parse_lists() {
             }
             .into(),
             DeclareImmutable {
-                variable: list2.into(),
+                variable: UnscopedVariable {
+                    name: list2,
+                    location: Location { row: 4, column: 14 }
+                }
+                .into(),
                 value: ListComprehension { elements: vec![] }.into(),
                 location: Location { row: 4, column: 10 },
             }
             .into(),
             DeclareImmutable {
-                variable: list3.into(),
+                variable: UnscopedVariable {
+                    name: list3,
+                    location: Location { row: 5, column: 14 }
+                }
+                .into(),
                 value: ListComprehension {
                     elements: vec![
                         StringConstant {
@@ -336,7 +396,11 @@ fn can_parse_sets() {
         statements,
         vec![vec![
             DeclareImmutable {
-                variable: set1.into(),
+                variable: UnscopedVariable {
+                    name: set1,
+                    location: Location { row: 3, column: 14 }
+                }
+                .into(),
                 value: SetComprehension {
                     elements: vec![
                         IntegerConstant { value: 1 }.into(),
@@ -349,13 +413,21 @@ fn can_parse_sets() {
             }
             .into(),
             DeclareImmutable {
-                variable: set2.into(),
+                variable: UnscopedVariable {
+                    name: set2,
+                    location: Location { row: 4, column: 14 }
+                }
+                .into(),
                 value: SetComprehension { elements: vec![] }.into(),
                 location: Location { row: 4, column: 10 },
             }
             .into(),
             DeclareImmutable {
-                variable: set3.into(),
+                variable: UnscopedVariable {
+                    name: set3,
+                    location: Location { row: 5, column: 14 }
+                }
+                .into(),
                 value: SetComprehension {
                     elements: vec![
                         StringConstant {

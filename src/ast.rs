@@ -370,6 +370,7 @@ impl DisplayWithContext for Variable {
 pub struct ScopedVariable {
     pub scope: Box<Expression>,
     pub name: Identifier,
+    pub location: Location,
 }
 
 impl From<ScopedVariable> for Variable {
@@ -393,17 +394,12 @@ impl DisplayWithContext for ScopedVariable {
 #[derive(Debug, Eq, PartialEq)]
 pub struct UnscopedVariable {
     pub name: Identifier,
+    pub location: Location,
 }
 
 impl From<UnscopedVariable> for Variable {
     fn from(variable: UnscopedVariable) -> Variable {
         Variable::Unscoped(variable)
-    }
-}
-
-impl From<Identifier> for Variable {
-    fn from(name: Identifier) -> Variable {
-        UnscopedVariable { name }.into()
     }
 }
 
@@ -614,9 +610,9 @@ impl From<String> for Expression {
     }
 }
 
-impl From<Identifier> for Expression {
-    fn from(name: Identifier) -> Expression {
-        Expression::Variable(UnscopedVariable { name }.into())
+impl From<UnscopedVariable> for Expression {
+    fn from(variable: UnscopedVariable) -> Expression {
+        Expression::Variable(variable.into())
     }
 }
 
