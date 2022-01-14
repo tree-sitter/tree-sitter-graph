@@ -221,6 +221,16 @@ impl<'tree> Graph<'tree> {
         let s = serde_json::to_string_pretty(&json_graph).unwrap();
         print!("{}", s)
     }
+
+    // Returns an iterator of references to all of the nodes in the graph.
+    pub fn iter_nodes(&self) -> impl Iterator<Item = GraphNodeRef> {
+        (0..self.graph_nodes.len() as u32).map(GraphNodeRef)
+    }
+
+    // Returns the number of nodes in the graph.
+    pub fn node_count(&self) -> usize {
+        self.graph_nodes.len()
+    }
 }
 
 impl<'tree> Index<SyntaxNodeRef> for Graph<'tree> {
@@ -291,6 +301,18 @@ impl GraphNode {
             .binary_search_by_key(&sink, |(sink, _)| *sink)
             .ok()
             .map(move |index| &mut self.outgoing_edges[index].1)
+    }
+
+    // Returns an iterator of all of the outgoing edges from this node.
+    pub fn iter_edges(&self) -> impl Iterator<Item = (GraphNodeRef, &Edge)> + '_ {
+        self.outgoing_edges
+            .iter()
+            .map(|(id, edge)| (GraphNodeRef(*id), edge))
+    }
+
+    // Returns the number of outgoing edges from this node.
+    pub fn edge_count(&self) -> usize {
+        self.outgoing_edges.len()
     }
 }
 
