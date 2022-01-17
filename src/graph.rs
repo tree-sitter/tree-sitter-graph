@@ -459,17 +459,27 @@ impl Value {
 
     /// Coerces this value into a syntax node reference, returning an error if it's some other type
     /// of value.
-    pub fn into_syntax_node<'a, 'tree>(
+    pub fn into_syntax_node_ref<'a, 'tree>(
         self,
         graph: &'a Graph<'tree>,
-    ) -> Result<&'a Node<'tree>, ExecutionError> {
+    ) -> Result<SyntaxNodeRef, ExecutionError> {
         match self {
-            Value::SyntaxNode(node) => Ok(&graph[node]),
+            Value::SyntaxNode(node) => Ok(node),
             _ => Err(ExecutionError::ExpectedSyntaxNode(format!(
                 "got {}",
                 self.display_with(graph)
             ))),
         }
+    }
+
+    /// Coerces this value into a syntax node, returning an error if it's some other type
+    /// of value.
+    #[deprecated(note = "Use the pattern graph[value.into_syntax_node_ref(graph)] instead")]
+    pub fn into_syntax_node<'a, 'tree>(
+        self,
+        graph: &'a Graph<'tree>,
+    ) -> Result<&'a Node<'tree>, ExecutionError> {
+        Ok(&graph[self.into_syntax_node_ref(graph)?])
     }
 }
 
