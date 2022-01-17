@@ -457,6 +457,21 @@ impl Value {
         }
     }
 
+    /// Coerces this value into a graph node reference, returning an error if it's some other type
+    /// of value.
+    pub fn into_graph_node_ref<'a, 'tree>(
+        self,
+        graph: &'a Graph<'tree>,
+    ) -> Result<GraphNodeRef, ExecutionError> {
+        match self {
+            Value::GraphNode(node) => Ok(node),
+            _ => Err(ExecutionError::ExpectedGraphNode(format!(
+                "got {}",
+                self.display_with(graph)
+            ))),
+        }
+    }
+
     /// Coerces this value into a syntax node reference, returning an error if it's some other type
     /// of value.
     pub fn into_syntax_node_ref<'a, 'tree>(
