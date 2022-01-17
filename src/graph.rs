@@ -424,6 +424,16 @@ impl Value {
         }
     }
 
+    pub fn as_bool(&self, graph: &Graph) -> Result<bool, ExecutionError> {
+        match self {
+            Value::Boolean(value) => Ok(*value),
+            _ => Err(ExecutionError::ExpectedBoolean(format!(
+                "got {}",
+                self.display_with(graph)
+            ))),
+        }
+    }
+
     /// Coerces this value into an integer, returning an error if it's some other type of value.
     pub fn into_integer(self, graph: &Graph) -> Result<u32, ExecutionError> {
         match self {
@@ -435,8 +445,28 @@ impl Value {
         }
     }
 
+    pub fn as_integer(&self, graph: &Graph) -> Result<u32, ExecutionError> {
+        match self {
+            Value::Integer(value) => Ok(*value),
+            _ => Err(ExecutionError::ExpectedInteger(format!(
+                "got {}",
+                self.display_with(graph)
+            ))),
+        }
+    }
+
     /// Coerces this value into a string, returning an error if it's some other type of value.
     pub fn into_string(self, graph: &Graph) -> Result<String, ExecutionError> {
+        match self {
+            Value::String(value) => Ok(value),
+            _ => Err(ExecutionError::ExpectedString(format!(
+                "got {}",
+                self.display_with(graph)
+            ))),
+        }
+    }
+
+    pub fn as_string(&self, graph: &Graph) -> Result<&str, ExecutionError> {
         match self {
             Value::String(value) => Ok(value),
             _ => Err(ExecutionError::ExpectedString(format!(
@@ -457,6 +487,16 @@ impl Value {
         }
     }
 
+    pub fn as_list(&self, graph: &Graph) -> Result<&Vec<Value>, ExecutionError> {
+        match self {
+            Value::List(values) => Ok(values),
+            _ => Err(ExecutionError::ExpectedList(format!(
+                "got {}",
+                self.display_with(graph)
+            ))),
+        }
+    }
+
     /// Coerces this value into a graph node reference, returning an error if it's some other type
     /// of value.
     pub fn into_graph_node_ref<'a, 'tree>(
@@ -465,6 +505,19 @@ impl Value {
     ) -> Result<GraphNodeRef, ExecutionError> {
         match self {
             Value::GraphNode(node) => Ok(node),
+            _ => Err(ExecutionError::ExpectedGraphNode(format!(
+                "got {}",
+                self.display_with(graph)
+            ))),
+        }
+    }
+
+    pub fn as_graph_node_ref<'a, 'tree>(
+        &self,
+        graph: &'a Graph<'tree>,
+    ) -> Result<GraphNodeRef, ExecutionError> {
+        match self {
+            Value::GraphNode(node) => Ok(*node),
             _ => Err(ExecutionError::ExpectedGraphNode(format!(
                 "got {}",
                 self.display_with(graph)
@@ -495,6 +548,19 @@ impl Value {
         graph: &'a Graph<'tree>,
     ) -> Result<&'a Node<'tree>, ExecutionError> {
         Ok(&graph[self.into_syntax_node_ref(graph)?])
+    }
+
+    pub fn as_syntax_node_ref<'a, 'tree>(
+        &self,
+        graph: &'a Graph<'tree>,
+    ) -> Result<SyntaxNodeRef, ExecutionError> {
+        match self {
+            Value::SyntaxNode(node) => Ok(*node),
+            _ => Err(ExecutionError::ExpectedSyntaxNode(format!(
+                "got {}",
+                self.display_with(graph)
+            ))),
+        }
     }
 }
 
