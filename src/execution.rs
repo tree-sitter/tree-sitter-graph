@@ -61,6 +61,24 @@ impl File {
         globals: &Globals,
     ) -> Result<Graph<'tree>, ExecutionError> {
         let mut graph = Graph::new();
+        self.execute_into(ctx, &mut graph, tree, source, functions, globals)?;
+        Ok(graph)
+    }
+
+    /// Executes this graph DSL file against a source file, saving the results into an existing
+    /// `Graph` instance.  You must provide the parsed syntax tree (`tree`) as well as the source
+    /// text that it was parsed from (`source`).  You also provide the set of functions and global
+    /// variables that are available during execution. This variant is useful when you need to
+    /// “pre-seed” the graph with some predefined nodes and/or edges before executing the DSL file.
+    pub fn execute_into<'tree>(
+        &self,
+        ctx: &Context,
+        graph: &mut Graph<'tree>,
+        tree: &'tree Tree,
+        source: &'tree str,
+        functions: &mut Functions,
+        globals: &Globals,
+    ) -> Result<(), ExecutionError> {
         if tree.root_node().has_error() {
             return Err(ExecutionError::ParseTreeHasErrors);
         }
@@ -74,7 +92,7 @@ impl File {
                 ctx,
                 tree,
                 source,
-                &mut graph,
+                graph,
                 functions,
                 globals,
                 &mut locals,
@@ -84,7 +102,7 @@ impl File {
                 &mut cursor,
             )?;
         }
-        Ok(graph)
+        Ok(())
     }
 }
 
