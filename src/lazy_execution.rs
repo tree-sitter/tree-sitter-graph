@@ -79,20 +79,25 @@ impl ast::File {
         let mut store = LazyStore::new();
         let mut scoped_store = LazyScopedVariables::new();
         let mut lazy_graph = Vec::new();
-        for stanza in &self.stanzas {
+
+        let query = &self.query.as_ref().unwrap();
+        let mut capture_indices = CaptureIndices::new(query);
+        let matches = cursor.matches(query, tree.root_node(), source.as_bytes());
+        for mat in matches {
+            let stanza = &self.stanzas[mat.pattern_index];
             stanza.execute_lazy(
                 ctx,
-                tree,
-                source,
+                &mut capture_indices,
+                &mat,
                 graph,
                 globals,
                 &mut locals,
-                &mut cursor,
                 &mut store,
                 &mut scoped_store,
                 &mut lazy_graph,
             )?;
         }
+
         let mut function_parameters = Vec::new();
         let mut prev_element_debug_info = HashMap::new();
         for graph_stmt in &lazy_graph {
@@ -148,51 +153,46 @@ pub(super) enum GraphElementKey {
 }
 
 impl ast::Stanza {
-    fn execute_lazy<'l, 'g, 'tree>(
+    fn execute_lazy<'l, 'g, 'q, 'tree>(
         &self,
         ctx: &Context,
-        tree: &'tree Tree,
-        source: &'tree str,
+        capture_indices: &mut CaptureIndices<'q>,
+        mat: &QueryMatch<'_, 'tree>,
         graph: &mut Graph<'tree>,
         globals: &Globals<'g>,
         locals: &mut VariableMap<'l>,
-        cursor: &mut QueryCursor,
         store: &mut LazyStore,
         scoped_store: &mut LazyScopedVariables,
         lazy_graph: &mut Vec<LazyStatement>,
     ) -> Result<(), ExecutionError> {
-        let mut capture_indices = CaptureIndices::new(&self.query);
         let full_match_index = capture_indices.index_for_name(FULL_MATCH);
         let current_regex_captures = vec![];
-        let matches = cursor.matches(&self.query, tree.root_node(), source.as_bytes());
-        for mat in matches {
-            locals.clear();
-            let mut exec = ExecutionContext {
-                ctx,
-                graph,
-                globals,
-                locals,
-                current_regex_captures: &current_regex_captures,
-                capture_indices: &mut capture_indices,
-                mat: &mat,
-                store,
-                scoped_store,
-                lazy_graph,
-            };
-            let node = query_capture_value(full_match_index, One, &mat, exec.graph);
-            debug!(
-                "match {} at {}",
-                node.display_with(exec.graph),
-                self.location
-            );
-            trace!("{{");
-            for statement in &self.statements {
-                statement
-                    .execute_lazy(&mut exec)
-                    .with_context(|| format!("Executing {}", statement.display_with(exec.ctx)))?;
-            }
-            trace!("}}");
+        locals.clear();
+        let mut exec = ExecutionContext {
+            ctx,
+            graph,
+            globals,
+            locals,
+            current_regex_captures: &current_regex_captures,
+            capture_indices,
+            mat,
+            store,
+            scoped_store,
+            lazy_graph,
+        };
+        let node = query_capture_value(full_match_index, One, &mat, exec.graph);
+        debug!(
+            "match {} at {}",
+            node.display_with(exec.graph),
+            self.location
+        );
+        trace!("{{");
+        for statement in &self.statements {
+            statement
+                .execute_lazy(&mut exec)
+                .with_context(|| format!("Executing {}", statement.display_with(exec.ctx)))?;
         }
+        trace!("}}");
         Ok(())
     }
 }

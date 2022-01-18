@@ -22,6 +22,8 @@ use crate::Location;
 #[derive(Debug)]
 pub struct File {
     pub language: Language,
+    /// The combined query of all stanzas in the file
+    pub query: Option<Query>,
     /// The list of stanzas in the file
     pub stanzas: Vec<Stanza>,
 }
@@ -30,6 +32,7 @@ impl File {
     pub fn new(language: Language) -> File {
         File {
             language,
+            query: None,
             stanzas: Vec::new(),
         }
     }
