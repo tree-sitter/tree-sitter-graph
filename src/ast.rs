@@ -661,7 +661,7 @@ impl From<Capture> for Expression {
 
 impl DisplayWithContext for Capture {
     fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
-        write!(f, "{}", self.name.display_with(ctx))
+        write!(f, "@{}", self.name.display_with(ctx))
     }
 }
 

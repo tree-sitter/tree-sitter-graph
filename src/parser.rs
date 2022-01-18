@@ -755,22 +755,14 @@ impl Parser<'_> {
         }
         self.consume_while(is_ident);
         let end = self.offset;
-        let capture_name = &self.source[start + 1..end];
-        let index = current_query
-            .capture_names()
-            .iter()
-            .position(|c| c == capture_name);
+        let name = &self.source[start + 1..end];
+        let index = current_query.capture_names().iter().position(|c| c == name);
         let index = match index {
             Some(index) => index,
-            None => {
-                return Err(ParseError::UndefinedCapture(
-                    capture_name.into(),
-                    capture_location,
-                ))
-            }
+            None => return Err(ParseError::UndefinedCapture(name.into(), capture_location)),
         };
         let quantifier = current_query.capture_quantifiers(0)[index];
-        let name = self.ctx.add_identifier(&self.source[start..end]);
+        let name = self.ctx.add_identifier(name);
         Ok(ast::Capture {
             index,
             quantifier,
