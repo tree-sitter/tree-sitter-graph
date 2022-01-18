@@ -59,7 +59,6 @@ fn can_parse_blocks() {
                 node: ScopedVariable {
                     scope: Box::new(
                         Capture {
-                            index: 1,
                             quantifier: One,
                             name: cap2,
                         }
@@ -76,7 +75,6 @@ fn can_parse_blocks() {
                 source: ScopedVariable {
                     scope: Box::new(
                         Capture {
-                            index: 1,
                             quantifier: One,
                             name: cap2,
                         }
@@ -98,7 +96,6 @@ fn can_parse_blocks() {
                 source: ScopedVariable {
                     scope: Box::new(
                         Capture {
-                            index: 1,
                             quantifier: One,
                             name: cap2,
                         }
@@ -124,7 +121,6 @@ fn can_parse_blocks() {
                 node: ScopedVariable {
                     scope: Box::new(
                         Capture {
-                            index: 1,
                             quantifier: One,
                             name: cap2,
                         }
@@ -151,7 +147,6 @@ fn can_parse_blocks() {
                 variable: ScopedVariable {
                     scope: Box::new(
                         Capture {
-                            index: 1,
                             quantifier: One,
                             name: cap2,
                         }
@@ -173,7 +168,6 @@ fn can_parse_blocks() {
                 variable: ScopedVariable {
                     scope: Box::new(
                         Capture {
-                            index: 1,
                             quantifier: One,
                             name: cap2,
                         }
@@ -531,7 +525,6 @@ fn can_parse_star_capture() {
         statements,
         vec![vec![Print {
             values: vec![Capture {
-                index: 0,
                 quantifier: ZeroOrMore,
                 name: stmts,
             }
@@ -568,7 +561,6 @@ fn can_parse_star_multiple_capture() {
         vec![vec![
             Print {
                 values: vec![Capture {
-                    index: 0,
                     quantifier: ZeroOrMore,
                     name: stmt,
                 }
@@ -578,7 +570,6 @@ fn can_parse_star_multiple_capture() {
             .into(),
             Print {
                 values: vec![Capture {
-                    index: 1,
                     quantifier: ZeroOrMore,
                     name: stmts,
                 }
@@ -613,7 +604,6 @@ fn can_parse_plus_capture() {
         statements,
         vec![vec![Print {
             values: vec![Capture {
-                index: 0,
                 quantifier: OneOrMore,
                 name: stmts,
             }
@@ -647,7 +637,6 @@ fn can_parse_optional_capture() {
         statements,
         vec![vec![Print {
             values: vec![Capture {
-                index: 0,
                 quantifier: ZeroOrOne,
                 name: stmt,
             }
@@ -681,7 +670,6 @@ fn can_parse_parent_optional_capture() {
         statements,
         vec![vec![Print {
             values: vec![Capture {
-                index: 0,
                 quantifier: ZeroOrOne,
                 name: stmt,
             }
@@ -715,7 +703,6 @@ fn can_parse_alternative_capture() {
         statements,
         vec![vec![Print {
             values: vec![Capture {
-                index: 0,
                 quantifier: ZeroOrOne,
                 name: stmt,
             }
@@ -749,7 +736,6 @@ fn can_parse_nested_plus_and_optional_capture() {
         statements,
         vec![vec![Print {
             values: vec![Capture {
-                index: 0,
                 quantifier: ZeroOrMore,
                 name: stmt,
             }
@@ -786,7 +772,6 @@ fn can_parse_if() {
         vec![vec![If {
             arms: vec![IfArm {
                 conditions: vec![Condition::Some(vec![Capture {
-                    index: 0,
                     quantifier: ZeroOrOne,
                     name: x,
                 }])],
@@ -835,7 +820,6 @@ fn can_parse_if_elif() {
             arms: vec![
                 IfArm {
                     conditions: vec![Condition::None(vec![Capture {
-                        index: 0,
                         quantifier: ZeroOrOne,
                         name: x,
                     }])],
@@ -851,7 +835,6 @@ fn can_parse_if_elif() {
                 },
                 IfArm {
                     conditions: vec![Condition::Some(vec![Capture {
-                        index: 0,
                         quantifier: ZeroOrOne,
                         name: x,
                     }])],
@@ -901,7 +884,6 @@ fn can_parse_if_else() {
             arms: vec![
                 IfArm {
                     conditions: vec![Condition::None(vec![Capture {
-                        index: 0,
                         quantifier: ZeroOrOne,
                         name: x,
                     }])],
@@ -981,7 +963,6 @@ fn can_parse_for_in() {
                 location: Location { row: 3, column: 14 }
             },
             capture: Capture {
-                index: 0,
                 quantifier: ZeroOrMore,
                 name: xs,
             }

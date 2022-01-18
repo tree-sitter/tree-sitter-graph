@@ -17,13 +17,13 @@ use std::collections::HashMap;
 use std::fmt;
 
 use tree_sitter::CaptureQuantifier::One;
-use tree_sitter::Query;
 use tree_sitter::QueryCursor;
 use tree_sitter::QueryMatch;
 use tree_sitter::Tree;
 
 use crate::ast;
 use crate::execution::query_capture_value;
+use crate::execution::CaptureIndices;
 use crate::execution::ExecutionError;
 use crate::execution::Globals;
 use crate::functions::Functions;
@@ -109,17 +109,19 @@ impl ast::File {
                 })
                 .with_context(|| format!("Executing {}", graph_stmt.display_with(ctx, &graph)))?;
         }
+
         Ok(())
     }
 }
 
 /// Context for execution, which executes stanzas to build the lazy graph
-struct ExecutionContext<'a, 'g, 'tree> {
+struct ExecutionContext<'a, 'g, 'q, 'tree> {
     ctx: &'a Context,
     graph: &'a mut Graph<'tree>,
     globals: &'a Globals<'g>,
     locals: &'a mut dyn Variables,
     current_regex_captures: &'a Vec<String>,
+    capture_indices: &'a mut CaptureIndices<'q>,
     mat: &'a QueryMatch<'a, 'tree>,
     store: &'a mut LazyStore,
     scoped_store: &'a mut LazyScopedVariables,
@@ -159,7 +161,8 @@ impl ast::Stanza {
         scoped_store: &mut LazyScopedVariables,
         lazy_graph: &mut Vec<LazyStatement>,
     ) -> Result<(), ExecutionError> {
-        let full_match_index = full_match_capture_index(&self.query);
+        let mut capture_indices = CaptureIndices::new(&self.query);
+        let full_match_index = capture_indices.index_for_name(FULL_MATCH);
         let current_regex_captures = vec![];
         let matches = cursor.matches(&self.query, tree.root_node(), source.as_bytes());
         for mat in matches {
@@ -170,6 +173,7 @@ impl ast::Stanza {
                 globals,
                 locals,
                 current_regex_captures: &current_regex_captures,
+                capture_indices: &mut capture_indices,
                 mat: &mat,
                 store,
                 scoped_store,
@@ -322,6 +326,7 @@ impl ast::Scan {
                 globals: exec.globals,
                 locals: &mut arm_locals,
                 current_regex_captures: &current_regex_captures,
+                capture_indices: exec.capture_indices,
                 mat: exec.mat,
                 store: exec.store,
                 scoped_store: exec.scoped_store,
@@ -390,6 +395,7 @@ impl ast::If {
                     globals: exec.globals,
                     locals: &mut arm_locals,
                     current_regex_captures: exec.current_regex_captures,
+                    capture_indices: exec.capture_indices,
                     mat: exec.mat,
                     store: exec.store,
                     scoped_store: exec.scoped_store,
@@ -436,6 +442,7 @@ impl ast::ForIn {
                 globals: exec.globals,
                 locals: &mut loop_locals,
                 current_regex_captures: exec.current_regex_captures,
+                capture_indices: exec.capture_indices,
                 mat: exec.mat,
                 store: exec.store,
                 scoped_store: exec.scoped_store,
@@ -510,8 +517,10 @@ impl ast::SetComprehension {
 
 impl ast::Capture {
     fn evaluate_strict(&self, exec: &mut ExecutionContext) -> Result<graph::Value, ExecutionError> {
+        let name = exec.ctx.resolve(self.name);
+        let index = exec.capture_indices.index_for_name(name);
         Ok(query_capture_value(
-            self.index,
+            index,
             self.quantifier,
             exec.mat,
             exec.graph,
@@ -519,7 +528,9 @@ impl ast::Capture {
     }
 
     fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<LazyValue, ExecutionError> {
-        Ok(query_capture_value(self.index, self.quantifier, exec.mat, exec.graph).into())
+        let name = exec.ctx.resolve(self.name);
+        let index = exec.capture_indices.index_for_name(name);
+        Ok(query_capture_value(index, self.quantifier, exec.mat, exec.graph).into())
     }
 }
 
@@ -738,14 +749,6 @@ impl ast::Attribute {
         let attribute = LazyAttribute::new(self.name, value);
         Ok(attribute)
     }
-}
-
-fn full_match_capture_index(query: &Query) -> usize {
-    query
-        .capture_names()
-        .iter()
-        .position(|c| c == FULL_MATCH)
-        .unwrap()
 }
 
 /// Trait to Display with a given Context and Graph

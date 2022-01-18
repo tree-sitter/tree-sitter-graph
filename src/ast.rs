@@ -645,8 +645,6 @@ impl DisplayWithContext for Call {
 /// A capture expression that references a syntax node
 #[derive(Debug, Eq, PartialEq)]
 pub struct Capture {
-    /// The index of this capture in the block's tree-sitter query
-    pub index: usize,
     /// The suffix of the capture
     pub quantifier: CaptureQuantifier,
     /// The name of the capture
