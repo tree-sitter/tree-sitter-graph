@@ -379,13 +379,16 @@ impl Attributes {
                 let attributes = self.0;
                 let ctx = self.1;
                 let graph = self.2;
-                for (name, value) in &attributes.values {
-                    write!(
-                        f,
-                        "  {}: {}\n",
-                        ctx.resolve(*name),
-                        value.display_with(graph),
-                    )?;
+
+                let mut keys = attributes
+                    .values
+                    .keys()
+                    .map(|k| (ctx.resolve(*k), k))
+                    .collect::<Vec<_>>();
+                keys.sort_by(|a, b| a.0.cmp(b.0));
+                for (name, key) in &keys {
+                    let value = &attributes.values[key];
+                    write!(f, "  {}: {}\n", name, value.display_with(graph),)?;
                 }
                 Ok(())
             }
