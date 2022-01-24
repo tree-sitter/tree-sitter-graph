@@ -7,6 +7,7 @@
 
 //! Defines data types for the graphs produced by the graph DSL
 
+use std::collections::hash_map::Entry;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::fmt;
@@ -332,27 +333,27 @@ impl Edge {
 
 /// A set of attributes associated with a graph node or edge
 pub struct Attributes {
-    values: SmallVec<[(Identifier, Value); 8]>,
+    values: HashMap<Identifier, Value>,
 }
 
 impl Attributes {
     /// Creates a new, empty set of attributes.
     pub fn new() -> Attributes {
         Attributes {
-            values: SmallVec::new(),
+            values: HashMap::new(),
         }
     }
 
     /// Adds an attribute to this attribute set.  If there was already an attribute with the same
     /// name, replaces its value and returns `Err`.
     pub fn add<V: Into<Value>>(&mut self, name: Identifier, value: V) -> Result<(), ()> {
-        match self.values.binary_search_by_key(&name, |(name, _)| *name) {
-            Ok(index) => {
-                self.values[index].1 = value.into();
+        match self.values.entry(name) {
+            Entry::Occupied(mut o) => {
+                o.insert(value.into());
                 Err(())
             }
-            Err(index) => {
-                self.values.insert(index, (name, value.into()));
+            Entry::Vacant(v) => {
+                v.insert(value.into());
                 Ok(())
             }
         }
@@ -360,10 +361,7 @@ impl Attributes {
 
     /// Returns the value of a particular attribute, if it exists.
     pub fn get(&self, name: Identifier) -> Option<&Value> {
-        self.values
-            .binary_search_by_key(&name, |(name, _)| *name)
-            .ok()
-            .map(|index| &self.values[index].1)
+        self.values.get(&name)
     }
 
     /// fmt::Displays the contents of this attribute set.
@@ -379,13 +377,16 @@ impl Attributes {
                 let attributes = self.0;
                 let ctx = self.1;
                 let graph = self.2;
-                for (name, value) in &attributes.values {
-                    write!(
-                        f,
-                        "  {}: {}\n",
-                        ctx.resolve(*name),
-                        value.display_with(graph),
-                    )?;
+
+                let mut keys = attributes
+                    .values
+                    .keys()
+                    .map(|k| (ctx.resolve(*k), k))
+                    .collect::<Vec<_>>();
+                keys.sort_by(|a, b| a.0.cmp(b.0));
+                for (name, key) in &keys {
+                    let value = &attributes.values[key];
+                    write!(f, "  {}: {}\n", name, value.display_with(graph),)?;
                 }
                 Ok(())
             }
