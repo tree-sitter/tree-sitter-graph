@@ -212,7 +212,7 @@ pub mod stdlib {
                 _source: &str,
                 parameters: &mut dyn Parameters,
             ) -> Result<Value, ExecutionError> {
-                let node = parameters.param()?.into_syntax_node(graph)?;
+                let node = graph[parameters.param()?.into_syntax_node_ref(graph)?];
                 parameters.finish()?;
                 let parent = match node.parent() {
                     Some(parent) => parent,
@@ -223,7 +223,7 @@ pub mod stdlib {
                 let mut tree_cursor = parent.walk();
                 let index = parent
                     .named_children(&mut tree_cursor)
-                    .position(|child| child == *node)
+                    .position(|child| child == node)
                     .ok_or(anyhow!("Called named-child-index on a non-named child"))?;
                 Ok(Value::Integer(index as u32))
             }
@@ -240,7 +240,7 @@ pub mod stdlib {
                 source: &str,
                 parameters: &mut dyn Parameters,
             ) -> Result<Value, ExecutionError> {
-                let node = parameters.param()?.into_syntax_node(graph)?;
+                let node = graph[parameters.param()?.into_syntax_node_ref(graph)?];
                 parameters.finish()?;
                 Ok(Value::String(source[node.byte_range()].to_string()))
             }
@@ -257,7 +257,7 @@ pub mod stdlib {
                 _source: &str,
                 parameters: &mut dyn Parameters,
             ) -> Result<Value, ExecutionError> {
-                let node = parameters.param()?.into_syntax_node(graph)?;
+                let node = graph[parameters.param()?.into_syntax_node_ref(graph)?];
                 parameters.finish()?;
                 Ok(Value::Integer(node.start_position().row as u32))
             }
@@ -275,7 +275,7 @@ pub mod stdlib {
                 _source: &str,
                 parameters: &mut dyn Parameters,
             ) -> Result<Value, ExecutionError> {
-                let node = parameters.param()?.into_syntax_node(graph)?;
+                let node = graph[parameters.param()?.into_syntax_node_ref(graph)?];
                 parameters.finish()?;
                 Ok(Value::Integer(node.start_position().column as u32))
             }
@@ -292,7 +292,7 @@ pub mod stdlib {
                 _source: &str,
                 parameters: &mut dyn Parameters,
             ) -> Result<Value, ExecutionError> {
-                let node = parameters.param()?.into_syntax_node(graph)?;
+                let node = graph[parameters.param()?.into_syntax_node_ref(graph)?];
                 parameters.finish()?;
                 Ok(Value::Integer(node.end_position().row as u32))
             }
@@ -309,7 +309,7 @@ pub mod stdlib {
                 _source: &str,
                 parameters: &mut dyn Parameters,
             ) -> Result<Value, ExecutionError> {
-                let node = parameters.param()?.into_syntax_node(graph)?;
+                let node = graph[parameters.param()?.into_syntax_node_ref(graph)?];
                 parameters.finish()?;
                 Ok(Value::Integer(node.end_position().column as u32))
             }
@@ -326,7 +326,7 @@ pub mod stdlib {
                 _source: &str,
                 parameters: &mut dyn Parameters,
             ) -> Result<Value, ExecutionError> {
-                let node = parameters.param()?.into_syntax_node(graph)?;
+                let node = graph[parameters.param()?.into_syntax_node_ref(graph)?];
                 parameters.finish()?;
                 Ok(Value::String(node.kind().to_string()))
             }
@@ -344,7 +344,7 @@ pub mod stdlib {
                 _source: &str,
                 parameters: &mut dyn Parameters,
             ) -> Result<Value, ExecutionError> {
-                let node = parameters.param()?.into_syntax_node(graph)?;
+                let node = graph[parameters.param()?.into_syntax_node_ref(graph)?];
                 parameters.finish()?;
                 Ok(Value::Integer(node.named_child_count() as u32))
             }
