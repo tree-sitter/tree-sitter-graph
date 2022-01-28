@@ -19,17 +19,21 @@ use crate::ast::AddGraphNodeAttribute;
 use crate::ast::Assign;
 use crate::ast::Call;
 use crate::ast::Capture;
+use crate::ast::Condition;
 use crate::ast::CreateEdge;
 use crate::ast::CreateGraphNode;
 use crate::ast::DeclareImmutable;
 use crate::ast::DeclareMutable;
 use crate::ast::Expression;
 use crate::ast::File;
+use crate::ast::ForIn;
+use crate::ast::If;
 use crate::ast::IntegerConstant;
 use crate::ast::ListComprehension;
 use crate::ast::Print;
 use crate::ast::RegexCapture;
 use crate::ast::Scan;
+use crate::ast::ScanExpression;
 use crate::ast::ScopedVariable;
 use crate::ast::SetComprehension;
 use crate::ast::Stanza;
@@ -227,6 +231,8 @@ impl Statement {
             Statement::AddEdgeAttribute(statement) => statement.execute(exec),
             Statement::Scan(statement) => statement.execute(exec),
             Statement::Print(statement) => statement.execute(exec),
+            Statement::If(statement) => statement.execute(exec),
+            Statement::ForIn(statement) => statement.execute(exec),
         }
     }
 }
@@ -399,6 +405,17 @@ impl Scan {
     }
 }
 
+impl ScanExpression {
+    fn evaluate(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+        match self {
+            Self::StringConstant(expr) => expr.evaluate(exec),
+            Self::Capture(expr) => expr.evaluate(exec),
+            Self::Variable(expr) => expr.get_global(exec).map(|v| v.clone()),
+            Self::RegexCapture(expr) => expr.evaluate(exec),
+        }
+    }
+}
+
 impl Print {
     fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
         for value in &self.values {
@@ -410,6 +427,83 @@ impl Print {
             }
         }
         eprintln!();
+        Ok(())
+    }
+}
+
+impl If {
+    fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        for arm in &self.arms {
+            let mut result = true;
+            for condition in &arm.conditions {
+                result &= condition.test(exec)?;
+            }
+            if result {
+                let mut arm_locals = VariableMap::new_child(exec.locals);
+                let mut arm_exec = ExecutionContext {
+                    ctx: exec.ctx,
+                    source: exec.source,
+                    graph: exec.graph,
+                    functions: exec.functions,
+                    globals: exec.globals,
+                    locals: &mut arm_locals,
+                    scoped: exec.scoped,
+                    current_regex_captures: exec.current_regex_captures,
+                    function_parameters: exec.function_parameters,
+                    mat: exec.mat,
+                };
+                for stmt in &arm.statements {
+                    stmt.execute(&mut arm_exec)?;
+                }
+                break;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Condition {
+    fn test(&self, exec: &mut ExecutionContext) -> Result<bool, ExecutionError> {
+        let mut result = true;
+        match self {
+            Condition::Some(captures) => {
+                for capture in captures {
+                    result &= !capture.evaluate(exec)?.is_null();
+                }
+            }
+            Condition::None(captures) => {
+                for capture in captures {
+                    result &= capture.evaluate(exec)?.is_null();
+                }
+            }
+        }
+        Ok(result)
+    }
+}
+
+impl ForIn {
+    fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        let values = self.capture.evaluate(exec)?.into_list(exec.graph)?;
+        let mut loop_locals = VariableMap::new_child(exec.locals);
+        for value in values {
+            loop_locals.clear();
+            let mut loop_exec = ExecutionContext {
+                ctx: exec.ctx,
+                source: exec.source,
+                graph: exec.graph,
+                functions: exec.functions,
+                globals: exec.globals,
+                locals: &mut loop_locals,
+                scoped: exec.scoped,
+                current_regex_captures: exec.current_regex_captures,
+                function_parameters: exec.function_parameters,
+                mat: exec.mat,
+            };
+            self.variable.add(&mut loop_exec, value, false)?;
+            for stmt in &self.statements {
+                stmt.execute(&mut loop_exec)?;
+            }
+        }
         Ok(())
     }
 }
@@ -619,6 +713,12 @@ impl ScopedVariable {
 }
 
 impl UnscopedVariable {
+    fn get_global<'a>(&self, exec: &'a mut ExecutionContext) -> Result<&'a Value, ExecutionError> {
+        exec.globals.get(self.name).ok_or_else(|| {
+            ExecutionError::UndefinedVariable(format!("{}", self.display_with(exec.ctx)))
+        })
+    }
+
     fn get<'a>(&self, exec: &'a mut ExecutionContext) -> Result<&'a Value, ExecutionError> {
         if let Some(value) = exec.globals.get(self.name) {
             Some(value)

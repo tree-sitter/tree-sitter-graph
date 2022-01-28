@@ -62,6 +62,10 @@ pub enum Statement {
     Scan(Scan),
     // Debugging
     Print(Print),
+    // If
+    If(If),
+    // ForIn
+    ForIn(ForIn),
 }
 
 impl DisplayWithContext for Statement {
@@ -76,6 +80,8 @@ impl DisplayWithContext for Statement {
             Statement::AddEdgeAttribute(stmt) => stmt.fmt(f, ctx),
             Statement::Scan(stmt) => stmt.fmt(f, ctx),
             Statement::Print(stmt) => stmt.fmt(f, ctx),
+            Statement::If(stmt) => stmt.fmt(f, ctx),
+            Statement::ForIn(stmt) => stmt.fmt(f, ctx),
         }
     }
 }
@@ -306,7 +312,7 @@ impl DisplayWithContext for Print {
 /// A `scan` statement that matches regular expressions against a string
 #[derive(Debug, Eq, PartialEq)]
 pub struct Scan {
-    pub value: Expression,
+    pub value: ScanExpression,
     pub arms: Vec<ScanArm>,
     pub location: Location,
 }
@@ -325,6 +331,61 @@ impl DisplayWithContext for Scan {
             self.value.display_with(ctx),
             self.location
         )
+    }
+}
+
+/// Subset of expressions that are allowed in scan
+#[derive(Debug, Eq, PartialEq)]
+pub enum ScanExpression {
+    StringConstant(StringConstant),
+    Capture(Capture),
+    Variable(UnscopedVariable),
+    RegexCapture(RegexCapture),
+}
+
+impl From<String> for ScanExpression {
+    fn from(value: String) -> Self {
+        Self::StringConstant(StringConstant { value }.into())
+    }
+}
+
+impl From<Capture> for ScanExpression {
+    fn from(value: Capture) -> Self {
+        Self::Capture(value)
+    }
+}
+
+impl From<UnscopedVariable> for ScanExpression {
+    fn from(value: UnscopedVariable) -> Self {
+        Self::Variable(value.into())
+    }
+}
+
+impl From<RegexCapture> for ScanExpression {
+    fn from(value: RegexCapture) -> Self {
+        Self::RegexCapture(value)
+    }
+}
+
+impl From<ScanExpression> for Expression {
+    fn from(value: ScanExpression) -> Self {
+        match value {
+            ScanExpression::StringConstant(value) => Self::StringConstant(value),
+            ScanExpression::Capture(value) => Self::Capture(value),
+            ScanExpression::Variable(value) => Self::Variable(value.into()),
+            ScanExpression::RegexCapture(value) => Self::RegexCapture(value),
+        }
+    }
+}
+
+impl DisplayWithContext for ScanExpression {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        match self {
+            Self::StringConstant(value) => value.fmt(f, ctx),
+            Self::Capture(value) => value.fmt(f, ctx),
+            Self::Variable(value) => value.fmt(f, ctx),
+            Self::RegexCapture(value) => value.fmt(f, ctx),
+        }
     }
 }
 
@@ -347,6 +408,113 @@ impl PartialEq for ScanArm {
 impl DisplayWithContext for ScanArm {
     fn fmt(&self, f: &mut fmt::Formatter, _ctx: &Context) -> fmt::Result {
         write!(f, "{:?} {{ ... }}", self.regex.as_str())
+    }
+}
+
+/// A `cond` conditional statement that selects the first branch with a matching condition
+#[derive(Debug, Eq, PartialEq)]
+pub struct If {
+    pub arms: Vec<IfArm>,
+    pub location: Location,
+}
+
+impl From<If> for Statement {
+    fn from(statement: If) -> Statement {
+        Statement::If(statement)
+    }
+}
+
+impl DisplayWithContext for If {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        let mut first = true;
+        for arm in &self.arms {
+            if first {
+                first = false;
+                write!(f, "if {} {{ ... }}", arm.conditions.display_with(ctx))?;
+            } else {
+                if !arm.conditions.is_empty() {
+                    write!(f, " elif {} {{ ... }}", arm.conditions.display_with(ctx))?;
+                } else {
+                    write!(f, " else {{ ... }}")?;
+                }
+            }
+        }
+        write!(f, " at {}", self.location)
+    }
+}
+
+/// One arm of a `cond` statement
+#[derive(Debug, PartialEq, Eq)]
+pub struct IfArm {
+    pub conditions: Vec<Condition>,
+    pub statements: Vec<Statement>,
+    pub location: Location,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum Condition {
+    Some(Vec<Capture>),
+    None(Vec<Capture>),
+}
+
+impl DisplayWithContext for Vec<Condition> {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        let mut first = true;
+        for condition in self.iter() {
+            if first {
+                first = false;
+                write!(f, "{}", condition.display_with(ctx))?;
+            } else {
+                write!(f, ", {}", condition.display_with(ctx))?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl DisplayWithContext for Condition {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        let captures = match self {
+            Condition::Some(captures) => {
+                write!(f, "some")?;
+                Ok(captures)
+            }
+            Condition::None(captures) => {
+                write!(f, "none")?;
+                Ok(captures)
+            }
+        }?;
+        for capture in captures {
+            write!(f, " {}", capture.display_with(ctx))?;
+        }
+        Ok(())
+    }
+}
+
+/// A `for in` statement
+#[derive(Debug, Eq, PartialEq)]
+pub struct ForIn {
+    pub variable: UnscopedVariable,
+    pub capture: Capture,
+    pub statements: Vec<Statement>,
+    pub location: Location,
+}
+
+impl From<ForIn> for Statement {
+    fn from(statement: ForIn) -> Statement {
+        Statement::ForIn(statement)
+    }
+}
+
+impl DisplayWithContext for ForIn {
+    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
+        write!(
+            f,
+            "for {} in {} {{ ... }} at {}",
+            self.variable.display_with(ctx),
+            self.capture.display_with(ctx),
+            self.location,
+        )
     }
 }
 

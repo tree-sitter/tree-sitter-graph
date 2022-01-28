@@ -367,7 +367,11 @@
 //! earliest matching regular expression in each iteration, until we have exhausted the entire
 //! string, or none of the regular expressions match.
 //!
-//! Note that a regular expression that matches an empty string results in an error.
+//! Regular expression matching is subject to the following restrictions:
+//!
+//!   - The regular expressions are not allowed to match an empty string. Any regular expression
+//!     that does match empty strings results in an error.
+//!   - The string value must be a capture, a reference to a global variable, or a literal string.
 //!
 //! Within each regular expression's block, you can use `$0`, `$1`, etc., to refer to any capture
 //! groups in the regular expression.
@@ -419,6 +423,40 @@
 //!       edge current_node -> new_node
 //!       let @mod.root = new_node
 //!     }
+//!   }
+//! }
+//! ```
+//!
+//! # Conditionals
+//!
+//! You can use `if` statements to make blocks of statements conditional on the result of
+//! optional captures in queries.  Conditions are comma-separated lists of `some @capture`,
+//! indicating the capture must be present, and `none @capture` clauses, indicating the
+//! capture must be absent.
+//!
+//! ``` tsg
+//! (lexical_declaration type:(_)? @type value:(_)? @value)
+//! {
+//!   if some @type, none @value {
+//!     ; ...
+//!   } elif some @value {
+//!     ; ...
+//!   } else {
+//!     ; ...
+//!   }
+//! }
+//! ```
+//!
+//! # List iteration
+//!
+//! You can use a `for` statement to execute blocks of statements for every element in list
+//! captures in queries.
+//!
+//! ```tsg
+//! (module (_)* @stmts)
+//! {
+//!   for stmt in @stmts {
+//!     print stmt
 //!   }
 //! }
 //! ```

@@ -11,6 +11,7 @@ use std::str::Chars;
 
 use regex::Regex;
 use thiserror::Error;
+use tree_sitter::CaptureQuantifier::*;
 use tree_sitter::Language;
 use tree_sitter::Query;
 use tree_sitter::QueryError;
@@ -33,6 +34,12 @@ pub enum ParseError {
     ExpectedToken(&'static str, Location),
     #[error("Expected variable name at {0}")]
     ExpectedVariable(Location),
+    #[error("Expected unscoped variable at {0}")]
+    ExpectedUnscopedVariable(Location),
+    #[error("Expected list capture {0}")]
+    ExpectedListCapture(Location),
+    #[error("Expected optional capture {0}")]
+    ExpectedOptionalCapture(Location),
     #[error("Invalid regular expression /{0}/ at {1}")]
     InvalidRegex(String, Location),
     #[error("Nullable regular expression /{0}/ at {1}")]
@@ -89,6 +96,8 @@ struct Parser<'a> {
     attr_keyword: Identifier,
     edge_keyword: Identifier,
     false_keyword: Identifier,
+    for_keyword: Identifier,
+    if_keyword: Identifier,
     let_keyword: Identifier,
     node_keyword: Identifier,
     null_keyword: Identifier,
@@ -113,6 +122,8 @@ impl<'a> Parser<'a> {
         let attr_keyword = ctx.add_identifier("attr");
         let edge_keyword = ctx.add_identifier("edge");
         let false_keyword = ctx.add_identifier("false");
+        let for_keyword = ctx.add_identifier("for");
+        let if_keyword = ctx.add_identifier("if");
         let let_keyword = ctx.add_identifier("let");
         let node_keyword = ctx.add_identifier("node");
         let null_keyword = ctx.add_identifier("null");
@@ -130,7 +141,9 @@ impl<'a> Parser<'a> {
             attr_keyword,
             edge_keyword,
             false_keyword,
+            for_keyword,
             let_keyword,
+            if_keyword,
             node_keyword,
             null_keyword,
             print_keyword,
@@ -407,7 +420,7 @@ impl Parser<'_> {
             }
             .into())
         } else if keyword == self.scan_keyword {
-            let value = self.parse_expression(current_query)?;
+            let value = self.parse_scan_expression(current_query)?;
             self.consume_whitespace();
             self.consume_token("{")?;
             self.consume_whitespace();
@@ -445,12 +458,157 @@ impl Parser<'_> {
                 location: keyword_location,
             }
             .into())
+        } else if keyword == self.if_keyword {
+            let mut arms = Vec::new();
+
+            // if
+            let location = keyword_location;
+            self.consume_whitespace();
+            let conditions = self.parse_conditions(current_query)?;
+            self.consume_whitespace();
+            let statements = self.parse_statements(current_query)?;
+            self.consume_whitespace();
+            arms.push(ast::IfArm {
+                conditions,
+                statements,
+                location,
+            });
+
+            // elif
+            let mut location = self.location;
+            while let Ok(_) = self.consume_token("elif") {
+                self.consume_whitespace();
+                let conditions = self.parse_conditions(current_query)?;
+                self.consume_whitespace();
+                let statements = self.parse_statements(current_query)?;
+                self.consume_whitespace();
+                arms.push(ast::IfArm {
+                    conditions,
+                    statements,
+                    location,
+                });
+                self.consume_whitespace();
+                location = self.location;
+            }
+
+            // else
+            let location = self.location;
+            if let Ok(_) = self.consume_token("else") {
+                let conditions = vec![];
+                self.consume_whitespace();
+                let statements = self.parse_statements(current_query)?;
+                self.consume_whitespace();
+                arms.push(ast::IfArm {
+                    conditions,
+                    statements,
+                    location,
+                });
+                self.consume_whitespace();
+            }
+
+            Ok(ast::If {
+                arms,
+                location: keyword_location,
+            }
+            .into())
+        } else if keyword == self.for_keyword {
+            self.consume_whitespace();
+            let variable = match self.parse_variable(current_query)? {
+                ast::Variable::Unscoped(variable) => Ok(variable),
+                ast::Variable::Scoped(variable) => {
+                    Err(ParseError::ExpectedUnscopedVariable(variable.location))
+                }
+            }?;
+            self.consume_whitespace();
+            self.consume_token("in")?;
+            self.consume_whitespace();
+            let capture_location = self.location;
+            let capture = self.parse_capture(current_query)?;
+            if capture.quantifier != ZeroOrMore && capture.quantifier != OneOrMore {
+                return Err(ParseError::ExpectedListCapture(capture_location));
+            }
+            self.consume_whitespace();
+            let statements = self.parse_statements(current_query)?;
+            Ok(ast::ForIn {
+                variable,
+                capture,
+                statements,
+                location: keyword_location,
+            }
+            .into())
         } else {
             Err(ParseError::UnexpectedKeyword(
                 self.ctx.resolve(keyword).into(),
                 keyword_location,
             ))
         }
+    }
+
+    fn parse_conditions(
+        &mut self,
+        current_query: &Query,
+    ) -> Result<Vec<ast::Condition>, ParseError> {
+        let mut conditions = Vec::new();
+        let mut has_next = true;
+        while has_next {
+            conditions.push(self.parse_condition(current_query)?);
+            self.consume_whitespace();
+            if let Some(',') = self.try_peek() {
+                self.consume_token(",")?;
+                self.consume_whitespace();
+                has_next = true;
+            } else {
+                has_next = false;
+            }
+        }
+        Ok(conditions)
+    }
+
+    fn parse_condition(&mut self, current_query: &Query) -> Result<ast::Condition, ParseError> {
+        let location = self.location;
+        let c = if let Ok(_) = self.consume_token("some") {
+            ast::Condition::Some
+        } else if let Ok(_) = self.consume_token("none") {
+            ast::Condition::None
+        } else {
+            return Err(ParseError::ExpectedToken("some | none", location));
+        };
+        let mut captures = Vec::new();
+        self.consume_whitespace();
+        let capture_location = self.location;
+        while let Ok(capture) = self.parse_capture(current_query) {
+            if capture.quantifier != ZeroOrOne {
+                return Err(ParseError::ExpectedOptionalCapture(capture_location));
+            }
+            captures.push(capture);
+            self.consume_whitespace();
+        }
+        Ok(c(captures))
+    }
+
+    fn parse_scan_expression(
+        &mut self,
+        current_query: &Query,
+    ) -> Result<ast::ScanExpression, ParseError> {
+        let expression = match self.peek()? {
+            '"' => self.parse_string()?.into(),
+            '@' => self.parse_capture(current_query)?.into(),
+            '$' => self.parse_regex_capture()?.into(),
+            ch if is_ident_start(ch) => {
+                let location = self.location;
+                let name = self.parse_identifier("variable name")?;
+                ast::UnscopedVariable { name, location }.into()
+            }
+            ch => {
+                return Err(ParseError::UnexpectedCharacter(
+                    ch,
+                    "expression",
+                    self.location,
+                ))
+            }
+        };
+        self.consume_whitespace();
+        Ok(expression)
     }
 
     fn parse_identifier(&mut self, within: &'static str) -> Result<Identifier, ParseError> {
@@ -493,8 +651,8 @@ impl Parser<'_> {
         let mut expression = match self.peek()? {
             '#' => self.parse_literal()?,
             '"' => self.parse_string()?.into(),
-            '@' => self.parse_capture(current_query)?,
-            '$' => self.parse_regex_capture()?,
+            '@' => self.parse_capture(current_query)?.into(),
+            '$' => self.parse_regex_capture()?.into(),
             '(' => self.parse_call(current_query)?,
             '[' => self.parse_list(current_query)?,
             '{' => self.parse_set(current_query)?,
@@ -581,7 +739,7 @@ impl Parser<'_> {
         Ok(ast::SetComprehension { elements }.into())
     }
 
-    fn parse_capture(&mut self, current_query: &Query) -> Result<ast::Expression, ParseError> {
+    fn parse_capture(&mut self, current_query: &Query) -> Result<ast::Capture, ParseError> {
         let capture_location = self.location;
         let start = self.offset;
         self.consume_token("@")?;
@@ -646,7 +804,7 @@ impl Parser<'_> {
         }
     }
 
-    fn parse_regex_capture(&mut self) -> Result<ast::Expression, ParseError> {
+    fn parse_regex_capture(&mut self) -> Result<ast::RegexCapture, ParseError> {
         let regex_capture_location = self.location;
         self.consume_token("$")?;
         let start = self.offset;
