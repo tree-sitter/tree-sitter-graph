@@ -8,7 +8,6 @@
 mod statements;
 mod store;
 mod values;
-mod variables;
 
 use anyhow::Context as _;
 use log::{debug, trace};
@@ -25,12 +24,14 @@ use crate::ast;
 use crate::execution::query_capture_value;
 use crate::execution::CaptureIndices;
 use crate::execution::ExecutionError;
-use crate::execution::Globals;
 use crate::functions::Functions;
 use crate::graph;
 use crate::graph::DisplayWithGraph as _;
 use crate::graph::Graph;
 use crate::parser::FULL_MATCH;
+use crate::variables::Globals;
+use crate::variables::VariableMap;
+use crate::variables::Variables;
 use crate::Context;
 use crate::DisplayWithContext as _;
 use crate::Identifier;
@@ -38,7 +39,6 @@ use crate::Identifier;
 use statements::*;
 use store::*;
 use values::*;
-use variables::*;
 
 impl ast::File {
     /// Executes this graph DSL file against a source file.  You must provide the parsed syntax
@@ -124,7 +124,7 @@ struct ExecutionContext<'a, 'g, 'q, 'tree> {
     ctx: &'a Context,
     graph: &'a mut Graph<'tree>,
     globals: &'a Globals<'g>,
-    locals: &'a mut dyn Variables,
+    locals: &'a mut dyn Variables<LazyValue>,
     current_regex_captures: &'a Vec<String>,
     capture_indices: &'a mut CaptureIndices<'q>,
     mat: &'a QueryMatch<'a, 'tree>,
@@ -160,7 +160,7 @@ impl ast::Stanza {
         mat: &QueryMatch<'_, 'tree>,
         graph: &mut Graph<'tree>,
         globals: &Globals<'g>,
-        locals: &mut VariableMap<'l>,
+        locals: &mut VariableMap<'l, LazyValue>,
         store: &mut LazyStore,
         scoped_store: &mut LazyScopedVariables,
         lazy_graph: &mut Vec<LazyStatement>,
@@ -636,7 +636,7 @@ impl ast::ScopedVariable {
 
 impl ast::UnscopedVariable {
     fn evaluate_strict(&self, exec: &mut ExecutionContext) -> Result<graph::Value, ExecutionError> {
-        if let Some(value) = exec.globals.get(self.name) {
+        if let Some(value) = exec.globals.get(&self.name) {
             Ok(value.clone())
         } else {
             Err(ExecutionError::UndefinedVariable(format!(
@@ -647,19 +647,10 @@ impl ast::UnscopedVariable {
     }
 
     fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<LazyValue, ExecutionError> {
-        if let Some(value) = exec.globals.get(self.name) {
+        if let Some(value) = exec.globals.get(&self.name) {
             Some(value.clone().into())
         } else {
-            exec.locals
-                .get(
-                    self.name,
-                    &VariableContext {
-                        ctx: exec.ctx,
-                        graph: exec.graph,
-                        store: exec.store,
-                    },
-                )
-                .map(|value| value.clone())
+            exec.locals.get(&self.name).map(|value| value.clone())
         }
         .ok_or_else(|| {
             ExecutionError::UndefinedVariable(format!("{}", self.display_with(exec.ctx)))
@@ -674,24 +665,17 @@ impl ast::UnscopedVariable {
         value: LazyValue,
         mutable: bool,
     ) -> Result<(), ExecutionError> {
-        if exec.globals.get(self.name).is_some() {
+        if exec.globals.get(&self.name).is_some() {
             return Err(ExecutionError::DuplicateVariable(format!(
                 " global {}",
                 self.display_with(exec.ctx)
             )));
         }
+        let value = exec
+            .store
+            .add(value, self.location.into(), exec.ctx, exec.graph);
         exec.locals
-            .add(
-                self.name,
-                value,
-                mutable,
-                self.location.into(),
-                &mut VariableContext {
-                    ctx: exec.ctx,
-                    graph: exec.graph,
-                    store: exec.store,
-                },
-            )
+            .add(self.name, value.into(), mutable)
             .map_err(|_| {
                 ExecutionError::DuplicateVariable(format!(" local {}", self.display_with(exec.ctx)))
             })
@@ -702,44 +686,25 @@ impl ast::UnscopedVariable {
         exec: &mut ExecutionContext,
         value: LazyValue,
     ) -> Result<(), ExecutionError> {
-        if exec.globals.get(self.name).is_some() {
+        if exec.globals.get(&self.name).is_some() {
             return Err(ExecutionError::CannotAssignImmutableVariable(format!(
                 " global {}",
                 self.display_with(exec.ctx)
             )));
         }
-        exec.locals
-            .set(
-                self.name,
-                value,
-                self.location.into(),
-                &mut VariableContext {
-                    ctx: exec.ctx,
-                    graph: exec.graph,
-                    store: exec.store,
-                },
-            )
-            .map_err(|_| {
-                if exec
-                    .locals
-                    .get(
-                        self.name,
-                        &VariableContext {
-                            ctx: exec.ctx,
-                            graph: exec.graph,
-                            store: exec.store,
-                        },
-                    )
-                    .is_some()
-                {
-                    ExecutionError::CannotAssignImmutableVariable(format!(
-                        "{}",
-                        self.display_with(exec.ctx)
-                    ))
-                } else {
-                    ExecutionError::UndefinedVariable(format!("{}", self.display_with(exec.ctx)))
-                }
-            })
+        let value = exec
+            .store
+            .add(value, self.location.into(), exec.ctx, exec.graph);
+        exec.locals.set(self.name, value.into()).map_err(|_| {
+            if exec.locals.get(&self.name).is_some() {
+                ExecutionError::CannotAssignImmutableVariable(format!(
+                    "{}",
+                    self.display_with(exec.ctx)
+                ))
+            } else {
+                ExecutionError::UndefinedVariable(format!("{}", self.display_with(exec.ctx)))
+            }
+        })
     }
 }
 

@@ -5,8 +5,6 @@
 // Please see the LICENSE-APACHE or LICENSE-MIT files in this distribution for license details.
 // ------------------------------------------------------------------------------------------------
 
-mod variables;
-
 use anyhow::Context as ErrorContext;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
@@ -44,15 +42,15 @@ use crate::ast::Statement;
 use crate::ast::StringConstant;
 use crate::ast::UnscopedVariable;
 use crate::ast::Variable;
-pub use crate::execution::variables::Globals;
-use crate::execution::variables::ScopedVariables;
-use crate::execution::variables::VariableMap;
-use crate::execution::variables::Variables;
 use crate::functions::Functions;
 use crate::graph::DisplayWithGraph;
 use crate::graph::Graph;
 use crate::graph::GraphNodeRef;
+use crate::graph::SyntaxNodeRef;
 use crate::graph::Value;
+pub use crate::variables::Globals;
+use crate::variables::VariableMap;
+use crate::variables::Variables;
 use crate::Context;
 use crate::DisplayWithContext;
 
@@ -187,12 +185,28 @@ struct ExecutionContext<'a, 'g, 's, 'q, 'tree> {
     graph: &'a mut Graph<'tree>,
     functions: &'a mut Functions,
     globals: &'a Globals<'g>,
-    locals: &'a mut dyn Variables,
+    locals: &'a mut dyn Variables<Value>,
     scoped: &'a mut ScopedVariables<'s>,
     current_regex_captures: &'a Vec<String>,
     function_parameters: &'a mut Vec<Value>,
     capture_indices: &'a mut CaptureIndices<'q>,
     mat: &'a QueryMatch<'a, 'tree>,
+}
+
+struct ScopedVariables<'a> {
+    scopes: HashMap<SyntaxNodeRef, VariableMap<'a, Value>>,
+}
+
+impl<'a> ScopedVariables<'a> {
+    fn new() -> Self {
+        Self {
+            scopes: HashMap::new(),
+        }
+    }
+
+    fn get(&mut self, scope: SyntaxNodeRef) -> &mut VariableMap<'a, Value> {
+        self.scopes.entry(scope).or_insert(VariableMap::new())
+    }
 }
 
 impl Stanza {
@@ -204,7 +218,7 @@ impl Stanza {
         graph: &mut Graph<'tree>,
         functions: &mut Functions,
         globals: &Globals,
-        locals: &mut VariableMap<'l>,
+        locals: &mut VariableMap<'l, Value>,
         scoped: &mut ScopedVariables<'s>,
         current_regex_captures: &Vec<String>,
         function_parameters: &mut Vec<Value>,
@@ -684,7 +698,7 @@ impl ScopedVariable {
             }
         };
         let variables = exec.scoped.get(scope);
-        if let Some(value) = variables.get(self.name) {
+        if let Some(value) = variables.get(&self.name) {
             Ok(value)
         } else {
             Err(ExecutionError::UndefinedVariable(format!(
@@ -737,16 +751,16 @@ impl ScopedVariable {
 
 impl UnscopedVariable {
     fn get_global<'a>(&self, exec: &'a mut ExecutionContext) -> Result<&'a Value, ExecutionError> {
-        exec.globals.get(self.name).ok_or_else(|| {
+        exec.globals.get(&self.name).ok_or_else(|| {
             ExecutionError::UndefinedVariable(format!("{}", self.display_with(exec.ctx)))
         })
     }
 
     fn get<'a>(&self, exec: &'a mut ExecutionContext) -> Result<&'a Value, ExecutionError> {
-        if let Some(value) = exec.globals.get(self.name) {
+        if let Some(value) = exec.globals.get(&self.name) {
             Some(value)
         } else {
-            exec.locals.get(self.name)
+            exec.locals.get(&self.name)
         }
         .ok_or_else(|| {
             ExecutionError::UndefinedVariable(format!("{}", self.display_with(exec.ctx)))
@@ -759,7 +773,7 @@ impl UnscopedVariable {
         value: Value,
         mutable: bool,
     ) -> Result<(), ExecutionError> {
-        if exec.globals.get(self.name).is_some() {
+        if exec.globals.get(&self.name).is_some() {
             return Err(ExecutionError::DuplicateVariable(format!(
                 " global {}",
                 self.display_with(exec.ctx)
@@ -771,14 +785,14 @@ impl UnscopedVariable {
     }
 
     fn set(&self, exec: &mut ExecutionContext, value: Value) -> Result<(), ExecutionError> {
-        if exec.globals.get(self.name).is_some() {
+        if exec.globals.get(&self.name).is_some() {
             return Err(ExecutionError::CannotAssignImmutableVariable(format!(
                 " global {}",
                 self.display_with(exec.ctx)
             )));
         }
         exec.locals.set(self.name, value).map_err(|_| {
-            if exec.locals.get(self.name).is_some() {
+            if exec.locals.get(&self.name).is_some() {
                 ExecutionError::CannotAssignImmutableVariable(format!(
                     "{}",
                     self.display_with(exec.ctx)
