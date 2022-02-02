@@ -27,78 +27,78 @@ use super::GraphElementKey;
 
 /// Lazy graph statements
 #[derive(Debug)]
-pub enum Statement {
-    AddGraphNodeAttribute(AddGraphNodeAttribute),
-    CreateEdge(CreateEdge),
-    AddEdgeAttribute(AddEdgeAttribute),
-    Print(Print),
+pub(super) enum LazyStatement {
+    AddGraphNodeAttribute(LazyAddGraphNodeAttribute),
+    CreateEdge(LazyCreateEdge),
+    AddEdgeAttribute(LazyAddEdgeAttribute),
+    Print(LazyPrint),
 }
 
-impl Statement {
+impl LazyStatement {
     pub(super) fn evaluate(&self, exec: &mut EvaluationContext) -> Result<(), ExecutionError> {
         debug!("eval {}", self.display_with(exec.ctx, exec.graph));
         trace!("{{");
         let result = match self {
-            Statement::AddGraphNodeAttribute(stmt) => stmt.evaluate(exec),
-            Statement::CreateEdge(stmt) => stmt.evaluate(exec),
-            Statement::AddEdgeAttribute(stmt) => stmt.evaluate(exec),
-            Statement::Print(stmt) => stmt.evaluate(exec),
+            Self::AddGraphNodeAttribute(stmt) => stmt.evaluate(exec),
+            Self::CreateEdge(stmt) => stmt.evaluate(exec),
+            Self::AddEdgeAttribute(stmt) => stmt.evaluate(exec),
+            Self::Print(stmt) => stmt.evaluate(exec),
         };
         trace!("}}");
         result
     }
 }
 
-impl From<AddEdgeAttribute> for Statement {
-    fn from(stmt: AddEdgeAttribute) -> Self {
-        Statement::AddEdgeAttribute(stmt)
+impl From<LazyAddEdgeAttribute> for LazyStatement {
+    fn from(stmt: LazyAddEdgeAttribute) -> Self {
+        Self::AddEdgeAttribute(stmt)
     }
 }
 
-impl From<AddGraphNodeAttribute> for Statement {
-    fn from(stmt: AddGraphNodeAttribute) -> Self {
-        Statement::AddGraphNodeAttribute(stmt)
+impl From<LazyAddGraphNodeAttribute> for LazyStatement {
+    fn from(stmt: LazyAddGraphNodeAttribute) -> Self {
+        Self::AddGraphNodeAttribute(stmt)
     }
 }
 
-impl From<CreateEdge> for Statement {
-    fn from(stmt: CreateEdge) -> Self {
-        Statement::CreateEdge(stmt)
+impl From<LazyCreateEdge> for LazyStatement {
+    fn from(stmt: LazyCreateEdge) -> Self {
+        Self::CreateEdge(stmt)
     }
 }
 
-impl From<Print> for Statement {
-    fn from(stmt: Print) -> Self {
-        Statement::Print(stmt)
+impl From<LazyPrint> for LazyStatement {
+    fn from(stmt: LazyPrint) -> Self {
+        Self::Print(stmt)
     }
 }
 
-impl DisplayWithContextAndGraph for Statement {
+impl DisplayWithContextAndGraph for LazyStatement {
     fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context, graph: &Graph) -> fmt::Result {
         match self {
-            Statement::AddGraphNodeAttribute(stmt) => stmt.fmt(f, ctx, graph),
-            Statement::CreateEdge(stmt) => stmt.fmt(f, ctx, graph),
-            Statement::AddEdgeAttribute(stmt) => stmt.fmt(f, ctx, graph),
-            Statement::Print(stmt) => stmt.fmt(f, ctx, graph),
+            Self::AddGraphNodeAttribute(stmt) => stmt.fmt(f, ctx, graph),
+            Self::CreateEdge(stmt) => stmt.fmt(f, ctx, graph),
+            Self::AddEdgeAttribute(stmt) => stmt.fmt(f, ctx, graph),
+            Self::Print(stmt) => stmt.fmt(f, ctx, graph),
         }
     }
 }
 
 /// Lazy statement to add graph node attributes
 #[derive(Debug)]
-pub struct AddGraphNodeAttribute {
-    node: Value,
-    attributes: Vec<Attribute>,
+pub(super) struct LazyAddGraphNodeAttribute {
+    node: LazyValue,
+    attributes: Vec<LazyAttribute>,
     debug_info: DebugInfo,
 }
 
-impl AddGraphNodeAttribute {
-    pub fn new(
-        node: Value,
-        attributes: Vec<Attribute>,
+impl LazyAddGraphNodeAttribute {
+    pub(super) fn new(
+        node: LazyValue,
+        attributes: Vec<LazyAttribute>,
         debug_info: DebugInfo,
-    ) -> AddGraphNodeAttribute {
-        AddGraphNodeAttribute {
+    ) -> Self {
+        Self {
             node,
             attributes,
             debug_info,
@@ -130,7 +130,7 @@ impl AddGraphNodeAttribute {
     }
 }
 
-impl DisplayWithContextAndGraph for AddGraphNodeAttribute {
+impl DisplayWithContextAndGraph for LazyAddGraphNodeAttribute {
     fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context, graph: &Graph) -> fmt::Result {
         write!(f, "attr ({})", self.node.display_with(ctx, graph))?;
         for attr in &self.attributes {
@@ -142,15 +142,15 @@ impl DisplayWithContextAndGraph for AddGraphNodeAttribute {
 
 /// Lazy statement to create a graph edge
 #[derive(Debug)]
-pub struct CreateEdge {
-    source: Value,
-    sink: Value,
+pub(super) struct LazyCreateEdge {
+    source: LazyValue,
+    sink: LazyValue,
     debug_info: DebugInfo,
 }
 
-impl CreateEdge {
-    pub fn new(source: Value, sink: Value, debug_info: DebugInfo) -> CreateEdge {
-        CreateEdge {
+impl LazyCreateEdge {
+    pub(super) fn new(source: LazyValue, sink: LazyValue, debug_info: DebugInfo) -> Self {
+        Self {
             source,
             sink,
             debug_info,
@@ -176,7 +176,7 @@ impl CreateEdge {
     }
 }
 
-impl DisplayWithContextAndGraph for CreateEdge {
+impl DisplayWithContextAndGraph for LazyCreateEdge {
     fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context, graph: &Graph) -> fmt::Result {
         write!(
             f,
@@ -190,21 +190,21 @@ impl DisplayWithContextAndGraph for CreateEdge {
 
 /// Lazy statement to add graph edge attributes
 #[derive(Debug)]
-pub struct AddEdgeAttribute {
-    source: Value,
-    sink: Value,
-    attributes: Vec<Attribute>,
+pub(super) struct LazyAddEdgeAttribute {
+    source: LazyValue,
+    sink: LazyValue,
+    attributes: Vec<LazyAttribute>,
     debug_info: DebugInfo,
 }
 
-impl AddEdgeAttribute {
-    pub fn new(
-        source: Value,
-        sink: Value,
-        attributes: Vec<Attribute>,
+impl LazyAddEdgeAttribute {
+    pub(super) fn new(
+        source: LazyValue,
+        sink: LazyValue,
+        attributes: Vec<LazyAttribute>,
         debug_info: DebugInfo,
-    ) -> AddEdgeAttribute {
-        AddEdgeAttribute {
+    ) -> Self {
+        Self {
             source,
             sink,
             attributes,
@@ -245,7 +245,7 @@ impl AddEdgeAttribute {
     }
 }
 
-impl DisplayWithContextAndGraph for AddEdgeAttribute {
+impl DisplayWithContextAndGraph for LazyAddEdgeAttribute {
     fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context, graph: &Graph) -> fmt::Result {
         write!(
             f,
@@ -262,20 +262,20 @@ impl DisplayWithContextAndGraph for AddEdgeAttribute {
 
 /// Lazy statement to print values
 #[derive(Debug)]
-pub struct Print {
-    arguments: Vec<PrintArgument>,
+pub(super) struct LazyPrint {
+    arguments: Vec<LazyPrintArgument>,
     debug_info: DebugInfo,
 }
 
 #[derive(Debug)]
-pub enum PrintArgument {
+pub(super) enum LazyPrintArgument {
     Text(String),
-    Value(Value),
+    Value(LazyValue),
 }
 
-impl Print {
-    pub fn new(arguments: Vec<PrintArgument>, debug_info: DebugInfo) -> Print {
-        Print {
+impl LazyPrint {
+    pub(super) fn new(arguments: Vec<LazyPrintArgument>, debug_info: DebugInfo) -> Self {
+        Self {
             arguments,
             debug_info,
         }
@@ -284,8 +284,8 @@ impl Print {
     pub(super) fn evaluate(&self, exec: &mut EvaluationContext) -> Result<(), ExecutionError> {
         for argument in &self.arguments {
             match argument {
-                PrintArgument::Text(string) => eprint!("{}", string),
-                PrintArgument::Value(value) => {
+                LazyPrintArgument::Text(string) => eprint!("{}", string),
+                LazyPrintArgument::Value(value) => {
                     let value = value.evaluate(exec)?;
                     eprint!("{}", value.display_with(exec.graph));
                 }
@@ -296,7 +296,7 @@ impl Print {
     }
 }
 
-impl DisplayWithContextAndGraph for Print {
+impl DisplayWithContextAndGraph for LazyPrint {
     fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context, graph: &Graph) -> fmt::Result {
         write!(f, "print")?;
         let mut first = true;
@@ -307,8 +307,8 @@ impl DisplayWithContextAndGraph for Print {
                 write!(f, ", ")?;
             }
             match argument {
-                PrintArgument::Text(string) => write!(f, "\"{}\"", string)?,
-                PrintArgument::Value(value) => write!(f, "{}", value.display_with(ctx, graph))?,
+                LazyPrintArgument::Text(string) => write!(f, "\"{}\"", string)?,
+                LazyPrintArgument::Value(value) => write!(f, "{}", value.display_with(ctx, graph))?,
             };
         }
         write!(f, " at {}", self.debug_info)
@@ -317,18 +317,18 @@ impl DisplayWithContextAndGraph for Print {
 
 /// Lazy attribute
 #[derive(Debug)]
-pub struct Attribute {
+pub(super) struct LazyAttribute {
     name: Identifier,
-    value: Value,
+    value: LazyValue,
 }
 
-impl Attribute {
-    pub fn new(name: Identifier, value: Value) -> Attribute {
-        Attribute { name, value }
+impl LazyAttribute {
+    pub(super) fn new(name: Identifier, value: LazyValue) -> Self {
+        Self { name, value }
     }
 }
 
-impl DisplayWithContextAndGraph for Attribute {
+impl DisplayWithContextAndGraph for LazyAttribute {
     fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context, graph: &Graph) -> fmt::Result {
         write!(
             f,

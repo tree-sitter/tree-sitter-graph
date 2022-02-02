@@ -15,18 +15,18 @@ use crate::DisplayWithContext;
 use crate::Identifier;
 
 use super::store::DebugInfo;
-use super::store::Store;
-use super::values::Value;
+use super::store::LazyStore;
+use super::values::LazyValue;
 use super::DisplayWithContextAndGraph;
 
 /// An environment of named lazy variables
-pub trait Variables {
+pub(super) trait Variables {
     /// Adds a new variable to an environment, returning an error if the variable already
     /// exists.
     fn add(
         &mut self,
         name: Identifier,
-        value: Value,
+        value: LazyValue,
         mutable: bool,
         debug_info: DebugInfo,
         exec: &mut VariableContext,
@@ -36,42 +36,42 @@ pub trait Variables {
     fn set(
         &mut self,
         name: Identifier,
-        value: Value,
+        value: LazyValue,
         debug_info: DebugInfo,
         exec: &mut VariableContext,
     ) -> Result<(), ()>;
 
     /// Returns the value of a variable, if it exists in this environment.
-    fn get(&self, name: Identifier, exec: &VariableContext) -> Option<&Value>;
+    fn get(&self, name: Identifier, exec: &VariableContext) -> Option<&LazyValue>;
 }
 
-pub struct VariableContext<'a, 'tree> {
+pub(super) struct VariableContext<'a, 'tree> {
     pub ctx: &'a Context,
     pub graph: &'a Graph<'tree>,
-    pub store: &'a mut Store,
+    pub store: &'a mut LazyStore,
 }
 
 /// A map-like implementation of an environment of named lazy variables
 #[derive(Default)]
-pub struct VariableMap<'a> {
+pub(super) struct VariableMap<'a> {
     parent: Option<&'a mut dyn Variables>,
     values: Vec<NamedVariable>,
 }
 
 struct NamedVariable {
     name: Identifier,
-    value: Value,
+    value: LazyValue,
     mutable: bool,
 }
 
 impl<'a> VariableMap<'a> {
     /// Creates a new, empty environment of variables.
-    pub fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self::default()
     }
 
     /// Creates a new, empty environment of variables.
-    pub fn new_child(parent: &'a mut dyn Variables) -> Self {
+    pub(super) fn new_child(parent: &'a mut dyn Variables) -> Self {
         Self {
             parent: Some(parent),
             values: Vec::default(),
@@ -79,7 +79,7 @@ impl<'a> VariableMap<'a> {
     }
 
     /// Clears this list of variables.
-    pub fn clear(&mut self) {
+    pub(super) fn clear(&mut self) {
         self.values.clear();
     }
 }
@@ -88,7 +88,7 @@ impl Variables for VariableMap<'_> {
     fn add(
         &mut self,
         name: Identifier,
-        value: Value,
+        value: LazyValue,
         mutable: bool,
         debug_info: DebugInfo,
         exec: &mut VariableContext,
@@ -124,7 +124,7 @@ impl Variables for VariableMap<'_> {
     fn set(
         &mut self,
         name: Identifier,
-        value: Value,
+        value: LazyValue,
         debug_info: DebugInfo,
         exec: &mut VariableContext,
     ) -> Result<(), ()> {
@@ -152,7 +152,7 @@ impl Variables for VariableMap<'_> {
         }
     }
 
-    fn get(&self, name: Identifier, exec: &VariableContext) -> Option<&Value> {
+    fn get(&self, name: Identifier, exec: &VariableContext) -> Option<&LazyValue> {
         debug!("get {}", name.display_with(exec.ctx));
         match self.values.binary_search_by_key(&name, |v| v.name) {
             Ok(index) => Some(&self.values[index].value),

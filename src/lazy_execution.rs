@@ -76,8 +76,8 @@ impl ast::File {
         }
         let mut locals = VariableMap::new();
         let mut cursor = QueryCursor::new();
-        let mut store = Store::new();
-        let mut scoped_store = ScopedVariables::new();
+        let mut store = LazyStore::new();
+        let mut scoped_store = LazyScopedVariables::new();
         let mut lazy_graph = Vec::new();
         for stanza in &self.stanzas {
             stanza.execute_lazy(
@@ -121,9 +121,9 @@ struct ExecutionContext<'a, 'g, 'tree> {
     locals: &'a mut dyn Variables,
     current_regex_captures: &'a Vec<String>,
     mat: &'a QueryMatch<'a, 'tree>,
-    store: &'a mut Store,
-    scoped_store: &'a mut ScopedVariables,
-    lazy_graph: &'a mut Vec<Statement>,
+    store: &'a mut LazyStore,
+    scoped_store: &'a mut LazyScopedVariables,
+    lazy_graph: &'a mut Vec<LazyStatement>,
 }
 
 /// Context for evaluation, which evalautes the lazy graph to build the actual graph
@@ -132,8 +132,8 @@ pub(self) struct EvaluationContext<'a, 'tree> {
     pub source: &'tree str,
     pub graph: &'a mut Graph<'tree>,
     pub functions: &'a mut Functions,
-    pub store: &'a Store,
-    pub scoped_store: &'a ScopedVariables,
+    pub store: &'a LazyStore,
+    pub scoped_store: &'a LazyScopedVariables,
     pub function_parameters: &'a mut Vec<graph::Value>, // re-usable buffer to reduce memory allocations
     pub prev_element_debug_info: &'a mut HashMap<GraphElementKey, DebugInfo>,
 }
@@ -155,9 +155,9 @@ impl ast::Stanza {
         globals: &Globals<'g>,
         locals: &mut VariableMap<'l>,
         cursor: &mut QueryCursor,
-        store: &mut Store,
-        scoped_store: &mut ScopedVariables,
-        lazy_graph: &mut Vec<Statement>,
+        store: &mut LazyStore,
+        scoped_store: &mut LazyScopedVariables,
+        lazy_graph: &mut Vec<LazyStatement>,
     ) -> Result<(), ExecutionError> {
         let full_match_index = full_match_capture_index(&self.query);
         let current_regex_captures = vec![];
@@ -246,7 +246,7 @@ impl ast::AddGraphNodeAttribute {
         for attribute in &self.attributes {
             attributes.push(attribute.evaluate_lazy(exec)?);
         }
-        let stmt = AddGraphNodeAttribute::new(node, attributes, self.location.into());
+        let stmt = LazyAddGraphNodeAttribute::new(node, attributes, self.location.into());
         exec.lazy_graph.push(stmt.into());
         Ok(())
     }
@@ -256,7 +256,7 @@ impl ast::CreateEdge {
     fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
         let source = self.source.evaluate_lazy(exec)?;
         let sink = self.sink.evaluate_lazy(exec)?;
-        let stmt = CreateEdge::new(source, sink, self.location.into());
+        let stmt = LazyCreateEdge::new(source, sink, self.location.into());
         exec.lazy_graph.push(stmt.into());
         Ok(())
     }
@@ -270,7 +270,7 @@ impl ast::AddEdgeAttribute {
         for attribute in &self.attributes {
             attributes.push(attribute.evaluate_lazy(exec)?);
         }
-        let stmt = AddEdgeAttribute::new(source, sink, attributes, self.location.into());
+        let stmt = LazyAddEdgeAttribute::new(source, sink, attributes, self.location.into());
         exec.lazy_graph.push(stmt.into());
         Ok(())
     }
@@ -363,13 +363,13 @@ impl ast::Print {
         let mut arguments = Vec::new();
         for value in &self.values {
             let argument = if let ast::Expression::StringConstant(expr) = value {
-                PrintArgument::Text(expr.value.clone())
+                LazyPrintArgument::Text(expr.value.clone())
             } else {
-                PrintArgument::Value(value.evaluate_lazy(exec)?)
+                LazyPrintArgument::Value(value.evaluate_lazy(exec)?)
             };
             arguments.push(argument);
         }
-        let stmt = Print::new(arguments, self.location.into());
+        let stmt = LazyPrint::new(arguments, self.location.into());
         exec.lazy_graph.push(stmt.into());
         Ok(())
     }
@@ -452,7 +452,7 @@ impl ast::ForIn {
 }
 
 impl ast::Expression {
-    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<LazyValue, ExecutionError> {
         match self {
             Self::FalseLiteral => Ok(false.into()),
             Self::NullLiteral => Ok(graph::Value::Null.into()),
@@ -470,7 +470,7 @@ impl ast::Expression {
 }
 
 impl ast::IntegerConstant {
-    fn evaluate_lazy(&self, _exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+    fn evaluate_lazy(&self, _exec: &mut ExecutionContext) -> Result<LazyValue, ExecutionError> {
         Ok(self.value.into())
     }
 }
@@ -483,13 +483,13 @@ impl ast::StringConstant {
         Ok(self.value.clone().into())
     }
 
-    fn evaluate_lazy(&self, _exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+    fn evaluate_lazy(&self, _exec: &mut ExecutionContext) -> Result<LazyValue, ExecutionError> {
         Ok(self.value.clone().into())
     }
 }
 
 impl ast::ListComprehension {
-    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<LazyValue, ExecutionError> {
         let mut elements = Vec::new();
         for element in &self.elements {
             elements.push(element.evaluate_lazy(exec)?);
@@ -499,12 +499,12 @@ impl ast::ListComprehension {
 }
 
 impl ast::SetComprehension {
-    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<LazyValue, ExecutionError> {
         let mut elements = Vec::new();
         for element in &self.elements {
             elements.push(element.evaluate_lazy(exec)?);
         }
-        Ok(Set::new(elements).into())
+        Ok(LazySet::new(elements).into())
     }
 }
 
@@ -518,18 +518,18 @@ impl ast::Capture {
         ))
     }
 
-    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<LazyValue, ExecutionError> {
         Ok(query_capture_value(self.index, self.quantifier, exec.mat, exec.graph).into())
     }
 }
 
 impl ast::Call {
-    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<LazyValue, ExecutionError> {
         let mut parameters = Vec::new();
         for parameter in &self.parameters {
             parameters.push(parameter.evaluate_lazy(exec)?);
         }
-        Ok(Call::new(self.function, parameters).into())
+        Ok(LazyCall::new(self.function, parameters).into())
     }
 }
 
@@ -539,14 +539,14 @@ impl ast::RegexCapture {
         Ok(value.into())
     }
 
-    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<LazyValue, ExecutionError> {
         let value = exec.current_regex_captures[self.match_index].clone();
         Ok(value.into())
     }
 }
 
 impl ast::Variable {
-    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<LazyValue, ExecutionError> {
         match self {
             Self::Scoped(variable) => variable.evaluate_lazy(exec),
             Self::Unscoped(variable) => variable.evaluate_lazy(exec),
@@ -558,7 +558,7 @@ impl ast::Variable {
     fn add_lazy(
         &self,
         exec: &mut ExecutionContext,
-        value: Value,
+        value: LazyValue,
         mutable: bool,
     ) -> Result<(), ExecutionError> {
         match self {
@@ -567,7 +567,11 @@ impl ast::Variable {
         }
     }
 
-    fn set_lazy(&self, exec: &mut ExecutionContext, value: Value) -> Result<(), ExecutionError> {
+    fn set_lazy(
+        &self,
+        exec: &mut ExecutionContext,
+        value: LazyValue,
+    ) -> Result<(), ExecutionError> {
         match self {
             Self::Scoped(variable) => variable.set_lazy(exec, value),
             Self::Unscoped(variable) => variable.set_lazy(exec, value),
@@ -576,16 +580,16 @@ impl ast::Variable {
 }
 
 impl ast::ScopedVariable {
-    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<LazyValue, ExecutionError> {
         let scope = self.scope.evaluate_lazy(exec)?;
-        let value = ScopedVariable::new(scope, self.name);
+        let value = LazyScopedVariable::new(scope, self.name);
         Ok(value.into())
     }
 
     fn add_lazy(
         &self,
         exec: &mut ExecutionContext,
-        value: Value,
+        value: LazyValue,
         mutable: bool,
     ) -> Result<(), ExecutionError> {
         if mutable {
@@ -607,7 +611,11 @@ impl ast::ScopedVariable {
         )
     }
 
-    fn set_lazy(&self, exec: &mut ExecutionContext, _value: Value) -> Result<(), ExecutionError> {
+    fn set_lazy(
+        &self,
+        exec: &mut ExecutionContext,
+        _value: LazyValue,
+    ) -> Result<(), ExecutionError> {
         Err(ExecutionError::CannotAssignScopedVariable(format!(
             "{}",
             self.display_with(exec.ctx)
@@ -627,7 +635,7 @@ impl ast::UnscopedVariable {
         }
     }
 
-    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<LazyValue, ExecutionError> {
         if let Some(value) = exec.globals.get(self.name) {
             Some(value.clone().into())
         } else {
@@ -652,7 +660,7 @@ impl ast::UnscopedVariable {
     fn add_lazy(
         &self,
         exec: &mut ExecutionContext,
-        value: Value,
+        value: LazyValue,
         mutable: bool,
     ) -> Result<(), ExecutionError> {
         if exec.globals.get(self.name).is_some() {
@@ -678,7 +686,11 @@ impl ast::UnscopedVariable {
             })
     }
 
-    fn set_lazy(&self, exec: &mut ExecutionContext, value: Value) -> Result<(), ExecutionError> {
+    fn set_lazy(
+        &self,
+        exec: &mut ExecutionContext,
+        value: LazyValue,
+    ) -> Result<(), ExecutionError> {
         if exec.globals.get(self.name).is_some() {
             return Err(ExecutionError::CannotAssignImmutableVariable(format!(
                 " global {}",
@@ -721,9 +733,9 @@ impl ast::UnscopedVariable {
 }
 
 impl ast::Attribute {
-    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<Attribute, ExecutionError> {
+    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<LazyAttribute, ExecutionError> {
         let value = self.value.evaluate_lazy(exec)?;
-        let attribute = Attribute::new(self.name, value);
+        let attribute = LazyAttribute::new(self.name, value);
         Ok(attribute)
     }
 }

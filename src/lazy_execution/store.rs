@@ -33,13 +33,13 @@ use super::EvaluationContext;
 
 /// Variable that points to a thunk in the store
 #[derive(Clone, Debug)]
-pub struct Variable {
+pub(super) struct LazyVariable {
     store_location: usize,
 }
 
-impl Variable {
-    fn new(store_location: usize) -> Variable {
-        Variable { store_location }
+impl LazyVariable {
+    fn new(store_location: usize) -> Self {
+        Self { store_location }
     }
 
     pub(super) fn evaluate(
@@ -50,7 +50,7 @@ impl Variable {
     }
 }
 
-impl DisplayWithContextAndGraph for Variable {
+impl DisplayWithContextAndGraph for LazyVariable {
     fn fmt(&self, f: &mut fmt::Formatter, _ctx: &Context, _graph: &Graph) -> fmt::Result {
         write!(f, "(load {})", self.store_location)
     }
@@ -58,26 +58,26 @@ impl DisplayWithContextAndGraph for Variable {
 
 /// Store holding thunks of lazy values
 #[derive(Default)]
-pub struct Store {
+pub(super) struct LazyStore {
     elements: Vec<Thunk>,
 }
 
-impl Store {
-    pub fn new() -> Store {
-        Store {
+impl LazyStore {
+    pub(super) fn new() -> Self {
+        Self {
             elements: Vec::new(),
         }
     }
 
-    pub fn add(
+    pub(super) fn add(
         &mut self,
-        value: Value,
+        value: LazyValue,
         debug_info: DebugInfo,
         ctx: &Context,
         graph: &Graph,
-    ) -> Variable {
+    ) -> LazyVariable {
         let store_location = self.elements.len();
-        let variable = Variable::new(store_location);
+        let variable = LazyVariable::new(store_location);
         trace!(
             "store {} = {}",
             store_location,
@@ -89,7 +89,7 @@ impl Store {
 
     pub(super) fn evaluate(
         &self,
-        variable: &Variable,
+        variable: &LazyVariable,
         exec: &mut EvaluationContext,
     ) -> Result<graph::Value, ExecutionError> {
         let variable = &self.elements[variable.store_location];
@@ -106,22 +106,22 @@ impl Store {
 }
 
 /// Data structure to hold scoped variables with lazy keys and values
-pub struct ScopedVariables {
+pub(super) struct LazyScopedVariables {
     variables: HashMap<Identifier, Cell<ScopedValues>>,
 }
 
-impl ScopedVariables {
-    pub fn new() -> ScopedVariables {
-        ScopedVariables {
+impl LazyScopedVariables {
+    pub(super) fn new() -> Self {
+        LazyScopedVariables {
             variables: HashMap::new(),
         }
     }
 
-    pub fn add(
+    pub(super) fn add(
         &mut self,
-        scope: Value,
+        scope: LazyValue,
         name: Identifier,
-        value: Value,
+        value: LazyValue,
         debug_info: DebugInfo,
         ctx: &Context,
     ) -> Result<(), ExecutionError> {
@@ -153,7 +153,7 @@ impl ScopedVariables {
         scope: SyntaxNodeRef,
         name: Identifier,
         exec: &mut EvaluationContext,
-    ) -> Result<Value, ExecutionError> {
+    ) -> Result<LazyValue, ExecutionError> {
         let values = match self.variables.get(&name) {
             Some(v) => v,
             None => {
@@ -219,9 +219,9 @@ impl ScopedVariables {
 }
 
 enum ScopedValues {
-    Unforced(Vec<(Value, Value, DebugInfo)>),
+    Unforced(Vec<(LazyValue, LazyValue, DebugInfo)>),
     Forcing,
-    Forced(HashMap<SyntaxNodeRef, Value>),
+    Forced(HashMap<SyntaxNodeRef, LazyValue>),
 }
 
 impl ScopedValues {
@@ -237,7 +237,7 @@ struct Thunk {
 }
 
 enum ThunkState {
-    Unforced(Value),
+    Unforced(LazyValue),
     Forcing,
     Forced(graph::Value),
 }
@@ -253,7 +253,7 @@ impl DisplayWithContextAndGraph for ThunkState {
 }
 
 impl Thunk {
-    fn new(value: Value, debug_info: DebugInfo) -> Thunk {
+    fn new(value: LazyValue, debug_info: DebugInfo) -> Thunk {
         Thunk {
             state: Rc::new(RefCell::new(ThunkState::Unforced(value))),
             debug_info,
@@ -282,7 +282,7 @@ impl Thunk {
 
 /// Debug info for tracking origins of values
 #[derive(Debug, Clone, Copy)]
-pub struct DebugInfo(Location);
+pub(super) struct DebugInfo(Location);
 
 impl From<Location> for DebugInfo {
     fn from(value: Location) -> Self {
