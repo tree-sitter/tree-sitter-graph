@@ -28,8 +28,8 @@ fn execute(python_source: &str, dsl_source: &str) -> Result<String, ExecutionErr
     parser.set_language(tree_sitter_python::language()).unwrap();
     let tree = parser.parse(python_source, None).unwrap();
     let mut ctx = Context::new();
-    let mut file = File::new(tree_sitter_python::language());
-    file.parse(&mut ctx, dsl_source).expect("Cannot parse file");
+    let file = File::from_source(tree_sitter_python::language(), &mut ctx, dsl_source)
+        .expect("Cannot parse file");
     let mut functions = Functions::stdlib(&mut ctx);
     let mut globals = Variables::new();
     globals

@@ -23,7 +23,23 @@ use crate::Identifier;
 pub const FULL_MATCH: &str = "__tsg__full_match";
 
 impl ast::File {
+    /// Parses a graph DSL file, returning a new `File` instance.
+    pub fn from_source(
+        language: Language,
+        ctx: &mut Context,
+        source: &str,
+    ) -> Result<Self, ParseError> {
+        let mut file = ast::File::new(language);
+        #[allow(deprecated)]
+        file.parse(ctx, source)?;
+        file.check(ctx)?;
+        Ok(file)
+    }
+
     /// Parses a graph DSL file, adding its content to an existing `File` instance.
+    #[deprecated(
+        note = "Parsing multiple times into the same `File` instance is unsound. Use `File::from_source` instead."
+    )]
     pub fn parse(&mut self, ctx: &mut Context, content: &str) -> Result<(), ParseError> {
         Parser::new(ctx, content).parse_into_file(self)
     }
@@ -62,6 +78,8 @@ pub enum ParseError {
     UnexpectedKeyword(String, Location),
     #[error("Unexpected literal '#{0}' at {1}")]
     UnexpectedLiteral(String, Location),
+    #[error(transparent)]
+    Check(#[from] crate::checker::CheckError),
 }
 
 /// The location of a graph DSL entity within its file

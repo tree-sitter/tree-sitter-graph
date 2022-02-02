@@ -29,6 +29,7 @@
 pub mod reference;
 
 pub mod ast;
+mod checker;
 mod execution;
 pub mod functions;
 pub mod graph;
