@@ -6,11 +6,9 @@
 // ------------------------------------------------------------------------------------------------
 
 use anyhow::Context as ErrorContext;
-use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use thiserror::Error;
 use tree_sitter::CaptureQuantifier;
-use tree_sitter::Query;
 use tree_sitter::QueryCursor;
 use tree_sitter::QueryMatch;
 use tree_sitter::Tree;
@@ -179,7 +177,7 @@ impl ExecutionError {
     }
 }
 
-struct ExecutionContext<'a, 'g, 's, 'q, 'tree> {
+struct ExecutionContext<'a, 'g, 's, 'tree> {
     ctx: &'a Context,
     source: &'tree str,
     graph: &'a mut Graph<'tree>,
@@ -189,7 +187,6 @@ struct ExecutionContext<'a, 'g, 's, 'q, 'tree> {
     scoped: &'a mut ScopedVariables<'s>,
     current_regex_captures: &'a Vec<String>,
     function_parameters: &'a mut Vec<Value>,
-    capture_indices: &'a mut CaptureIndices<'q>,
     mat: &'a QueryMatch<'a, 'tree>,
 }
 
@@ -224,7 +221,6 @@ impl Stanza {
         function_parameters: &mut Vec<Value>,
         cursor: &mut QueryCursor,
     ) -> Result<(), ExecutionError> {
-        let mut capture_indices = CaptureIndices::new(&self.query);
         let matches = cursor.matches(&self.query, tree.root_node(), source.as_bytes());
         for mat in matches {
             locals.clear();
@@ -238,7 +234,6 @@ impl Stanza {
                 scoped,
                 current_regex_captures,
                 function_parameters,
-                capture_indices: &mut capture_indices,
                 mat: &mat,
             };
             for statement in &self.statements {
@@ -415,7 +410,6 @@ impl Scan {
                 scoped: exec.scoped,
                 current_regex_captures: &current_regex_captures,
                 function_parameters: exec.function_parameters,
-                capture_indices: exec.capture_indices,
                 mat: exec.mat,
             };
 
@@ -483,7 +477,6 @@ impl If {
                     scoped: exec.scoped,
                     current_regex_captures: exec.current_regex_captures,
                     function_parameters: exec.function_parameters,
-                    capture_indices: exec.capture_indices,
                     mat: exec.mat,
                 };
                 for stmt in &arm.statements {
@@ -531,7 +524,6 @@ impl ForIn {
                 scoped: exec.scoped,
                 current_regex_captures: exec.current_regex_captures,
                 function_parameters: exec.function_parameters,
-                capture_indices: exec.capture_indices,
                 mat: exec.mat,
             };
             self.variable.add(&mut loop_exec, value, false)?;
@@ -612,10 +604,8 @@ impl SetComprehension {
 
 impl Capture {
     fn evaluate(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
-        let name = exec.ctx.resolve(self.name);
-        let index = exec.capture_indices.index_for_name(name);
         Ok(query_capture_value(
-            index,
+            self.stanza_capture_index,
             self.quantifier,
             exec.mat,
             exec.graph,
@@ -801,36 +791,6 @@ impl UnscopedVariable {
                 ExecutionError::UndefinedVariable(format!("{}", self.display_with(exec.ctx)))
             }
         })
-    }
-}
-
-/// Get and cache the index for a named capture
-pub(crate) struct CaptureIndices<'a> {
-    query: &'a Query,
-    indices: HashMap<String, usize>,
-}
-
-impl<'a> CaptureIndices<'a> {
-    pub(crate) fn new(query: &'a Query) -> Self {
-        CaptureIndices {
-            query,
-            indices: HashMap::new(),
-        }
-    }
-
-    pub(crate) fn index_for_name(&mut self, name: &str) -> usize {
-        match self.indices.entry(name.into()) {
-            Entry::Occupied(o) => *o.get(),
-            Entry::Vacant(v) => {
-                let index = self
-                    .query
-                    .capture_names()
-                    .iter()
-                    .position(|n| n == name)
-                    .unwrap();
-                *v.insert(index)
-            }
-        }
     }
 }
 

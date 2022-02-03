@@ -61,6 +61,9 @@ fn can_parse_blocks() {
                         Capture {
                             quantifier: One,
                             name: cap2,
+                            file_capture_index: 1,
+                            stanza_capture_index: 1,
+                            location: Location { row: 5, column: 15 }
                         }
                         .into()
                     ),
@@ -77,6 +80,9 @@ fn can_parse_blocks() {
                         Capture {
                             quantifier: One,
                             name: cap2,
+                            file_capture_index: 1,
+                            stanza_capture_index: 1,
+                            location: Location { row: 6, column: 15 }
                         }
                         .into()
                     ),
@@ -98,6 +104,9 @@ fn can_parse_blocks() {
                         Capture {
                             quantifier: One,
                             name: cap2,
+                            file_capture_index: 1,
+                            stanza_capture_index: 1,
+                            location: Location { row: 7, column: 16 }
                         }
                         .into()
                     ),
@@ -123,6 +132,9 @@ fn can_parse_blocks() {
                         Capture {
                             quantifier: One,
                             name: cap2,
+                            file_capture_index: 1,
+                            stanza_capture_index: 1,
+                            location: Location { row: 8, column: 16 }
                         }
                         .into()
                     ),
@@ -149,6 +161,9 @@ fn can_parse_blocks() {
                         Capture {
                             quantifier: One,
                             name: cap2,
+                            file_capture_index: 1,
+                            stanza_capture_index: 1,
+                            location: Location { row: 9, column: 14 }
                         }
                         .into()
                     ),
@@ -170,6 +185,12 @@ fn can_parse_blocks() {
                         Capture {
                             quantifier: One,
                             name: cap2,
+                            file_capture_index: 1,
+                            stanza_capture_index: 1,
+                            location: Location {
+                                row: 10,
+                                column: 14
+                            }
                         }
                         .into()
                     ),
@@ -526,6 +547,9 @@ fn can_parse_star_capture() {
             values: vec![Capture {
                 quantifier: ZeroOrMore,
                 name: stmts,
+                file_capture_index: 0,
+                stanza_capture_index: 0,
+                location: Location { row: 3, column: 16 },
             }
             .into()],
             location: Location { row: 3, column: 10 },
@@ -562,6 +586,9 @@ fn can_parse_star_multiple_capture() {
                 values: vec![Capture {
                     quantifier: ZeroOrMore,
                     name: stmt,
+                    file_capture_index: 0,
+                    stanza_capture_index: 0,
+                    location: Location { row: 3, column: 16 },
                 }
                 .into()],
                 location: Location { row: 3, column: 10 },
@@ -571,6 +598,9 @@ fn can_parse_star_multiple_capture() {
                 values: vec![Capture {
                     quantifier: ZeroOrMore,
                     name: stmts,
+                    file_capture_index: 1,
+                    stanza_capture_index: 1,
+                    location: Location { row: 4, column: 16 },
                 }
                 .into()],
                 location: Location { row: 4, column: 10 },
@@ -605,6 +635,9 @@ fn can_parse_plus_capture() {
             values: vec![Capture {
                 quantifier: OneOrMore,
                 name: stmts,
+                file_capture_index: 0,
+                stanza_capture_index: 0,
+                location: Location { row: 3, column: 16 },
             }
             .into()],
             location: Location { row: 3, column: 10 },
@@ -638,6 +671,9 @@ fn can_parse_optional_capture() {
             values: vec![Capture {
                 quantifier: ZeroOrOne,
                 name: stmt,
+                file_capture_index: 0,
+                stanza_capture_index: 0,
+                location: Location { row: 3, column: 16 },
             }
             .into()],
             location: Location { row: 3, column: 10 },
@@ -671,6 +707,9 @@ fn can_parse_parent_optional_capture() {
             values: vec![Capture {
                 quantifier: ZeroOrOne,
                 name: stmt,
+                file_capture_index: 0,
+                stanza_capture_index: 0,
+                location: Location { row: 3, column: 16 },
             }
             .into()],
             location: Location { row: 3, column: 10 },
@@ -704,6 +743,9 @@ fn can_parse_alternative_capture() {
             values: vec![Capture {
                 quantifier: ZeroOrOne,
                 name: stmt,
+                file_capture_index: 0,
+                stanza_capture_index: 0,
+                location: Location { row: 3, column: 16 },
             }
             .into()],
             location: Location { row: 3, column: 10 },
@@ -737,6 +779,9 @@ fn can_parse_nested_plus_and_optional_capture() {
             values: vec![Capture {
                 quantifier: ZeroOrMore,
                 name: stmt,
+                file_capture_index: 0,
+                stanza_capture_index: 0,
+                location: Location { row: 3, column: 16 },
             }
             .into()],
             location: Location { row: 3, column: 10 },
@@ -773,6 +818,9 @@ fn can_parse_if() {
                 conditions: vec![Condition::Some(vec![Capture {
                     quantifier: ZeroOrOne,
                     name: x,
+                    file_capture_index: 0,
+                    stanza_capture_index: 0,
+                    location: Location { row: 3, column: 18 },
                 }])],
                 statements: vec![Print {
                     values: vec![StringConstant {
@@ -821,6 +869,9 @@ fn can_parse_if_elif() {
                     conditions: vec![Condition::None(vec![Capture {
                         quantifier: ZeroOrOne,
                         name: x,
+                        file_capture_index: 0,
+                        stanza_capture_index: 0,
+                        location: Location { row: 3, column: 18 },
                     }])],
                     statements: vec![Print {
                         values: vec![StringConstant {
@@ -836,6 +887,9 @@ fn can_parse_if_elif() {
                     conditions: vec![Condition::Some(vec![Capture {
                         quantifier: ZeroOrOne,
                         name: x,
+                        file_capture_index: 0,
+                        stanza_capture_index: 0,
+                        location: Location { row: 5, column: 22 },
                     }])],
                     statements: vec![Print {
                         values: vec![StringConstant {
@@ -885,6 +939,9 @@ fn can_parse_if_else() {
                     conditions: vec![Condition::None(vec![Capture {
                         quantifier: ZeroOrOne,
                         name: x,
+                        file_capture_index: 0,
+                        stanza_capture_index: 0,
+                        location: Location { row: 3, column: 18 },
                     }])],
                     statements: vec![Print {
                         values: vec![StringConstant {
@@ -963,6 +1020,9 @@ fn can_parse_for_in() {
             capture: Capture {
                 quantifier: ZeroOrMore,
                 name: xs,
+                file_capture_index: 0,
+                stanza_capture_index: 0,
+                location: Location { row: 3, column: 19 },
             }
             .into(),
             statements: vec![Print {

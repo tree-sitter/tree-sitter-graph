@@ -6,16 +6,30 @@
 // ------------------------------------------------------------------------------------------------
 
 use thiserror::Error;
+use tree_sitter::CaptureQuantifier;
+use tree_sitter::CaptureQuantifier::One;
+use tree_sitter::CaptureQuantifier::OneOrMore;
+use tree_sitter::CaptureQuantifier::ZeroOrMore;
+use tree_sitter::CaptureQuantifier::ZeroOrOne;
+use tree_sitter::Query;
 
 use crate::ast;
+use crate::parser::FULL_MATCH;
 use crate::variables::VariableError;
 use crate::variables::VariableMap;
 use crate::variables::Variables;
 use crate::Context;
 use crate::DisplayWithContext as _;
+use crate::Location;
 
 #[derive(Debug, Error)]
 pub enum CheckError {
+    #[error("Expected list value at {0}")]
+    ExpectedListValue(Location),
+    #[error("Expected optional value at {0}")]
+    ExpectedOptionalValue(Location),
+    #[error("Undefined syntax capture @{0} at {1}")]
+    UndefinedSyntaxCapture(String, Location),
     #[error("{0}: {1}")]
     Variable(VariableError, String),
 }
@@ -24,6 +38,9 @@ pub enum CheckError {
 struct CheckContext<'a> {
     ctx: &'a Context,
     locals: &'a mut dyn Variables<ExpressionResult>,
+    file_query: &'a Query,
+    stanza_index: usize,
+    stanza_query: &'a Query,
 }
 
 //-----------------------------------------------------------------------------
@@ -31,13 +48,9 @@ struct CheckContext<'a> {
 
 impl ast::File {
     pub fn check(&mut self, ctx: &Context) -> Result<(), CheckError> {
-        let locals = &mut VariableMap::new();
-        let ctx = &mut CheckContext {
-            ctx: ctx,
-            locals: locals,
-        };
-        for stanza in &mut self.stanzas {
-            stanza.check(ctx)?;
+        let file_query = self.query.as_ref().unwrap();
+        for (index, stanza) in self.stanzas.iter_mut().enumerate() {
+            stanza.check(ctx, file_query, index)?;
         }
         Ok(())
     }
@@ -47,9 +60,24 @@ impl ast::File {
 // Stanza
 
 impl ast::Stanza {
-    fn check(&mut self, ctx: &mut CheckContext) -> Result<(), CheckError> {
+    fn check(
+        &mut self,
+        ctx: &Context,
+        file_query: &Query,
+        stanza_index: usize,
+    ) -> Result<(), CheckError> {
+        let mut locals = VariableMap::new();
+        let mut ctx = CheckContext {
+            ctx,
+            locals: &mut locals,
+            file_query,
+            stanza_index,
+            stanza_query: &self.query,
+        };
+        self.full_match_file_capture_index =
+            ctx.file_query.capture_index_for_name(FULL_MATCH).unwrap() as usize;
         for statement in &mut self.statements {
-            statement.check(ctx)?;
+            statement.check(&mut ctx)?;
         }
         Ok(())
     }
@@ -102,7 +130,8 @@ impl ast::Assign {
 
 impl ast::CreateGraphNode {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<(), CheckError> {
-        self.node.add_check(ctx, ExpressionResult {}, false)?;
+        self.node
+            .add_check(ctx, ExpressionResult { quantifier: One }, false)?;
         Ok(())
     }
 }
@@ -145,6 +174,9 @@ impl ast::Scan {
             let mut arm_ctx = CheckContext {
                 ctx: ctx.ctx,
                 locals: &mut arm_locals,
+                file_query: ctx.file_query,
+                stanza_index: ctx.stanza_index,
+                stanza_query: ctx.stanza_query,
             };
 
             for statement in &mut arm.statements {
@@ -175,6 +207,9 @@ impl ast::If {
             let mut arm_ctx = CheckContext {
                 ctx: ctx.ctx,
                 locals: &mut arm_locals,
+                file_query: ctx.file_query,
+                stanza_index: ctx.stanza_index,
+                stanza_query: ctx.stanza_query,
             };
 
             for statement in &mut arm.statements {
@@ -191,8 +226,12 @@ impl ast::Condition {
             Self::None(captures) => captures,
             Self::Some(captures) => captures,
         };
+
         for capture in captures {
-            capture.check(ctx)?;
+            let result = capture.check(ctx)?;
+            if result.quantifier != ZeroOrOne {
+                return Err(CheckError::ExpectedOptionalValue(capture.location));
+            }
         }
         Ok(())
     }
@@ -201,11 +240,17 @@ impl ast::Condition {
 impl ast::ForIn {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<(), CheckError> {
         let capture = self.capture.check(ctx)?;
+        if capture.quantifier != ZeroOrMore && capture.quantifier != OneOrMore {
+            return Err(CheckError::ExpectedListValue(self.location));
+        }
 
         let mut loop_locals = VariableMap::new_child(ctx.locals);
         let mut loop_ctx = CheckContext {
             ctx: ctx.ctx,
             locals: &mut loop_locals,
+            file_query: ctx.file_query,
+            stanza_index: ctx.stanza_index,
+            stanza_query: ctx.stanza_query,
         };
         self.variable.add_check(&mut loop_ctx, capture, false)?;
         for statement in &mut self.statements {
@@ -220,14 +265,16 @@ impl ast::ForIn {
 
 /// Expression checking result
 #[derive(Clone, Debug)]
-struct ExpressionResult {}
+struct ExpressionResult {
+    quantifier: CaptureQuantifier,
+}
 
 impl ast::Expression {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
         match self {
-            Self::FalseLiteral => Ok(ExpressionResult {}),
-            Self::NullLiteral => Ok(ExpressionResult {}),
-            Self::TrueLiteral => Ok(ExpressionResult {}),
+            Self::FalseLiteral => Ok(ExpressionResult { quantifier: One }),
+            Self::NullLiteral => Ok(ExpressionResult { quantifier: One }),
+            Self::TrueLiteral => Ok(ExpressionResult { quantifier: One }),
             Self::IntegerConstant(expr) => expr.check(ctx),
             Self::StringConstant(expr) => expr.check(ctx),
             Self::List(expr) => expr.check(ctx),
@@ -253,13 +300,13 @@ impl ast::ScanExpression {
 
 impl ast::IntegerConstant {
     fn check(&mut self, _ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
-        Ok(ExpressionResult {})
+        Ok(ExpressionResult { quantifier: One })
     }
 }
 
 impl ast::StringConstant {
     fn check(&mut self, _ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
-        Ok(ExpressionResult {})
+        Ok(ExpressionResult { quantifier: One })
     }
 }
 
@@ -268,7 +315,9 @@ impl ast::ListComprehension {
         for element in &mut self.elements {
             element.check(ctx)?;
         }
-        Ok(ExpressionResult {})
+        Ok(ExpressionResult {
+            quantifier: ZeroOrMore,
+        })
     }
 }
 
@@ -277,13 +326,26 @@ impl ast::SetComprehension {
         for element in &mut self.elements {
             element.check(ctx)?;
         }
-        Ok(ExpressionResult {})
+        Ok(ExpressionResult {
+            quantifier: ZeroOrMore,
+        })
     }
 }
 
 impl ast::Capture {
-    fn check(&mut self, _ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
-        Ok(ExpressionResult {})
+    fn check(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
+        let name = ctx.ctx.resolve(self.name);
+        self.stanza_capture_index = ctx
+            .stanza_query
+            .capture_index_for_name(name)
+            .ok_or_else(|| CheckError::UndefinedSyntaxCapture(name.to_string(), self.location))?
+            as usize;
+        self.file_capture_index = ctx.file_query.capture_index_for_name(name).unwrap() as usize;
+        self.quantifier =
+            ctx.file_query.capture_quantifiers(ctx.stanza_index)[self.file_capture_index];
+        Ok(ExpressionResult {
+            quantifier: self.quantifier,
+        })
     }
 }
 
@@ -292,13 +354,15 @@ impl ast::Call {
         for parameter in &mut self.parameters {
             parameter.check(ctx)?;
         }
-        Ok(ExpressionResult {})
+        Ok(ExpressionResult {
+            quantifier: One, // FIXME we don't really know
+        })
     }
 }
 
 impl ast::RegexCapture {
     fn check(&mut self, _ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
-        Ok(ExpressionResult {})
+        Ok(ExpressionResult { quantifier: One })
     }
 }
 
@@ -365,7 +429,9 @@ impl ast::UnscopedVariable {
             .locals
             .get(&self.name)
             .cloned()
-            .unwrap_or_else(|| ExpressionResult {});
+            .unwrap_or_else(|| ExpressionResult {
+                quantifier: One, /* FIXME we don't really know */
+            });
         Ok(value)
     }
 }
@@ -373,23 +439,28 @@ impl ast::UnscopedVariable {
 impl ast::ScopedVariable {
     fn add_check(
         &mut self,
-        _ctx: &mut CheckContext,
+        ctx: &mut CheckContext,
         _value: ExpressionResult,
         _mutable: bool,
     ) -> Result<(), CheckError> {
+        self.scope.check(ctx)?;
         Ok(())
     }
 
     fn set_check(
         &mut self,
-        _ctx: &mut CheckContext,
+        ctx: &mut CheckContext,
         _value: ExpressionResult,
     ) -> Result<(), CheckError> {
+        self.scope.check(ctx)?;
         Ok(())
     }
 
-    fn get_check(&mut self, _ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
-        Ok(ExpressionResult {})
+    fn get_check(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
+        self.scope.check(ctx)?;
+        Ok(ExpressionResult {
+            quantifier: One, // FIXME we don't really know
+        })
     }
 }
 

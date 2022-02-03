@@ -45,6 +45,8 @@ pub struct Stanza {
     pub query: Query,
     /// The list of statements in the stanza
     pub statements: Vec<Statement>,
+    /// Capture index of the full match in the file query
+    pub full_match_file_capture_index: usize,
     pub location: Location,
 }
 
@@ -648,10 +650,15 @@ impl DisplayWithContext for Call {
 /// A capture expression that references a syntax node
 #[derive(Debug, Eq, PartialEq)]
 pub struct Capture {
-    /// The suffix of the capture
-    pub quantifier: CaptureQuantifier,
     /// The name of the capture
     pub name: Identifier,
+    /// The suffix of the capture
+    pub quantifier: CaptureQuantifier,
+    /// Capture index in the merged file query
+    pub file_capture_index: usize,
+    /// Capture index in the stanza query
+    pub stanza_capture_index: usize,
+    pub location: Location,
 }
 
 impl From<Capture> for Expression {

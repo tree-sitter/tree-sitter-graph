@@ -565,7 +565,7 @@ fn variables_do_not_escape_if_body() {
           pass
         "#,
         indoc! {r#"
-          (module (pass_statement)? @xs) @root
+          (module (pass_statement)? @x) @root
           {
             var n = 1
             if some @x {

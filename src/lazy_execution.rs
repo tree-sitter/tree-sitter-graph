@@ -22,13 +22,11 @@ use tree_sitter::Tree;
 
 use crate::ast;
 use crate::execution::query_capture_value;
-use crate::execution::CaptureIndices;
 use crate::execution::ExecutionError;
 use crate::functions::Functions;
 use crate::graph;
 use crate::graph::DisplayWithGraph as _;
 use crate::graph::Graph;
-use crate::parser::FULL_MATCH;
 use crate::variables::Globals;
 use crate::variables::VariableMap;
 use crate::variables::Variables;
@@ -81,13 +79,11 @@ impl ast::File {
         let mut lazy_graph = Vec::new();
 
         let query = &self.query.as_ref().unwrap();
-        let mut capture_indices = CaptureIndices::new(query);
         let matches = cursor.matches(query, tree.root_node(), source.as_bytes());
         for mat in matches {
             let stanza = &self.stanzas[mat.pattern_index];
             stanza.execute_lazy(
                 ctx,
-                &mut capture_indices,
                 &mat,
                 graph,
                 globals,
@@ -120,13 +116,12 @@ impl ast::File {
 }
 
 /// Context for execution, which executes stanzas to build the lazy graph
-struct ExecutionContext<'a, 'g, 'q, 'tree> {
+struct ExecutionContext<'a, 'g, 'tree> {
     ctx: &'a Context,
     graph: &'a mut Graph<'tree>,
     globals: &'a Globals<'g>,
     locals: &'a mut dyn Variables<LazyValue>,
     current_regex_captures: &'a Vec<String>,
-    capture_indices: &'a mut CaptureIndices<'q>,
     mat: &'a QueryMatch<'a, 'tree>,
     store: &'a mut LazyStore,
     scoped_store: &'a mut LazyScopedVariables,
@@ -156,7 +151,6 @@ impl ast::Stanza {
     fn execute_lazy<'l, 'g, 'q, 'tree>(
         &self,
         ctx: &Context,
-        capture_indices: &mut CaptureIndices<'q>,
         mat: &QueryMatch<'_, 'tree>,
         graph: &mut Graph<'tree>,
         globals: &Globals<'g>,
@@ -165,7 +159,6 @@ impl ast::Stanza {
         scoped_store: &mut LazyScopedVariables,
         lazy_graph: &mut Vec<LazyStatement>,
     ) -> Result<(), ExecutionError> {
-        let full_match_index = capture_indices.index_for_name(FULL_MATCH);
         let current_regex_captures = vec![];
         locals.clear();
         let mut exec = ExecutionContext {
@@ -174,13 +167,12 @@ impl ast::Stanza {
             globals,
             locals,
             current_regex_captures: &current_regex_captures,
-            capture_indices,
             mat,
             store,
             scoped_store,
             lazy_graph,
         };
-        let node = query_capture_value(full_match_index, One, &mat, exec.graph);
+        let node = query_capture_value(self.full_match_file_capture_index, One, &mat, exec.graph);
         debug!(
             "match {} at {}",
             node.display_with(exec.graph),
@@ -326,7 +318,6 @@ impl ast::Scan {
                 globals: exec.globals,
                 locals: &mut arm_locals,
                 current_regex_captures: &current_regex_captures,
-                capture_indices: exec.capture_indices,
                 mat: exec.mat,
                 store: exec.store,
                 scoped_store: exec.scoped_store,
@@ -395,7 +386,6 @@ impl ast::If {
                     globals: exec.globals,
                     locals: &mut arm_locals,
                     current_regex_captures: exec.current_regex_captures,
-                    capture_indices: exec.capture_indices,
                     mat: exec.mat,
                     store: exec.store,
                     scoped_store: exec.scoped_store,
@@ -442,7 +432,6 @@ impl ast::ForIn {
                 globals: exec.globals,
                 locals: &mut loop_locals,
                 current_regex_captures: exec.current_regex_captures,
-                capture_indices: exec.capture_indices,
                 mat: exec.mat,
                 store: exec.store,
                 scoped_store: exec.scoped_store,
@@ -517,10 +506,8 @@ impl ast::SetComprehension {
 
 impl ast::Capture {
     fn evaluate_strict(&self, exec: &mut ExecutionContext) -> Result<graph::Value, ExecutionError> {
-        let name = exec.ctx.resolve(self.name);
-        let index = exec.capture_indices.index_for_name(name);
         Ok(query_capture_value(
-            index,
+            self.file_capture_index,
             self.quantifier,
             exec.mat,
             exec.graph,
@@ -528,9 +515,13 @@ impl ast::Capture {
     }
 
     fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<LazyValue, ExecutionError> {
-        let name = exec.ctx.resolve(self.name);
-        let index = exec.capture_indices.index_for_name(name);
-        Ok(query_capture_value(index, self.quantifier, exec.mat, exec.graph).into())
+        Ok(query_capture_value(
+            self.file_capture_index,
+            self.quantifier,
+            exec.mat,
+            exec.graph,
+        )
+        .into())
     }
 }
 
