@@ -35,7 +35,7 @@ fn can_parse_blocks() {
     let pop = ctx.add_identifier("pop");
     let prop1 = ctx.add_identifier("prop1");
     let push = ctx.add_identifier("push");
-    let cap2 = ctx.add_identifier("@cap2");
+    let cap2 = ctx.add_identifier("cap2");
     let var1 = ctx.add_identifier("var1");
 
     let statements = file
@@ -59,9 +59,8 @@ fn can_parse_blocks() {
                 node: ScopedVariable {
                     scope: Box::new(
                         Capture {
-                            index: 1,
                             quantifier: One,
-                            name: cap2
+                            name: cap2,
                         }
                         .into()
                     ),
@@ -76,9 +75,8 @@ fn can_parse_blocks() {
                 source: ScopedVariable {
                     scope: Box::new(
                         Capture {
-                            index: 1,
                             quantifier: One,
-                            name: cap2
+                            name: cap2,
                         }
                         .into()
                     ),
@@ -98,9 +96,8 @@ fn can_parse_blocks() {
                 source: ScopedVariable {
                     scope: Box::new(
                         Capture {
-                            index: 1,
                             quantifier: One,
-                            name: cap2
+                            name: cap2,
                         }
                         .into()
                     ),
@@ -124,9 +121,8 @@ fn can_parse_blocks() {
                 node: ScopedVariable {
                     scope: Box::new(
                         Capture {
-                            index: 1,
                             quantifier: One,
-                            name: cap2
+                            name: cap2,
                         }
                         .into()
                     ),
@@ -151,9 +147,8 @@ fn can_parse_blocks() {
                 variable: ScopedVariable {
                     scope: Box::new(
                         Capture {
-                            index: 1,
                             quantifier: One,
-                            name: cap2
+                            name: cap2,
                         }
                         .into()
                     ),
@@ -173,9 +168,8 @@ fn can_parse_blocks() {
                 variable: ScopedVariable {
                     scope: Box::new(
                         Capture {
-                            index: 1,
                             quantifier: One,
-                            name: cap2
+                            name: cap2,
                         }
                         .into()
                     ),
@@ -520,7 +514,7 @@ fn can_parse_star_capture() {
     let mut file = File::new(tree_sitter_python::language());
     file.parse(&mut ctx, source).expect("Cannot parse file");
 
-    let stmts = ctx.add_identifier("@stmts");
+    let stmts = ctx.add_identifier("stmts");
 
     let statements = file
         .stanzas
@@ -531,7 +525,6 @@ fn can_parse_star_capture() {
         statements,
         vec![vec![Print {
             values: vec![Capture {
-                index: 0,
                 quantifier: ZeroOrMore,
                 name: stmts,
             }
@@ -555,8 +548,8 @@ fn can_parse_star_multiple_capture() {
     let mut file = File::new(tree_sitter_python::language());
     file.parse(&mut ctx, source).expect("Cannot parse file");
 
-    let stmt = ctx.add_identifier("@stmt");
-    let stmts = ctx.add_identifier("@stmts");
+    let stmt = ctx.add_identifier("stmt");
+    let stmts = ctx.add_identifier("stmts");
 
     let statements = file
         .stanzas
@@ -568,7 +561,6 @@ fn can_parse_star_multiple_capture() {
         vec![vec![
             Print {
                 values: vec![Capture {
-                    index: 0,
                     quantifier: ZeroOrMore,
                     name: stmt,
                 }
@@ -578,7 +570,6 @@ fn can_parse_star_multiple_capture() {
             .into(),
             Print {
                 values: vec![Capture {
-                    index: 1,
                     quantifier: ZeroOrMore,
                     name: stmts,
                 }
@@ -602,7 +593,7 @@ fn can_parse_plus_capture() {
     let mut file = File::new(tree_sitter_python::language());
     file.parse(&mut ctx, source).expect("Cannot parse file");
 
-    let stmts = ctx.add_identifier("@stmts");
+    let stmts = ctx.add_identifier("stmts");
 
     let statements = file
         .stanzas
@@ -613,7 +604,6 @@ fn can_parse_plus_capture() {
         statements,
         vec![vec![Print {
             values: vec![Capture {
-                index: 0,
                 quantifier: OneOrMore,
                 name: stmts,
             }
@@ -636,7 +626,7 @@ fn can_parse_optional_capture() {
     let mut file = File::new(tree_sitter_python::language());
     file.parse(&mut ctx, source).expect("Cannot parse file");
 
-    let stmt = ctx.add_identifier("@stmt");
+    let stmt = ctx.add_identifier("stmt");
 
     let statements = file
         .stanzas
@@ -647,7 +637,6 @@ fn can_parse_optional_capture() {
         statements,
         vec![vec![Print {
             values: vec![Capture {
-                index: 0,
                 quantifier: ZeroOrOne,
                 name: stmt,
             }
@@ -670,7 +659,7 @@ fn can_parse_parent_optional_capture() {
     let mut file = File::new(tree_sitter_python::language());
     file.parse(&mut ctx, source).expect("Cannot parse file");
 
-    let stmt = ctx.add_identifier("@stmt");
+    let stmt = ctx.add_identifier("stmt");
 
     let statements = file
         .stanzas
@@ -681,7 +670,6 @@ fn can_parse_parent_optional_capture() {
         statements,
         vec![vec![Print {
             values: vec![Capture {
-                index: 0,
                 quantifier: ZeroOrOne,
                 name: stmt,
             }
@@ -704,7 +692,7 @@ fn can_parse_alternative_capture() {
     let mut file = File::new(tree_sitter_python::language());
     file.parse(&mut ctx, source).expect("Cannot parse file");
 
-    let stmt = ctx.add_identifier("@stmt");
+    let stmt = ctx.add_identifier("stmt");
 
     let statements = file
         .stanzas
@@ -715,7 +703,6 @@ fn can_parse_alternative_capture() {
         statements,
         vec![vec![Print {
             values: vec![Capture {
-                index: 0,
                 quantifier: ZeroOrOne,
                 name: stmt,
             }
@@ -738,7 +725,7 @@ fn can_parse_nested_plus_and_optional_capture() {
     let mut file = File::new(tree_sitter_python::language());
     file.parse(&mut ctx, source).expect("Cannot parse file");
 
-    let stmt = ctx.add_identifier("@stmt");
+    let stmt = ctx.add_identifier("stmt");
 
     let statements = file
         .stanzas
@@ -749,7 +736,6 @@ fn can_parse_nested_plus_and_optional_capture() {
         statements,
         vec![vec![Print {
             values: vec![Capture {
-                index: 0,
                 quantifier: ZeroOrMore,
                 name: stmt,
             }
@@ -774,7 +760,7 @@ fn can_parse_if() {
     let mut file = File::new(tree_sitter_python::language());
     file.parse(&mut ctx, source).expect("Cannot parse file");
 
-    let x = ctx.add_identifier("@x");
+    let x = ctx.add_identifier("x");
 
     let statements = file
         .stanzas
@@ -786,7 +772,6 @@ fn can_parse_if() {
         vec![vec![If {
             arms: vec![IfArm {
                 conditions: vec![Condition::Some(vec![Capture {
-                    index: 0,
                     quantifier: ZeroOrOne,
                     name: x,
                 }])],
@@ -822,7 +807,7 @@ fn can_parse_if_elif() {
     let mut file = File::new(tree_sitter_python::language());
     file.parse(&mut ctx, source).expect("Cannot parse file");
 
-    let x = ctx.add_identifier("@x");
+    let x = ctx.add_identifier("x");
 
     let statements = file
         .stanzas
@@ -835,7 +820,6 @@ fn can_parse_if_elif() {
             arms: vec![
                 IfArm {
                     conditions: vec![Condition::None(vec![Capture {
-                        index: 0,
                         quantifier: ZeroOrOne,
                         name: x,
                     }])],
@@ -851,7 +835,6 @@ fn can_parse_if_elif() {
                 },
                 IfArm {
                     conditions: vec![Condition::Some(vec![Capture {
-                        index: 0,
                         quantifier: ZeroOrOne,
                         name: x,
                     }])],
@@ -888,7 +871,7 @@ fn can_parse_if_else() {
     let mut file = File::new(tree_sitter_python::language());
     file.parse(&mut ctx, source).expect("Cannot parse file");
 
-    let x = ctx.add_identifier("@x");
+    let x = ctx.add_identifier("x");
 
     let statements = file
         .stanzas
@@ -901,7 +884,6 @@ fn can_parse_if_else() {
             arms: vec![
                 IfArm {
                     conditions: vec![Condition::None(vec![Capture {
-                        index: 0,
                         quantifier: ZeroOrOne,
                         name: x,
                     }])],
@@ -965,7 +947,7 @@ fn can_parse_for_in() {
     let mut file = File::new(tree_sitter_python::language());
     file.parse(&mut ctx, source).expect("Cannot parse file");
 
-    let xs = ctx.add_identifier("@xs");
+    let xs = ctx.add_identifier("xs");
     let x = ctx.add_identifier("x");
 
     let statements = file
@@ -981,7 +963,6 @@ fn can_parse_for_in() {
                 location: Location { row: 3, column: 14 }
             },
             capture: Capture {
-                index: 0,
                 quantifier: ZeroOrMore,
                 name: xs,
             }

@@ -22,6 +22,8 @@ use crate::Location;
 #[derive(Debug)]
 pub struct File {
     pub language: Language,
+    /// The combined query of all stanzas in the file
+    pub query: Option<Query>,
     /// The list of stanzas in the file
     pub stanzas: Vec<Stanza>,
 }
@@ -30,6 +32,7 @@ impl File {
     pub fn new(language: Language) -> File {
         File {
             language,
+            query: None,
             stanzas: Vec::new(),
         }
     }
@@ -645,8 +648,6 @@ impl DisplayWithContext for Call {
 /// A capture expression that references a syntax node
 #[derive(Debug, Eq, PartialEq)]
 pub struct Capture {
-    /// The index of this capture in the block's tree-sitter query
-    pub index: usize,
     /// The suffix of the capture
     pub quantifier: CaptureQuantifier,
     /// The name of the capture
@@ -661,7 +662,7 @@ impl From<Capture> for Expression {
 
 impl DisplayWithContext for Capture {
     fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
-        write!(f, "{}", self.name.display_with(ctx))
+        write!(f, "@{}", self.name.display_with(ctx))
     }
 }
 

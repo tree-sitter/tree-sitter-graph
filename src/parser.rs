@@ -94,6 +94,7 @@ struct Parser<'a> {
     chars: Peekable<Chars<'a>>,
     offset: usize,
     location: Location,
+    query_source: String,
     // Keywords
     attr_keyword: Identifier,
     edge_keyword: Identifier,
@@ -121,6 +122,8 @@ fn is_ident(c: char) -> bool {
 impl<'a> Parser<'a> {
     fn new(ctx: &'a mut Context, source: &'a str) -> Parser<'a> {
         let chars = source.chars().peekable();
+        let query_source = String::with_capacity(source.len());
+        // Keywords
         let attr_keyword = ctx.add_identifier("attr");
         let edge_keyword = ctx.add_identifier("edge");
         let false_keyword = ctx.add_identifier("false");
@@ -140,6 +143,8 @@ impl<'a> Parser<'a> {
             chars,
             offset: 0,
             location: Location::default(),
+            query_source,
+            // Keywords
             attr_keyword,
             edge_keyword,
             false_keyword,
@@ -232,6 +237,7 @@ impl Parser<'_> {
             file.stanzas.push(stanza);
             self.consume_whitespace();
         }
+        file.query = Some(Query::new(file.language, &self.query_source)?);
         Ok(())
     }
 
@@ -252,6 +258,11 @@ impl Parser<'_> {
         self.skip_query()?;
         let query_end = self.offset;
         let query_source = self.source[query_start..query_end].to_owned() + "@" + FULL_MATCH;
+        // If tree-sitter allowed us to incrementally add patterns to a query, we wouldn't need
+        // the global query_source and could compute the cpature indices in the AST instead of
+        // having to resolve the capture names at execution time.
+        self.query_source += &query_source;
+        self.query_source += "\n";
         Ok(Query::new(language, &query_source)?)
     }
 
@@ -755,28 +766,15 @@ impl Parser<'_> {
         }
         self.consume_while(is_ident);
         let end = self.offset;
-        let capture_name = &self.source[start + 1..end];
-        let index = current_query
-            .capture_names()
-            .iter()
-            .position(|c| c == capture_name);
+        let name = &self.source[start + 1..end];
+        let index = current_query.capture_names().iter().position(|c| c == name);
         let index = match index {
             Some(index) => index,
-            None => {
-                return Err(ParseError::UndefinedCapture(
-                    capture_name.into(),
-                    capture_location,
-                ))
-            }
+            None => return Err(ParseError::UndefinedCapture(name.into(), capture_location)),
         };
         let quantifier = current_query.capture_quantifiers(0)[index];
-        let name = self.ctx.add_identifier(&self.source[start..end]);
-        Ok(ast::Capture {
-            index,
-            quantifier,
-            name,
-        }
-        .into())
+        let name = self.ctx.add_identifier(name);
+        Ok(ast::Capture { quantifier, name }.into())
     }
 
     fn parse_integer_constant(&mut self) -> Result<ast::Expression, ParseError> {
