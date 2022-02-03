@@ -30,6 +30,8 @@ pub enum CheckError {
     ExpectedLocalValue(Location),
     #[error("Expected optional value at {0}")]
     ExpectedOptionalValue(Location),
+    #[error("Nullable regular expression /{0}/ at {1}")]
+    NullableRegex(String, Location),
     #[error("Undefined syntax capture @{0} at {1}")]
     UndefinedSyntaxCapture(String, Location),
     #[error("{0}: {1}")]
@@ -181,6 +183,18 @@ impl ast::Scan {
         }
 
         for arm in &mut self.arms {
+            // Be aware that this check is not complete, as it does not rule out
+            // all regular expressions that admit empty matches. For example, th
+            // regex "\b" matches empty strings within a larger non-empty one.
+            // Therefore, there is also a runtime check that checks that a match was
+            // non-empty. This is all to prevent non-termination of scan.
+            if let Some(_) = arm.regex.captures("") {
+                return Err(CheckError::NullableRegex(
+                    arm.regex.to_string(),
+                    arm.location,
+                ));
+            }
+
             let mut arm_locals = VariableMap::new_child(ctx.locals);
             let mut arm_ctx = CheckContext {
                 ctx: ctx.ctx,

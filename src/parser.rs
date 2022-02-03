@@ -56,8 +56,6 @@ pub enum ParseError {
     ExpectedUnscopedVariable(Location),
     #[error("Invalid regular expression /{0}/ at {1}")]
     InvalidRegex(String, Location),
-    #[error("Nullable regular expression /{0}/ at {1}")]
-    NullableRegex(String, Location),
     #[error("Expected integer constant in regex capture at {0}")]
     InvalidRegexCapture(Location),
     // TODO: The positions in the wrapped QueryError will be incorrect, since they will count the
@@ -451,20 +449,8 @@ impl Parser<'_> {
             while self.peek()? != '}' {
                 let pattern_location = self.location;
                 let pattern = self.parse_string()?;
-                let regex = match Regex::new(&pattern) {
-                    Ok(regex) => {
-                        if let Some(_) = regex.captures("") {
-                            return Err(ParseError::NullableRegex(
-                                pattern.into(),
-                                pattern_location,
-                            ));
-                        }
-                        regex
-                    }
-                    Err(_) => {
-                        return Err(ParseError::InvalidRegex(pattern.into(), pattern_location))
-                    }
-                };
+                let regex = Regex::new(&pattern)
+                    .map_err(|_| ParseError::InvalidRegex(pattern.into(), pattern_location))?;
                 self.consume_whitespace();
                 let statements = self.parse_statements()?;
                 arms.push(ast::ScanArm {
