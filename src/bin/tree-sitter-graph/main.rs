@@ -23,6 +23,8 @@ use tree_sitter_loader::Loader;
 const BUILD_VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
 fn main() -> Result<()> {
+    init_log();
+
     let matches = App::new("tree-sitter-graph")
         .version(BUILD_VERSION)
         .author("Douglas Creager <dcreager@dcreager.net>")
@@ -35,6 +37,12 @@ fn main() -> Result<()> {
                 .long("quiet")
                 .help("Suppress console output"),
         )
+        .arg(
+            Arg::with_name("lazy")
+                .short("z")
+                .long("lazy")
+                .help("Use lazy evaluation (experimental)"),
+        )
         .arg(Arg::with_name("scope").long("scope").takes_value(true))
         .arg(Arg::with_name("json").long("json").takes_value(false))
         .get_matches();
@@ -43,6 +51,7 @@ fn main() -> Result<()> {
     let source_path = Path::new(matches.value_of("source").unwrap());
     let current_dir = std::env::current_dir().unwrap();
     let quiet = matches.is_present("quiet");
+    let lazy = matches.is_present("lazy");
     let config = Config::load()?;
     let mut loader = Loader::new()?;
     let loader_config = config.get()?;
@@ -65,9 +74,12 @@ fn main() -> Result<()> {
         .with_context(|| anyhow!("Error parsing TSG file {}", tsg_path.display()))?;
     let mut functions = Functions::stdlib(&mut ctx);
     let globals = Variables::new();
-    let graph = file
-        .execute(&ctx, &tree, &source, &mut functions, &globals)
-        .with_context(|| format!("Could not execute TSG file {}", tsg_path.display()))?;
+    let graph = if lazy {
+        file.execute_lazy(&mut ctx, &tree, &source, &mut functions, &globals)
+    } else {
+        file.execute(&mut ctx, &tree, &source, &mut functions, &globals)
+    }
+    .with_context(|| anyhow!("Could not execute TSG file {}", tsg_path.display()))?;
     let json = matches.is_present("json");
     if json {
         graph.display_json(&ctx);
@@ -75,4 +87,12 @@ fn main() -> Result<()> {
         print!("{}", graph.display_with(&ctx));
     }
     Ok(())
+}
+
+fn init_log() {
+    let _ = env_logger::builder()
+        .format_level(false)
+        .format_target(false)
+        .format_timestamp(None)
+        .init();
 }

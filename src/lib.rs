@@ -32,6 +32,7 @@ pub mod ast;
 mod execution;
 pub mod functions;
 pub mod graph;
+mod lazy_execution;
 mod parser;
 
 pub use execution::ExecutionError;

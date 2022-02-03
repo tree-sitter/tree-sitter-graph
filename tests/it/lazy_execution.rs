@@ -1,6 +1,6 @@
 // -*- coding: utf-8 -*-
 // ------------------------------------------------------------------------------------------------
-// Copyright © 2021, tree-sitter authors.
+// Copyright © 2022, tree-sitter authors.
 // Licensed under either of Apache License, Version 2.0, or MIT license, at your option.
 // Please see the LICENSE-APACHE or LICENSE-MIT files in this distribution for license details.
 // ------------------------------------------------------------------------------------------------
@@ -35,7 +35,7 @@ fn execute(python_source: &str, dsl_source: &str) -> Result<String, ExecutionErr
     globals
         .add(ctx.add_identifier("filename"), "test.py".into())
         .map_err(|_| ExecutionError::DuplicateVariable("filename".into()))?;
-    let graph = file.execute(&ctx, &tree, python_source, &mut functions, &mut globals)?;
+    let graph = file.execute_lazy(&mut ctx, &tree, python_source, &mut functions, &globals)?;
     let result = graph.display_with(&ctx).to_string();
     Ok(result)
 }
@@ -62,7 +62,7 @@ fn can_build_simple_graph() {
           {
             node node0
             attr (node0) name = "node0", source = @root
-            var node1 = (node)
+            let node1 = (node)
             attr (node1) name = "node1"
             edge node0 -> node1
             attr (node0 -> node1) precedence = 14
@@ -74,13 +74,13 @@ fn can_build_simple_graph() {
           node 0
             name: "node0"
             source: [syntax node module (1, 1)]
-          edge 0 -> 1
+          edge 0 -> 2
             precedence: 14
           node 1
-            name: "node1"
-          node 2
             name: "node2"
-            parent: [graph node 1]
+            parent: [graph node 2]
+          node 2
+            name: "node1"
         "#},
     );
 }
@@ -115,10 +115,10 @@ fn can_scan_strings() {
         "#},
         indoc! {r#"
           node 0
-          edge 0 -> 1
-          node 1
             name: "alpha"
-          edge 1 -> 2
+          edge 0 -> 2
+          node 1
+          edge 1 -> 0
           node 2
             name: "beta"
           edge 2 -> 3
@@ -143,16 +143,18 @@ fn variables_in_scan_arms_are_local() {
             scan "alpha/beta/gamma/delta.py" {
                "([^/]+)/"
                {
-                 let new_node = (node)
-                 attr (new_node) name = $1
+                 let v = $1
+                 node new_node
+                 attr (new_node) name = v
                  edge current_node -> new_node
                  set current_node = new_node
                }
 
                "([^/]+)\\.py$"
                {
-                 let new_node = (node)
-                 attr (new_node) name = $1
+                 let v = $1
+                 node new_node
+                 attr (new_node) name = v
                  edge current_node -> new_node
                }
             }
@@ -160,18 +162,18 @@ fn variables_in_scan_arms_are_local() {
         "#},
         indoc! {r#"
           node 0
+            name: "alpha"
           edge 0 -> 1
           node 1
-            name: "alpha"
+            name: "beta"
           edge 1 -> 2
           node 2
-            name: "beta"
+            name: "gamma"
           edge 2 -> 3
           node 3
-            name: "gamma"
-          edge 3 -> 4
-          node 4
             name: "delta"
+          node 4
+          edge 4 -> 0
         "#},
     );
 }
@@ -276,10 +278,15 @@ fn can_use_variable_multiple_times() {
             let x = (node)
             let y = x
             let z = x
+            node n
+            attr (n) v1 = y, v2 = x
           }
         "#},
         indoc! {r#"
           node 0
+            v1: [graph node 1]
+            v2: [graph node 1]
+          node 1
         "#},
     );
 }
@@ -719,6 +726,529 @@ fn variables_are_inherited_in_for_in_body() {
         indoc! {r#"
           node 0
             val: 3
+        "#},
+    );
+}
+
+#[test]
+fn can_build_node() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node node0
+          }
+        "#},
+        indoc! {r#"
+          node 0
+        "#},
+    );
+}
+
+#[test]
+fn can_build_node_with_attrs() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node node0
+            attr (node0) name = "node0", source = @root
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            name: "node0"
+            source: [syntax node module (1, 1)]
+        "#},
+    );
+}
+
+#[test]
+fn can_build_edge() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node node0
+            node node1
+            edge node0 -> node1
+          }
+        "#},
+        indoc! {r#"
+          node 0
+          edge 0 -> 1
+          node 1
+        "#},
+    );
+}
+
+#[test]
+fn can_build_edges() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node node0
+            node node1
+            edge node0 -> node1
+            node node2
+            edge node1 -> node2
+            edge node2 -> node0
+          }
+        "#},
+        indoc! {r#"
+          node 0
+          edge 0 -> 1
+          node 1
+          edge 1 -> 2
+          node 2
+          edge 2 -> 0
+        "#},
+    );
+}
+
+#[test]
+fn can_set_mutable_local_variables() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            var node = #null
+
+            set node = (node)
+
+            let new_node = (node)
+            edge new_node -> node
+            set node = new_node
+          }
+        "#},
+        indoc! {r#"
+          node 0
+          edge 0 -> 1
+          node 1
+        "#},
+    );
+}
+
+#[test]
+fn scoped_variables_can_appear_out_of_order() {
+    check_execution(
+        indoc! {r#"
+          import a
+          from b import c
+          print(a.d.f)
+        "#},
+        indoc! {r#"
+          (identifier) @id
+          {
+            attr (@id.node) name = (source-text @id)
+          }
+
+          (identifier) @id
+          {
+            let @id.node = (node)
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            name: "a"
+          node 1
+            name: "b"
+          node 2
+            name: "c"
+          node 3
+            name: "print"
+          node 4
+            name: "a"
+          node 5
+            name: "d"
+          node 6
+            name: "f"
+        "#},
+    );
+}
+
+#[test]
+fn variables_can_be_scoped_in_arbitrary_expressions() {
+    check_execution(
+        indoc! {r#"
+          import a
+          from b import c
+          print(a.d.f)
+        "#},
+        indoc! {r#"
+          (call function:(_)@fun arguments: (argument_list (_)@arg)) {
+          ; let @arg.no_object.lala = 3 ; error
+            let @arg.object.lala = 3
+            let @arg.object.object.lala = 12
+          ; let @arg.object.object = 42 ; error
+          }
+          (attribute object:(_)@obj)@attr {
+            let @attr.object = @obj
+            let @attr.no_object = 7
+          }
+        "#},
+        indoc! {r#""#},
+    );
+}
+
+#[test]
+fn can_mutate_inside_scan_no_branch_simple() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node n
+
+            var x = 0
+
+            scan "b" {
+               "c" {
+                 set x = (plus x 1)
+               }
+            }
+
+            attr (n) len = x
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            len: 0
+        "#},
+    );
+}
+
+#[test]
+fn can_mutate_inside_scan_once_first_branch_simple() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node n
+
+            var x = 0
+
+            scan "b" {
+               "b" {
+                 set x = (plus x 1)
+               }
+            }
+
+            attr (n) len = x
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            len: 1
+        "#},
+    );
+}
+
+#[test]
+fn can_mutate_inside_scan_once_first_branch() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node n
+
+            var x = 0
+            var y = 0
+            var s = ""
+
+            scan "b" {
+               "b" { ; it's a "b"
+                 attr (n) fst = #null
+                 set x = (plus x 1)
+                 set s = $0
+               }
+               "(.)" { ; it's something else
+                 attr (n) snd = #null
+                 let local_y = (plus y 1)
+                 set y = local_y
+                 set s = $1
+               }
+            }
+
+            attr (n) len = (plus x y)
+            attr (n) str = s
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            fst: #null
+            len: 1
+            str: "b"
+        "#},
+    );
+}
+
+#[test]
+fn can_mutate_inside_scan_once_second_branch() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node n
+
+            var x = 0
+            var y = 0
+            var s = ""
+
+            scan "a" {
+               "b" { ; it's a "b"
+                 attr (n) fst = #null
+                 set x = (plus x 1)
+                 set s = $0
+               }
+               "(.)" { ; it's something else
+                 attr (n) snd = #null
+                 let local_y = (plus y 1)
+                 set y = local_y
+                 set s = $1
+               }
+            }
+
+            attr (n) len = (plus x y)
+            attr (n) str = s
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            len: 1
+            snd: #null
+            str: "a"
+        "#},
+    );
+}
+
+#[test]
+fn can_mutate_inside_scan_once_no_branch() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node n
+
+            var x = 0
+            var y = 0
+            var s = ""
+
+            scan "a" {
+               "b" { ; it's a "b"
+                 attr (n) fst = #null
+                 set x = (plus x 1)
+                 set s = $0
+               }
+               "(c)" { ; it's something else
+                 attr (n) snd = #null
+                 let local_y = (plus y 1)
+                 set y = local_y
+                 set s = $1
+               }
+            }
+
+            attr (n) len = (plus x y)
+            attr (n) str = s
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            len: 0
+            str: ""
+        "#},
+    );
+}
+
+#[test]
+fn can_mutate_inside_scan_multiple_times_simple() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            var x = 0
+            var y = 0
+
+            scan "ab" {
+               "b" { ; count "b"s
+                  set x = (plus x 1)
+               }
+               "(.)" { ; count the rest
+                  set y = (plus y 1)
+               }
+            }
+
+            node n
+            attr (n) len = (plus x y)
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            len: 2
+        "#},
+    );
+}
+
+#[test]
+fn can_mutate_inside_scan_multiple_times() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            var x = 0
+            var y = 0
+            var s = ""
+
+            scan "abcd" {
+               "b" { ; count "b"s
+                 set x = (plus x 1)
+                 set s = $0
+               }
+               "(.)" { ; count the rest
+                 let local_y = (plus y 1)
+                 set y = local_y
+                 set s = $1
+               }
+            }
+
+            node n
+            attr (n) len = (plus x y)
+            attr (n) str = s
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            len: 4
+            str: "d"
+        "#},
+    );
+}
+
+#[test]
+fn can_mutate_inside_nested_scan_multiple_times_simple() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            var x = 0
+
+            scan "ab|c|d" {
+              "\\|" {}
+              "[^|]+" {
+                scan $0 {
+                  "(.)" { ; count the rest
+                    set x = (plus x 1)
+                  }
+                }
+              }
+            }
+
+            node n
+            attr (n) len = x
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            len: 4
+        "#},
+    );
+}
+
+#[test]
+fn can_mutate_inside_nested_scan_multiple_times() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            var x = 0
+            var y = 0
+            var s = ""
+
+            scan "ab|c|d" {
+              "\\|" {}
+              "[^|]+" {
+                scan $0 {
+                  "b" { ; count "b"s
+                    set x = (plus x 1)
+                    set s = $0
+                  }
+                  "(.)" { ; count the rest
+                    let local_y = (plus y 1)
+                    set y = local_y
+                    set s = $1
+                  }
+                }
+              }
+            }
+
+            node n
+            attr (n) len = (plus x y)
+            attr (n) str = s
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            len: 4
+            str: "d"
+        "#},
+    );
+}
+
+#[test]
+fn variable_let_executed_once() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            let x = (node)
+            attr ((node)) ref = x
+            attr ((node)) ref = x
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            ref: [graph node 1]
+          node 1
+          node 2
+            ref: [graph node 1]
+        "#},
+    );
+}
+
+#[test]
+fn variable_set_executed_once() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            var x = #null
+            set x = (node)
+            attr ((node)) ref = x
+            attr ((node)) ref = x
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            ref: [graph node 1]
+          node 1
+          node 2
+            ref: [graph node 1]
         "#},
     );
 }
