@@ -32,7 +32,6 @@ use crate::ast::ListComprehension;
 use crate::ast::Print;
 use crate::ast::RegexCapture;
 use crate::ast::Scan;
-use crate::ast::ScanExpression;
 use crate::ast::ScopedVariable;
 use crate::ast::SetComprehension;
 use crate::ast::Stanza;
@@ -432,17 +431,6 @@ impl Scan {
     }
 }
 
-impl ScanExpression {
-    fn evaluate(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
-        match self {
-            Self::StringConstant(expr) => expr.evaluate(exec),
-            Self::Capture(expr) => expr.evaluate(exec),
-            Self::Variable(expr) => expr.get_global(exec).map(|v| v.clone()),
-            Self::RegexCapture(expr) => expr.evaluate(exec),
-        }
-    }
-}
-
 impl Print {
     fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
         for value in &self.values {
@@ -491,26 +479,17 @@ impl If {
 
 impl Condition {
     fn test(&self, exec: &mut ExecutionContext) -> Result<bool, ExecutionError> {
-        let mut result = true;
         match self {
-            Condition::Some(captures) => {
-                for capture in captures {
-                    result &= !capture.evaluate(exec)?.is_null();
-                }
-            }
-            Condition::None(captures) => {
-                for capture in captures {
-                    result &= capture.evaluate(exec)?.is_null();
-                }
-            }
+            Condition::Some { value, .. } => Ok(!value.evaluate(exec)?.is_null()),
+            Condition::None { value, .. } => Ok(value.evaluate(exec)?.is_null()),
+            Condition::Bool { value, .. } => Ok(value.evaluate(exec)?.into_bool(exec.graph)?),
         }
-        Ok(result)
     }
 }
 
 impl ForIn {
     fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
-        let values = self.capture.evaluate(exec)?.into_list(exec.graph)?;
+        let values = self.value.evaluate(exec)?.into_list(exec.graph)?;
         let mut loop_locals = VariableMap::new_child(exec.locals);
         for value in values {
             loop_locals.clear();
@@ -740,12 +719,6 @@ impl ScopedVariable {
 }
 
 impl UnscopedVariable {
-    fn get_global<'a>(&self, exec: &'a mut ExecutionContext) -> Result<&'a Value, ExecutionError> {
-        exec.globals.get(&self.name).ok_or_else(|| {
-            ExecutionError::UndefinedVariable(format!("{}", self.display_with(exec.ctx)))
-        })
-    }
-
     fn get<'a>(&self, exec: &'a mut ExecutionContext) -> Result<&'a Value, ExecutionError> {
         if let Some(value) = exec.globals.get(&self.name) {
             Some(value)

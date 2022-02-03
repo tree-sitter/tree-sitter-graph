@@ -815,13 +815,17 @@ fn can_parse_if() {
         statements,
         vec![vec![If {
             arms: vec![IfArm {
-                conditions: vec![Condition::Some(vec![Capture {
-                    quantifier: ZeroOrOne,
-                    name: x,
-                    file_capture_index: 0,
-                    stanza_capture_index: 0,
-                    location: Location { row: 3, column: 18 },
-                }])],
+                conditions: vec![Condition::Some {
+                    value: Capture {
+                        quantifier: ZeroOrOne,
+                        name: x,
+                        file_capture_index: 0,
+                        stanza_capture_index: 0,
+                        location: Location { row: 3, column: 18 },
+                    }
+                    .into(),
+                    location: Location { row: 3, column: 13 },
+                }],
                 statements: vec![Print {
                     values: vec![StringConstant {
                         value: "x is not null".into()
@@ -866,13 +870,18 @@ fn can_parse_if_elif() {
         vec![vec![If {
             arms: vec![
                 IfArm {
-                    conditions: vec![Condition::None(vec![Capture {
-                        quantifier: ZeroOrOne,
-                        name: x,
-                        file_capture_index: 0,
-                        stanza_capture_index: 0,
-                        location: Location { row: 3, column: 18 },
-                    }])],
+                    conditions: vec![Condition::None {
+                        value: Capture {
+                            quantifier: ZeroOrOne,
+                            name: x,
+                            file_capture_index: 0,
+                            stanza_capture_index: 0,
+                            location: Location { row: 3, column: 18 },
+                        }
+                        .into(),
+                        location: Location { row: 3, column: 13 },
+                    }
+                    .into(),],
                     statements: vec![Print {
                         values: vec![StringConstant {
                             value: "x is null".into()
@@ -884,13 +893,17 @@ fn can_parse_if_elif() {
                     location: Location { row: 3, column: 10 }
                 },
                 IfArm {
-                    conditions: vec![Condition::Some(vec![Capture {
-                        quantifier: ZeroOrOne,
-                        name: x,
-                        file_capture_index: 0,
-                        stanza_capture_index: 0,
-                        location: Location { row: 5, column: 22 },
-                    }])],
+                    conditions: vec![Condition::Some {
+                        value: Capture {
+                            quantifier: ZeroOrOne,
+                            name: x,
+                            file_capture_index: 0,
+                            stanza_capture_index: 0,
+                            location: Location { row: 5, column: 22 },
+                        }
+                        .into(),
+                        location: Location { row: 5, column: 17 },
+                    }],
                     statements: vec![Print {
                         values: vec![StringConstant {
                             value: "x is not null".into()
@@ -936,13 +949,17 @@ fn can_parse_if_else() {
         vec![vec![If {
             arms: vec![
                 IfArm {
-                    conditions: vec![Condition::None(vec![Capture {
-                        quantifier: ZeroOrOne,
-                        name: x,
-                        file_capture_index: 0,
-                        stanza_capture_index: 0,
-                        location: Location { row: 3, column: 18 },
-                    }])],
+                    conditions: vec![Condition::None {
+                        value: Capture {
+                            quantifier: ZeroOrOne,
+                            name: x,
+                            file_capture_index: 0,
+                            stanza_capture_index: 0,
+                            location: Location { row: 3, column: 18 },
+                        }
+                        .into(),
+                        location: Location { row: 3, column: 13 },
+                    }],
                     statements: vec![Print {
                         values: vec![StringConstant {
                             value: "x is null".into()
@@ -973,12 +990,12 @@ fn can_parse_if_else() {
 }
 
 #[test]
-fn cannot_parse_if_list_capture() {
+fn cannot_parse_if_some_list_capture() {
     let mut ctx = Context::new();
     let source = r#"
         (module (_)+ @xs) @root
         {
-          if @xs {
+          if some @xs {
             node n
           }
         }
@@ -1017,7 +1034,7 @@ fn can_parse_for_in() {
                 name: x,
                 location: Location { row: 3, column: 14 }
             },
-            capture: Capture {
+            value: Capture {
                 quantifier: ZeroOrMore,
                 name: xs,
                 file_capture_index: 0,
@@ -1050,6 +1067,47 @@ fn cannot_parse_for_in_optional_capture() {
             node n
           }
         }
+    "#;
+    if let Ok(_) = File::from_source(tree_sitter_python::language(), &mut ctx, source) {
+        panic!("Parse succeeded unexpectedly");
+    }
+}
+
+#[test]
+fn cannot_parse_scan_of_nonlocal_call_expression() {
+    let mut ctx = Context::new();
+    let source = r#"
+      (function_definition
+      name: (identifier) @name)
+      {
+        node n
+        scan (source-text @name.val) {
+          "get_.*" {
+            attr (n) is_getter = #true
+          }
+        }
+      }
+    "#;
+    if let Ok(_) = File::from_source(tree_sitter_python::language(), &mut ctx, source) {
+        panic!("Parse succeeded unexpectedly");
+    }
+}
+
+#[test]
+fn cannot_parse_scan_of_nonlocal_variable() {
+    let mut ctx = Context::new();
+    let source = r#"
+      (function_definition
+      name: (identifier) @name)
+      {
+        node n
+        let val = (source-text @name.val)
+        scan val {
+          "get_.*" {
+            attr (n) is_getter = #true
+          }
+        }
+      }
     "#;
     if let Ok(_) = File::from_source(tree_sitter_python::language(), &mut ctx, source) {
         panic!("Parse succeeded unexpectedly");

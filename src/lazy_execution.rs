@@ -77,6 +77,8 @@ impl ast::File {
         let mut store = LazyStore::new();
         let mut scoped_store = LazyScopedVariables::new();
         let mut lazy_graph = Vec::new();
+        let mut function_parameters = Vec::new();
+        let mut prev_element_debug_info = HashMap::new();
 
         let query = &self.query.as_ref().unwrap();
         let matches = cursor.matches(query, tree.root_node(), source.as_bytes());
@@ -84,18 +86,20 @@ impl ast::File {
             let stanza = &self.stanzas[mat.pattern_index];
             stanza.execute_lazy(
                 ctx,
+                source,
                 &mat,
                 graph,
+                functions,
                 globals,
                 &mut locals,
                 &mut store,
                 &mut scoped_store,
                 &mut lazy_graph,
+                &mut function_parameters,
+                &mut prev_element_debug_info,
             )?;
         }
 
-        let mut function_parameters = Vec::new();
-        let mut prev_element_debug_info = HashMap::new();
         for graph_stmt in &lazy_graph {
             graph_stmt
                 .evaluate(&mut EvaluationContext {
@@ -118,7 +122,9 @@ impl ast::File {
 /// Context for execution, which executes stanzas to build the lazy graph
 struct ExecutionContext<'a, 'g, 'tree> {
     ctx: &'a Context,
+    source: &'tree str,
     graph: &'a mut Graph<'tree>,
+    functions: &'a mut Functions,
     globals: &'a Globals<'g>,
     locals: &'a mut dyn Variables<LazyValue>,
     current_regex_captures: &'a Vec<String>,
@@ -126,6 +132,8 @@ struct ExecutionContext<'a, 'g, 'tree> {
     store: &'a mut LazyStore,
     scoped_store: &'a mut LazyScopedVariables,
     lazy_graph: &'a mut Vec<LazyStatement>,
+    function_parameters: &'a mut Vec<graph::Value>, // re-usable buffer to reduce memory allocations
+    prev_element_debug_info: &'a mut HashMap<GraphElementKey, DebugInfo>,
 }
 
 /// Context for evaluation, which evalautes the lazy graph to build the actual graph
@@ -151,19 +159,25 @@ impl ast::Stanza {
     fn execute_lazy<'l, 'g, 'q, 'tree>(
         &self,
         ctx: &Context,
+        source: &'tree str,
         mat: &QueryMatch<'_, 'tree>,
         graph: &mut Graph<'tree>,
+        functions: &mut Functions,
         globals: &Globals<'g>,
         locals: &mut VariableMap<'l, LazyValue>,
         store: &mut LazyStore,
         scoped_store: &mut LazyScopedVariables,
         lazy_graph: &mut Vec<LazyStatement>,
+        function_parameters: &mut Vec<graph::Value>,
+        prev_element_debug_info: &mut HashMap<GraphElementKey, DebugInfo>,
     ) -> Result<(), ExecutionError> {
         let current_regex_captures = vec![];
         locals.clear();
         let mut exec = ExecutionContext {
             ctx,
+            source,
             graph,
+            functions,
             globals,
             locals,
             current_regex_captures: &current_regex_captures,
@@ -171,6 +185,8 @@ impl ast::Stanza {
             store,
             scoped_store,
             lazy_graph,
+            function_parameters,
+            prev_element_debug_info,
         };
         let node = query_capture_value(self.full_match_file_capture_index, One, &mat, exec.graph);
         debug!(
@@ -274,7 +290,7 @@ impl ast::AddEdgeAttribute {
 
 impl ast::Scan {
     fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
-        let match_string = self.value.evaluate_strict(exec)?.into_string(exec.graph)?;
+        let match_string = self.value.evaluate_eager(exec)?.into_string(exec.graph)?;
 
         let mut i = 0;
         let mut matches = Vec::new();
@@ -314,7 +330,9 @@ impl ast::Scan {
             let mut arm_locals = VariableMap::new_child(exec.locals);
             let mut arm_exec = ExecutionContext {
                 ctx: exec.ctx,
+                source: exec.source,
                 graph: exec.graph,
+                functions: exec.functions,
                 globals: exec.globals,
                 locals: &mut arm_locals,
                 current_regex_captures: &current_regex_captures,
@@ -322,6 +340,8 @@ impl ast::Scan {
                 store: exec.store,
                 scoped_store: exec.scoped_store,
                 lazy_graph: exec.lazy_graph,
+                function_parameters: exec.function_parameters,
+                prev_element_debug_info: exec.prev_element_debug_info,
             };
 
             for statement in &arm.statements {
@@ -340,17 +360,6 @@ impl ast::Scan {
         }
 
         Ok(())
-    }
-}
-
-impl ast::ScanExpression {
-    fn evaluate_strict(&self, exec: &mut ExecutionContext) -> Result<graph::Value, ExecutionError> {
-        match self {
-            Self::StringConstant(expr) => expr.evaluate_strict(exec),
-            Self::Capture(expr) => expr.evaluate_strict(exec),
-            Self::Variable(expr) => expr.evaluate_strict(exec).map(|v| v.clone()),
-            Self::RegexCapture(expr) => expr.evaluate_strict(exec),
-        }
     }
 }
 
@@ -376,13 +385,15 @@ impl ast::If {
         for arm in &self.arms {
             let mut result = true;
             for condition in &arm.conditions {
-                result &= condition.test_strict(exec)?;
+                result &= condition.test_eager(exec)?;
             }
             if result {
                 let mut arm_locals = VariableMap::new_child(exec.locals);
                 let mut arm_exec = ExecutionContext {
                     ctx: exec.ctx,
+                    source: exec.source,
                     graph: exec.graph,
+                    functions: exec.functions,
                     globals: exec.globals,
                     locals: &mut arm_locals,
                     current_regex_captures: exec.current_regex_captures,
@@ -390,6 +401,8 @@ impl ast::If {
                     store: exec.store,
                     scoped_store: exec.scoped_store,
                     lazy_graph: exec.lazy_graph,
+                    function_parameters: exec.function_parameters,
+                    prev_element_debug_info: exec.prev_element_debug_info,
                 };
                 for stmt in &arm.statements {
                     stmt.execute_lazy(&mut arm_exec)?;
@@ -402,33 +415,28 @@ impl ast::If {
 }
 
 impl ast::Condition {
-    fn test_strict(&self, exec: &mut ExecutionContext) -> Result<bool, ExecutionError> {
-        let mut result = true;
+    // Eagerly evaluate the condition to a boolean. It assumes the argument expressions
+    // are local (i.e., `is_local = true` in the checker).
+    fn test_eager(&self, exec: &mut ExecutionContext) -> Result<bool, ExecutionError> {
         match self {
-            Self::Some(captures) => {
-                for capture in captures {
-                    result &= !capture.evaluate_strict(exec)?.is_null();
-                }
-            }
-            Self::None(captures) => {
-                for capture in captures {
-                    result &= capture.evaluate_strict(exec)?.is_null();
-                }
-            }
+            Self::Some { value, .. } => Ok(!value.evaluate_eager(exec)?.is_null()),
+            Self::None { value, .. } => Ok(value.evaluate_eager(exec)?.is_null()),
+            Self::Bool { value, .. } => Ok(value.evaluate_eager(exec)?.into_bool(exec.graph)?),
         }
-        Ok(result)
     }
 }
 
 impl ast::ForIn {
     fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
-        let values = self.capture.evaluate_strict(exec)?.into_list(exec.graph)?;
+        let values = self.value.evaluate_eager(exec)?.into_list(exec.graph)?;
         let mut loop_locals = VariableMap::new_child(exec.locals);
         for value in values {
             loop_locals.clear();
             let mut loop_exec = ExecutionContext {
                 ctx: exec.ctx,
+                source: exec.source,
                 graph: exec.graph,
+                functions: exec.functions,
                 globals: exec.globals,
                 locals: &mut loop_locals,
                 current_regex_captures: exec.current_regex_captures,
@@ -436,6 +444,8 @@ impl ast::ForIn {
                 store: exec.store,
                 scoped_store: exec.scoped_store,
                 lazy_graph: exec.lazy_graph,
+                function_parameters: exec.function_parameters,
+                prev_element_debug_info: exec.prev_element_debug_info,
             };
             self.variable
                 .add_lazy(&mut loop_exec, value.into(), false)?;
@@ -463,6 +473,21 @@ impl ast::Expression {
             Self::RegexCapture(expr) => expr.evaluate_lazy(exec),
         }
     }
+
+    // Eagerly evaluate the expression to a `Value`, instead of a `LazyValue`. This method should
+    // only be called on expressions that are local (i.e., `is_local = true` in the checker).
+    fn evaluate_eager(&self, exec: &mut ExecutionContext) -> Result<graph::Value, ExecutionError> {
+        self.evaluate_lazy(exec)?.evaluate(&mut EvaluationContext {
+            ctx: exec.ctx,
+            source: exec.source,
+            graph: exec.graph,
+            functions: exec.functions,
+            store: exec.store,
+            scoped_store: exec.scoped_store,
+            function_parameters: exec.function_parameters,
+            prev_element_debug_info: exec.prev_element_debug_info,
+        })
+    }
 }
 
 impl ast::IntegerConstant {
@@ -472,13 +497,6 @@ impl ast::IntegerConstant {
 }
 
 impl ast::StringConstant {
-    fn evaluate_strict(
-        &self,
-        _exec: &mut ExecutionContext,
-    ) -> Result<graph::Value, ExecutionError> {
-        Ok(self.value.clone().into())
-    }
-
     fn evaluate_lazy(&self, _exec: &mut ExecutionContext) -> Result<LazyValue, ExecutionError> {
         Ok(self.value.clone().into())
     }
@@ -505,15 +523,6 @@ impl ast::SetComprehension {
 }
 
 impl ast::Capture {
-    fn evaluate_strict(&self, exec: &mut ExecutionContext) -> Result<graph::Value, ExecutionError> {
-        Ok(query_capture_value(
-            self.file_capture_index,
-            self.quantifier,
-            exec.mat,
-            exec.graph,
-        ))
-    }
-
     fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<LazyValue, ExecutionError> {
         Ok(query_capture_value(
             self.file_capture_index,
@@ -536,11 +545,6 @@ impl ast::Call {
 }
 
 impl ast::RegexCapture {
-    fn evaluate_strict(&self, exec: &mut ExecutionContext) -> Result<graph::Value, ExecutionError> {
-        let value = exec.current_regex_captures[self.match_index].clone();
-        Ok(value.into())
-    }
-
     fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<LazyValue, ExecutionError> {
         let value = exec.current_regex_captures[self.match_index].clone();
         Ok(value.into())
@@ -626,17 +630,6 @@ impl ast::ScopedVariable {
 }
 
 impl ast::UnscopedVariable {
-    fn evaluate_strict(&self, exec: &mut ExecutionContext) -> Result<graph::Value, ExecutionError> {
-        if let Some(value) = exec.globals.get(&self.name) {
-            Ok(value.clone())
-        } else {
-            Err(ExecutionError::UndefinedVariable(format!(
-                "global {}",
-                self.display_with(exec.ctx)
-            )))
-        }
-    }
-
     fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<LazyValue, ExecutionError> {
         if let Some(value) = exec.globals.get(&self.name) {
             Some(value.clone().into())

@@ -26,6 +26,8 @@ use crate::Location;
 pub enum CheckError {
     #[error("Expected list value at {0}")]
     ExpectedListValue(Location),
+    #[error("Expected local value at {0}")]
+    ExpectedLocalValue(Location),
     #[error("Expected optional value at {0}")]
     ExpectedOptionalValue(Location),
     #[error("Undefined syntax capture @{0} at {1}")]
@@ -130,8 +132,14 @@ impl ast::Assign {
 
 impl ast::CreateGraphNode {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<(), CheckError> {
-        self.node
-            .add_check(ctx, ExpressionResult { quantifier: One }, false)?;
+        self.node.add_check(
+            ctx,
+            ExpressionResult {
+                is_local: true,
+                quantifier: One,
+            },
+            false,
+        )?;
         Ok(())
     }
 }
@@ -167,7 +175,10 @@ impl ast::AddEdgeAttribute {
 
 impl ast::Scan {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<(), CheckError> {
-        self.value.check(ctx)?;
+        let value_result = self.value.check(ctx)?;
+        if !value_result.is_local {
+            return Err(CheckError::ExpectedLocalValue(self.location));
+        }
 
         for arm in &mut self.arms {
             let mut arm_locals = VariableMap::new_child(ctx.locals);
@@ -222,15 +233,21 @@ impl ast::If {
 
 impl ast::Condition {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<(), CheckError> {
-        let captures = match self {
-            Self::None(captures) => captures,
-            Self::Some(captures) => captures,
-        };
-
-        for capture in captures {
-            let result = capture.check(ctx)?;
-            if result.quantifier != ZeroOrOne {
-                return Err(CheckError::ExpectedOptionalValue(capture.location));
+        match self {
+            Self::None { value, location } | Self::Some { value, location } => {
+                let value_result = value.check(ctx)?;
+                if !value_result.is_local {
+                    return Err(CheckError::ExpectedLocalValue(*location));
+                }
+                if value_result.quantifier != ZeroOrOne {
+                    return Err(CheckError::ExpectedOptionalValue(*location));
+                }
+            }
+            Self::Bool { value, location } => {
+                let value_result = value.check(ctx)?;
+                if !value_result.is_local {
+                    return Err(CheckError::ExpectedLocalValue(*location));
+                }
             }
         }
         Ok(())
@@ -239,8 +256,11 @@ impl ast::Condition {
 
 impl ast::ForIn {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<(), CheckError> {
-        let capture = self.capture.check(ctx)?;
-        if capture.quantifier != ZeroOrMore && capture.quantifier != OneOrMore {
+        let value_result = self.value.check(ctx)?;
+        if !value_result.is_local {
+            return Err(CheckError::ExpectedLocalValue(self.location));
+        }
+        if value_result.quantifier != ZeroOrMore && value_result.quantifier != OneOrMore {
             return Err(CheckError::ExpectedListValue(self.location));
         }
 
@@ -252,7 +272,8 @@ impl ast::ForIn {
             stanza_index: ctx.stanza_index,
             stanza_query: ctx.stanza_query,
         };
-        self.variable.add_check(&mut loop_ctx, capture, false)?;
+        self.variable
+            .add_check(&mut loop_ctx, value_result, false)?;
         for statement in &mut self.statements {
             statement.check(&mut loop_ctx)?;
         }
@@ -266,15 +287,25 @@ impl ast::ForIn {
 /// Expression checking result
 #[derive(Clone, Debug)]
 struct ExpressionResult {
+    is_local: bool,
     quantifier: CaptureQuantifier,
 }
 
 impl ast::Expression {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
         match self {
-            Self::FalseLiteral => Ok(ExpressionResult { quantifier: One }),
-            Self::NullLiteral => Ok(ExpressionResult { quantifier: One }),
-            Self::TrueLiteral => Ok(ExpressionResult { quantifier: One }),
+            Self::FalseLiteral => Ok(ExpressionResult {
+                is_local: true,
+                quantifier: One,
+            }),
+            Self::NullLiteral => Ok(ExpressionResult {
+                is_local: true,
+                quantifier: One,
+            }),
+            Self::TrueLiteral => Ok(ExpressionResult {
+                is_local: true,
+                quantifier: One,
+            }),
             Self::IntegerConstant(expr) => expr.check(ctx),
             Self::StringConstant(expr) => expr.check(ctx),
             Self::List(expr) => expr.check(ctx),
@@ -287,35 +318,33 @@ impl ast::Expression {
     }
 }
 
-impl ast::ScanExpression {
-    fn check(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
-        match self {
-            Self::StringConstant(expr) => expr.check(ctx),
-            Self::Capture(expr) => expr.check(ctx),
-            Self::Variable(expr) => expr.get_check(ctx),
-            Self::RegexCapture(expr) => expr.check(ctx),
-        }
-    }
-}
-
 impl ast::IntegerConstant {
     fn check(&mut self, _ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
-        Ok(ExpressionResult { quantifier: One })
+        Ok(ExpressionResult {
+            is_local: true,
+            quantifier: One,
+        })
     }
 }
 
 impl ast::StringConstant {
     fn check(&mut self, _ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
-        Ok(ExpressionResult { quantifier: One })
+        Ok(ExpressionResult {
+            is_local: true,
+            quantifier: One,
+        })
     }
 }
 
 impl ast::ListComprehension {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
+        let mut is_local = true;
         for element in &mut self.elements {
-            element.check(ctx)?;
+            let element_result = element.check(ctx)?;
+            is_local &= element_result.is_local;
         }
         Ok(ExpressionResult {
+            is_local,
             quantifier: ZeroOrMore,
         })
     }
@@ -323,10 +352,13 @@ impl ast::ListComprehension {
 
 impl ast::SetComprehension {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
+        let mut is_local = true;
         for element in &mut self.elements {
-            element.check(ctx)?;
+            let element_result = element.check(ctx)?;
+            is_local &= element_result.is_local;
         }
         Ok(ExpressionResult {
+            is_local,
             quantifier: ZeroOrMore,
         })
     }
@@ -344,6 +376,7 @@ impl ast::Capture {
         self.quantifier =
             ctx.file_query.capture_quantifiers(ctx.stanza_index)[self.file_capture_index];
         Ok(ExpressionResult {
+            is_local: true,
             quantifier: self.quantifier,
         })
     }
@@ -351,10 +384,13 @@ impl ast::Capture {
 
 impl ast::Call {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
+        let mut is_local = true;
         for parameter in &mut self.parameters {
-            parameter.check(ctx)?;
+            let parameter_result = parameter.check(ctx)?;
+            is_local &= parameter_result.is_local;
         }
         Ok(ExpressionResult {
+            is_local,
             quantifier: One, // FIXME we don't really know
         })
     }
@@ -362,7 +398,10 @@ impl ast::Call {
 
 impl ast::RegexCapture {
     fn check(&mut self, _ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
-        Ok(ExpressionResult { quantifier: One })
+        Ok(ExpressionResult {
+            is_local: true,
+            quantifier: One,
+        })
     }
 }
 
@@ -408,6 +447,14 @@ impl ast::UnscopedVariable {
         value: ExpressionResult,
         mutable: bool,
     ) -> Result<(), CheckError> {
+        let mut value = value;
+        // Mutable variables are not considered local, because a non-local
+        // assignment in a loop could invalidate an earlier local assignment.
+        // Since we process all statement in order, we don't have info on later
+        // assignments, and and assume non-local to be sound.
+        if mutable {
+            value.is_local = false;
+        }
         ctx.locals
             .add(self.name, value, mutable)
             .map_err(|e| CheckError::Variable(e, format!("{}", self.name.display_with(ctx.ctx))))
@@ -418,6 +465,12 @@ impl ast::UnscopedVariable {
         ctx: &mut CheckContext,
         value: ExpressionResult,
     ) -> Result<(), CheckError> {
+        let mut value = value;
+        // Mutable variables are not considered local, because a non-local
+        // assignment in a loop could invalidate an earlier local assignment.
+        // Since we process all statement in order, we don't have info on later
+        // assignments, and and assume non-local to be sound.
+        value.is_local = false;
         ctx.locals
             .set(self.name, value)
             .map_err(|e| CheckError::Variable(e, format!("{}", self.name.display_with(ctx.ctx))))
@@ -430,7 +483,8 @@ impl ast::UnscopedVariable {
             .get(&self.name)
             .cloned()
             .unwrap_or_else(|| ExpressionResult {
-                quantifier: One, /* FIXME we don't really know */
+                is_local: true,
+                quantifier: One, // FIXME we don't really know
             });
         Ok(value)
     }
@@ -459,6 +513,7 @@ impl ast::ScopedVariable {
     fn get_check(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
         self.scope.check(ctx)?;
         Ok(ExpressionResult {
+            is_local: false,
             quantifier: One, // FIXME we don't really know
         })
     }

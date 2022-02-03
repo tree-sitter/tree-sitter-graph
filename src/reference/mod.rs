@@ -376,6 +376,8 @@
 //! Within each regular expression's block, you can use `$0`, `$1`, etc., to refer to any capture
 //! groups in the regular expression.
 //!
+//! The value being scanned must be local, which means it cannot be derived from scoped variables.
+//!
 //! For example, if `filepath` is a global variable containing the path of a Python source file,
 //! you could use the following `scan` statement to construct graph nodes for the name of the
 //! module defined in the file:
@@ -429,10 +431,11 @@
 //!
 //! # Conditionals
 //!
-//! You can use `if` statements to make blocks of statements conditional on the result of
-//! optional captures in queries.  Conditions are comma-separated lists of `some @capture`,
-//! indicating the capture must be present, and `none @capture` clauses, indicating the
-//! capture must be absent.
+//! You can use `if` statements to make blocks of statements conditional on optional values.
+//! Conditions are comma-separated lists of clauses.  The clause `some EXPRESSION` indicates
+//! that the optional value must be present.  The clause `none EXPRESSION` indicates that the
+//! optional value is absent.  A bare expression is evaluated as to boolean.  All values in
+//! conditions must be local, which means they cannot be derived from scoped variables.
 //!
 //! ``` tsg
 //! (lexical_declaration type:(_)? @type value:(_)? @value)
@@ -450,7 +453,7 @@
 //! # List iteration
 //!
 //! You can use a `for` statement to execute blocks of statements for every element in list
-//! captures in queries.
+//! values.  The list value must be local, which means it cannot be derived from scoped variables.
 //!
 //! ```tsg
 //! (module (_)* @stmts)

@@ -54,10 +54,6 @@ pub enum ParseError {
     ExpectedVariable(Location),
     #[error("Expected unscoped variable at {0}")]
     ExpectedUnscopedVariable(Location),
-    #[error("Expected list capture {0}")]
-    ExpectedListCapture(Location),
-    #[error("Expected optional capture {0}")]
-    ExpectedOptionalCapture(Location),
     #[error("Invalid regular expression /{0}/ at {1}")]
     InvalidRegex(String, Location),
     #[error("Nullable regular expression /{0}/ at {1}")]
@@ -447,7 +443,7 @@ impl Parser<'_> {
             }
             .into())
         } else if keyword == self.scan_keyword {
-            let value = self.parse_scan_expression()?;
+            let value = self.parse_expression()?;
             self.consume_whitespace();
             self.consume_token("{")?;
             self.consume_whitespace();
@@ -549,12 +545,12 @@ impl Parser<'_> {
             self.consume_whitespace();
             self.consume_token("in")?;
             self.consume_whitespace();
-            let capture = self.parse_capture()?;
+            let value = self.parse_expression()?;
             self.consume_whitespace();
             let statements = self.parse_statements()?;
             Ok(ast::ForIn {
                 variable,
-                capture,
+                value,
                 statements,
                 location: keyword_location,
             }
@@ -586,42 +582,25 @@ impl Parser<'_> {
 
     fn parse_condition(&mut self) -> Result<ast::Condition, ParseError> {
         let location = self.location;
-        let c = if let Ok(_) = self.consume_token("some") {
-            ast::Condition::Some
-        } else if let Ok(_) = self.consume_token("none") {
-            ast::Condition::None
-        } else {
-            return Err(ParseError::ExpectedToken("some | none", location));
-        };
-        let mut captures = Vec::new();
-        self.consume_whitespace();
-        while let Ok(capture) = self.parse_capture() {
-            captures.push(capture);
+        let condition = if let Ok(_) = self.consume_token("some") {
             self.consume_whitespace();
-        }
-        Ok(c(captures))
-    }
-
-    fn parse_scan_expression(&mut self) -> Result<ast::ScanExpression, ParseError> {
-        let expression = match self.peek()? {
-            '"' => self.parse_string()?.into(),
-            '@' => self.parse_capture()?.into(),
-            '$' => self.parse_regex_capture()?.into(),
-            ch if is_ident_start(ch) => {
-                let location = self.location;
-                let name = self.parse_identifier("variable name")?;
-                ast::UnscopedVariable { name, location }.into()
-            }
-            ch => {
-                return Err(ParseError::UnexpectedCharacter(
-                    ch,
-                    "expression",
-                    self.location,
-                ))
-            }
+            let value = self.parse_expression()?;
+            ast::Condition::Some { value, location }
+        } else if let Ok(_) = self.consume_token("none") {
+            self.consume_whitespace();
+            let value = self.parse_expression()?;
+            ast::Condition::None { value, location }
+        } else if let Ok(value) = self.parse_expression() {
+            self.consume_whitespace();
+            ast::Condition::Bool { value, location }
+        } else {
+            return Err(ParseError::ExpectedToken(
+                "(some|none)? EXPRESSION",
+                location,
+            ));
         };
         self.consume_whitespace();
-        Ok(expression)
+        Ok(condition)
     }
 
     fn parse_identifier(&mut self, within: &'static str) -> Result<Identifier, ParseError> {

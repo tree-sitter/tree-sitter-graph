@@ -507,6 +507,28 @@ fn can_execute_else() {
 }
 
 #[test]
+fn can_execute_if_literal() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module (import_statement)? @x) @root
+          {
+            node node0
+            if #true {
+              attr (node0) val = 0
+            } else {
+              attr (node0) val = 1
+            }
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            val: 0
+        "#},
+    );
+}
+
+#[test]
 fn skip_if_without_true_conditions() {
     check_execution(
         "pass",
@@ -600,7 +622,7 @@ fn variables_are_inherited_in_if_body() {
 }
 
 #[test]
-fn can_execute_for_in_nonempty_list() {
+fn can_execute_for_in_nonempty_list_capture() {
     check_execution(
         r#"
           pass
@@ -626,7 +648,7 @@ fn can_execute_for_in_nonempty_list() {
 }
 
 #[test]
-fn can_execute_for_in_empty_list() {
+fn can_execute_for_in_empty_list_capture() {
     check_execution(
         r#"
           pass
@@ -645,6 +667,30 @@ fn can_execute_for_in_empty_list() {
         indoc! {r#"
           node 0
             val: 0
+        "#},
+    );
+}
+
+#[test]
+fn can_execute_for_in_list_literal() {
+    check_execution(
+        r#"
+          pass
+        "#,
+        indoc! {r#"
+          (module) @root
+          {
+            var n = 0
+            for x in [#null, #null, #null] {
+              set n = (plus n 1)
+            }
+            node node0
+            attr (node0) val = n
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            val: 3
         "#},
     );
 }
@@ -719,6 +765,59 @@ fn variables_are_inherited_in_for_in_body() {
         indoc! {r#"
           node 0
             val: 3
+        "#},
+    );
+}
+
+#[test]
+fn can_execute_scan_of_local_call_expression() {
+    check_execution(
+        r#"
+          def get_f():
+            pass
+        "#,
+        indoc! {r#"
+          (function_definition
+            name: (identifier) @name)
+          {
+            node n
+            scan (source-text @name) {
+              "get_.*" {
+                attr (n) is_getter = #true
+              }
+            }
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            is_getter: #true
+        "#},
+    );
+}
+
+#[test]
+fn can_execute_scan_of_local_variable() {
+    check_execution(
+        r#"
+          def get_f():
+            pass
+        "#,
+        indoc! {r#"
+          (function_definition
+            name: (identifier) @name)
+          {
+            node n
+            let val = (source-text @name)
+            scan val {
+              "get_.*" {
+                attr (n) is_getter = #true
+              }
+            }
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            is_getter: #true
         "#},
     );
 }
