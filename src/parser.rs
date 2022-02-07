@@ -24,7 +24,7 @@ pub const FULL_MATCH: &str = "__tsg__full_match";
 
 impl ast::File {
     /// Parses a graph DSL file, returning a new `File` instance.
-    pub fn from_source(
+    pub fn from_str(
         language: Language,
         ctx: &mut Context,
         source: &str,
@@ -38,7 +38,7 @@ impl ast::File {
 
     /// Parses a graph DSL file, adding its content to an existing `File` instance.
     #[deprecated(
-        note = "Parsing multiple times into the same `File` instance is unsound. Use `File::from_source` instead."
+        note = "Parsing multiple times into the same `File` instance is unsound. Use `File::from_str` instead."
     )]
     pub fn parse(&mut self, ctx: &mut Context, content: &str) -> Result<(), ParseError> {
         Parser::new(ctx, content).parse_into_file(self)
