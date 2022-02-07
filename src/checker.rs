@@ -111,7 +111,7 @@ impl ast::Statement {
 impl ast::DeclareImmutable {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<(), CheckError> {
         let value = self.value.check(ctx)?;
-        self.variable.add_check(ctx, value, false)?;
+        self.variable.check_add(ctx, value, false)?;
         Ok(())
     }
 }
@@ -119,7 +119,7 @@ impl ast::DeclareImmutable {
 impl ast::DeclareMutable {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<(), CheckError> {
         let value = self.value.check(ctx)?;
-        self.variable.add_check(ctx, value, true)?;
+        self.variable.check_add(ctx, value, true)?;
         Ok(())
     }
 }
@@ -127,14 +127,14 @@ impl ast::DeclareMutable {
 impl ast::Assign {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<(), CheckError> {
         let value = self.value.check(ctx)?;
-        self.variable.set_check(ctx, value)?;
+        self.variable.check_set(ctx, value)?;
         Ok(())
     }
 }
 
 impl ast::CreateGraphNode {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<(), CheckError> {
-        self.node.add_check(
+        self.node.check_add(
             ctx,
             ExpressionResult {
                 is_local: true,
@@ -287,7 +287,7 @@ impl ast::ForIn {
             stanza_query: ctx.stanza_query,
         };
         self.variable
-            .add_check(&mut loop_ctx, value_result, false)?;
+            .check_add(&mut loop_ctx, value_result, false)?;
         for statement in &mut self.statements {
             statement.check(&mut loop_ctx)?;
         }
@@ -325,7 +325,7 @@ impl ast::Expression {
             Self::List(expr) => expr.check(ctx),
             Self::Set(expr) => expr.check(ctx),
             Self::Capture(expr) => expr.check(ctx),
-            Self::Variable(expr) => expr.get_check(ctx),
+            Self::Variable(expr) => expr.check_get(ctx),
             Self::Call(expr) => expr.check(ctx),
             Self::RegexCapture(expr) => expr.check(ctx),
         }
@@ -423,39 +423,39 @@ impl ast::RegexCapture {
 // Variables
 
 impl ast::Variable {
-    fn add_check(
+    fn check_add(
         &mut self,
         ctx: &mut CheckContext,
         value: ExpressionResult,
         mutable: bool,
     ) -> Result<(), CheckError> {
         match self {
-            Self::Unscoped(v) => v.add_check(ctx, value, mutable),
-            Self::Scoped(v) => v.add_check(ctx, value, mutable),
+            Self::Unscoped(v) => v.check_add(ctx, value, mutable),
+            Self::Scoped(v) => v.check_add(ctx, value, mutable),
         }
     }
 
-    fn set_check(
+    fn check_set(
         &mut self,
         ctx: &mut CheckContext,
         value: ExpressionResult,
     ) -> Result<(), CheckError> {
         match self {
-            Self::Unscoped(v) => v.set_check(ctx, value),
-            Self::Scoped(v) => v.set_check(ctx, value),
+            Self::Unscoped(v) => v.check_set(ctx, value),
+            Self::Scoped(v) => v.check_set(ctx, value),
         }
     }
 
-    fn get_check(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
+    fn check_get(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
         match self {
-            Self::Unscoped(v) => v.get_check(ctx),
-            Self::Scoped(v) => v.get_check(ctx),
+            Self::Unscoped(v) => v.check_get(ctx),
+            Self::Scoped(v) => v.check_get(ctx),
         }
     }
 }
 
 impl ast::UnscopedVariable {
-    fn add_check(
+    fn check_add(
         &mut self,
         ctx: &mut CheckContext,
         value: ExpressionResult,
@@ -465,7 +465,7 @@ impl ast::UnscopedVariable {
         // Mutable variables are not considered local, because a non-local
         // assignment in a loop could invalidate an earlier local assignment.
         // Since we process all statement in order, we don't have info on later
-        // assignments, and and assume non-local to be sound.
+        // assignments, and can assume non-local to be sound.
         if mutable {
             value.is_local = false;
         }
@@ -474,7 +474,7 @@ impl ast::UnscopedVariable {
             .map_err(|e| CheckError::Variable(e, format!("{}", self.name.display_with(ctx.ctx))))
     }
 
-    fn set_check(
+    fn check_set(
         &mut self,
         ctx: &mut CheckContext,
         value: ExpressionResult,
@@ -483,14 +483,14 @@ impl ast::UnscopedVariable {
         // Mutable variables are not considered local, because a non-local
         // assignment in a loop could invalidate an earlier local assignment.
         // Since we process all statement in order, we don't have info on later
-        // assignments, and and assume non-local to be sound.
+        // assignments, and can assume non-local to be sound.
         value.is_local = false;
         ctx.locals
             .set(self.name, value)
             .map_err(|e| CheckError::Variable(e, format!("{}", self.name.display_with(ctx.ctx))))
     }
 
-    fn get_check(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
+    fn check_get(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
         // If the variable is not found, we return a default value for a possible global variable.
         let value = ctx
             .locals
@@ -505,7 +505,7 @@ impl ast::UnscopedVariable {
 }
 
 impl ast::ScopedVariable {
-    fn add_check(
+    fn check_add(
         &mut self,
         ctx: &mut CheckContext,
         _value: ExpressionResult,
@@ -515,7 +515,7 @@ impl ast::ScopedVariable {
         Ok(())
     }
 
-    fn set_check(
+    fn check_set(
         &mut self,
         ctx: &mut CheckContext,
         _value: ExpressionResult,
@@ -524,7 +524,7 @@ impl ast::ScopedVariable {
         Ok(())
     }
 
-    fn get_check(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
+    fn check_get(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
         self.scope.check(ctx)?;
         Ok(ExpressionResult {
             is_local: false,
