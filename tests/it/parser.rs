@@ -27,7 +27,7 @@ fn can_parse_blocks() {
           set @cap2.var1 = loc1
         }
     "#;
-    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
         .expect("Cannot parse file");
 
     let loc1 = ctx.add_identifier("loc1");
@@ -230,7 +230,7 @@ fn can_parse_literals() {
           let t = #true
         }
     "#;
-    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
         .expect("Cannot parse file");
 
     let f = ctx.add_identifier("f");
@@ -288,7 +288,7 @@ fn can_parse_strings() {
           let loc1 = "\"abc,\ndef\\"
         }
     "#;
-    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
         .expect("Cannot parse file");
 
     let loc1 = ctx.add_identifier("loc1");
@@ -324,7 +324,7 @@ fn can_parse_lists() {
           let list3 = ["hello", "world",]
         }
     "#;
-    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
         .expect("Cannot parse file");
 
     let list1 = ctx.add_identifier("list1");
@@ -403,7 +403,7 @@ fn can_parse_sets() {
           let set3 = {"hello", "world",}
         }
     "#;
-    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
         .expect("Cannot parse file");
 
     let set1 = ctx.add_identifier("set1");
@@ -480,7 +480,7 @@ fn can_parse_print() {
           print "x =", 5
         }    
     "#;
-    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
         .expect("Cannot parse file");
 
     let statements = file
@@ -517,7 +517,7 @@ fn cannot_parse_nullable_regex() {
           node n
         }
     "#;
-    if let Ok(_) = File::from_source(tree_sitter_python::language(), &mut ctx, source) {
+    if let Ok(_) = File::from_str(tree_sitter_python::language(), &mut ctx, source) {
         panic!("Parse succeeded unexpectedly");
     }
 }
@@ -531,7 +531,7 @@ fn can_parse_star_capture() {
           print @stmts
         }
     "#;
-    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
         .expect("Cannot parse file");
 
     let stmts = ctx.add_identifier("stmts");
@@ -568,7 +568,7 @@ fn can_parse_star_multiple_capture() {
           print @stmts
         }
     "#;
-    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
         .expect("Cannot parse file");
 
     let stmt = ctx.add_identifier("stmt");
@@ -619,7 +619,7 @@ fn can_parse_plus_capture() {
           print @stmts
         }
     "#;
-    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
         .expect("Cannot parse file");
 
     let stmts = ctx.add_identifier("stmts");
@@ -655,7 +655,7 @@ fn can_parse_optional_capture() {
           print @stmt
         }
     "#;
-    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
         .expect("Cannot parse file");
 
     let stmt = ctx.add_identifier("stmt");
@@ -691,7 +691,7 @@ fn can_parse_parent_optional_capture() {
           print @stmt
         }
     "#;
-    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
         .expect("Cannot parse file");
 
     let stmt = ctx.add_identifier("stmt");
@@ -727,7 +727,7 @@ fn can_parse_alternative_capture() {
           print @stmt
         }
     "#;
-    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
         .expect("Cannot parse file");
 
     let stmt = ctx.add_identifier("stmt");
@@ -763,7 +763,7 @@ fn can_parse_nested_plus_and_optional_capture() {
           print @stmt
         }
     "#;
-    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
         .expect("Cannot parse file");
 
     let stmt = ctx.add_identifier("stmt");
@@ -801,7 +801,7 @@ fn can_parse_if() {
           }
         }
     "#;
-    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
         .expect("Cannot parse file");
 
     let x = ctx.add_identifier("x");
@@ -855,7 +855,7 @@ fn can_parse_if_elif() {
           }
         }
     "#;
-    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
         .expect("Cannot parse file");
 
     let x = ctx.add_identifier("x");
@@ -934,7 +934,7 @@ fn can_parse_if_else() {
           }
         }
     "#;
-    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
         .expect("Cannot parse file");
 
     let x = ctx.add_identifier("x");
@@ -1000,7 +1000,7 @@ fn cannot_parse_if_some_list_capture() {
           }
         }
     "#;
-    if let Ok(_) = File::from_source(tree_sitter_python::language(), &mut ctx, source) {
+    if let Ok(_) = File::from_str(tree_sitter_python::language(), &mut ctx, source) {
         panic!("Parse succeeded unexpectedly");
     }
 }
@@ -1016,7 +1016,7 @@ fn can_parse_for_in() {
           }
         }
     "#;
-    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
         .expect("Cannot parse file");
 
     let xs = ctx.add_identifier("xs");
@@ -1068,7 +1068,7 @@ fn cannot_parse_for_in_optional_capture() {
           }
         }
     "#;
-    if let Ok(_) = File::from_source(tree_sitter_python::language(), &mut ctx, source) {
+    if let Ok(_) = File::from_str(tree_sitter_python::language(), &mut ctx, source) {
         panic!("Parse succeeded unexpectedly");
     }
 }
@@ -1088,7 +1088,7 @@ fn cannot_parse_scan_of_nonlocal_call_expression() {
         }
       }
     "#;
-    if let Ok(_) = File::from_source(tree_sitter_python::language(), &mut ctx, source) {
+    if let Ok(_) = File::from_str(tree_sitter_python::language(), &mut ctx, source) {
         panic!("Parse succeeded unexpectedly");
     }
 }
@@ -1109,7 +1109,7 @@ fn cannot_parse_scan_of_nonlocal_variable() {
         }
       }
     "#;
-    if let Ok(_) = File::from_source(tree_sitter_python::language(), &mut ctx, source) {
+    if let Ok(_) = File::from_str(tree_sitter_python::language(), &mut ctx, source) {
         panic!("Parse succeeded unexpectedly");
     }
 }

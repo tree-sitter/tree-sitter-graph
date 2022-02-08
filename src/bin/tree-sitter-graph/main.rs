@@ -69,7 +69,7 @@ fn main() -> Result<()> {
         .parse(&source, None)
         .ok_or_else(|| anyhow!("Could not parse {}", source_path.display()))?;
     let mut ctx = Context::new();
-    let file = File::from_source(language, &mut ctx, &tsg)
+    let file = File::from_str(language, &mut ctx, &tsg)
         .with_context(|| anyhow!("Error parsing TSG file {}", tsg_path.display()))?;
     let mut functions = Functions::stdlib(&mut ctx);
     let globals = Variables::new();
