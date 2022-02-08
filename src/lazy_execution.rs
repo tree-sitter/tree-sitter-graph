@@ -13,7 +13,6 @@ use anyhow::Context as _;
 use log::{debug, trace};
 
 use std::collections::HashMap;
-use std::fmt;
 
 use tree_sitter::CaptureQuantifier::One;
 use tree_sitter::QueryCursor;
@@ -25,13 +24,10 @@ use crate::execution::query_capture_value;
 use crate::execution::ExecutionError;
 use crate::functions::Functions;
 use crate::graph;
-use crate::graph::DisplayWithGraph as _;
 use crate::graph::Graph;
 use crate::variables::Globals;
 use crate::variables::VariableMap;
 use crate::variables::Variables;
-use crate::Context;
-use crate::DisplayWithContext as _;
 use crate::Identifier;
 
 use statements::*;
@@ -44,14 +40,13 @@ impl ast::File {
     /// provide the set of functions and global variables that are available during execution.
     pub fn execute_lazy<'tree>(
         &self,
-        ctx: &Context,
         tree: &'tree Tree,
         source: &'tree str,
         functions: &mut Functions,
         globals: &Globals,
     ) -> Result<Graph<'tree>, ExecutionError> {
         let mut graph = Graph::new();
-        self.execute_lazy_into(ctx, &mut graph, tree, source, functions, globals)?;
+        self.execute_lazy_into(&mut graph, tree, source, functions, globals)?;
         Ok(graph)
     }
 
@@ -62,7 +57,6 @@ impl ast::File {
     /// “pre-seed” the graph with some predefined nodes and/or edges before executing the DSL file.
     pub fn execute_lazy_into<'tree>(
         &self,
-        ctx: &Context,
         graph: &mut Graph<'tree>,
         tree: &'tree Tree,
         source: &'tree str,
@@ -85,7 +79,6 @@ impl ast::File {
         for mat in matches {
             let stanza = &self.stanzas[mat.pattern_index];
             stanza.execute_lazy(
-                ctx,
                 source,
                 &mat,
                 graph,
@@ -103,7 +96,6 @@ impl ast::File {
         for graph_stmt in &lazy_graph {
             graph_stmt
                 .evaluate(&mut EvaluationContext {
-                    ctx,
                     source,
                     graph,
                     functions,
@@ -112,7 +104,7 @@ impl ast::File {
                     function_parameters: &mut function_parameters,
                     prev_element_debug_info: &mut prev_element_debug_info,
                 })
-                .with_context(|| format!("Executing {}", graph_stmt.display_with(ctx, &graph)))?;
+                .with_context(|| format!("Executing {}", graph_stmt))?;
         }
 
         Ok(())
@@ -121,7 +113,6 @@ impl ast::File {
 
 /// Context for execution, which executes stanzas to build the lazy graph
 struct ExecutionContext<'a, 'g, 'tree> {
-    ctx: &'a Context,
     source: &'tree str,
     graph: &'a mut Graph<'tree>,
     functions: &'a mut Functions,
@@ -138,7 +129,6 @@ struct ExecutionContext<'a, 'g, 'tree> {
 
 /// Context for evaluation, which evalautes the lazy graph to build the actual graph
 pub(self) struct EvaluationContext<'a, 'tree> {
-    pub ctx: &'a Context,
     pub source: &'tree str,
     pub graph: &'a mut Graph<'tree>,
     pub functions: &'a mut Functions,
@@ -158,7 +148,6 @@ pub(super) enum GraphElementKey {
 impl ast::Stanza {
     fn execute_lazy<'l, 'g, 'q, 'tree>(
         &self,
-        ctx: &Context,
         source: &'tree str,
         mat: &QueryMatch<'_, 'tree>,
         graph: &mut Graph<'tree>,
@@ -174,7 +163,6 @@ impl ast::Stanza {
         let current_regex_captures = vec![];
         locals.clear();
         let mut exec = ExecutionContext {
-            ctx,
             source,
             graph,
             functions,
@@ -189,16 +177,12 @@ impl ast::Stanza {
             prev_element_debug_info,
         };
         let node = query_capture_value(self.full_match_file_capture_index, One, &mat, exec.graph);
-        debug!(
-            "match {} at {}",
-            node.display_with(exec.graph),
-            self.location
-        );
+        debug!("match {} at {}", node, self.location);
         trace!("{{");
         for statement in &self.statements {
             statement
                 .execute_lazy(&mut exec)
-                .with_context(|| format!("Executing {}", statement.display_with(exec.ctx)))?;
+                .with_context(|| format!("Executing {}", statement))?;
         }
         trace!("}}");
         Ok(())
@@ -290,7 +274,7 @@ impl ast::AddEdgeAttribute {
 
 impl ast::Scan {
     fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
-        let match_string = self.value.evaluate_eager(exec)?.into_string(exec.graph)?;
+        let match_string = self.value.evaluate_eager(exec)?.into_string()?;
 
         let mut i = 0;
         let mut matches = Vec::new();
@@ -329,7 +313,6 @@ impl ast::Scan {
 
             let mut arm_locals = VariableMap::new_child(exec.locals);
             let mut arm_exec = ExecutionContext {
-                ctx: exec.ctx,
                 source: exec.source,
                 graph: exec.graph,
                 functions: exec.functions,
@@ -347,7 +330,7 @@ impl ast::Scan {
             for statement in &arm.statements {
                 statement
                     .execute_lazy(&mut arm_exec)
-                    .with_context(|| format!("Executing {}", statement.display_with(arm_exec.ctx)))
+                    .with_context(|| format!("Executing {}", statement))
                     .with_context(|| {
                         format!(
                             "Matching {} with arm \"{}\" {{ ... }}",
@@ -390,7 +373,6 @@ impl ast::If {
             if result {
                 let mut arm_locals = VariableMap::new_child(exec.locals);
                 let mut arm_exec = ExecutionContext {
-                    ctx: exec.ctx,
                     source: exec.source,
                     graph: exec.graph,
                     functions: exec.functions,
@@ -421,19 +403,18 @@ impl ast::Condition {
         match self {
             Self::Some { value, .. } => Ok(!value.evaluate_eager(exec)?.is_null()),
             Self::None { value, .. } => Ok(value.evaluate_eager(exec)?.is_null()),
-            Self::Bool { value, .. } => Ok(value.evaluate_eager(exec)?.into_bool(exec.graph)?),
+            Self::Bool { value, .. } => Ok(value.evaluate_eager(exec)?.into_boolean()?),
         }
     }
 }
 
 impl ast::ForIn {
     fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
-        let values = self.value.evaluate_eager(exec)?.into_list(exec.graph)?;
+        let values = self.value.evaluate_eager(exec)?.into_list()?;
         let mut loop_locals = VariableMap::new_child(exec.locals);
         for value in values {
             loop_locals.clear();
             let mut loop_exec = ExecutionContext {
-                ctx: exec.ctx,
                 source: exec.source,
                 graph: exec.graph,
                 functions: exec.functions,
@@ -478,7 +459,6 @@ impl ast::Expression {
     // only be called on expressions that are local (i.e., `is_local = true` in the checker).
     fn evaluate_eager(&self, exec: &mut ExecutionContext) -> Result<graph::Value, ExecutionError> {
         self.evaluate_lazy(exec)?.evaluate(&mut EvaluationContext {
-            ctx: exec.ctx,
             source: exec.source,
             graph: exec.graph,
             functions: exec.functions,
@@ -540,7 +520,7 @@ impl ast::Call {
         for parameter in &self.parameters {
             parameters.push(parameter.evaluate_lazy(exec)?);
         }
-        Ok(LazyCall::new(self.function, parameters).into())
+        Ok(LazyCall::new(self.function.clone(), parameters).into())
     }
 }
 
@@ -588,7 +568,7 @@ impl ast::Variable {
 impl ast::ScopedVariable {
     fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<LazyValue, ExecutionError> {
         let scope = self.scope.evaluate_lazy(exec)?;
-        let value = LazyScopedVariable::new(scope, self.name);
+        let value = LazyScopedVariable::new(scope, self.name.clone());
         Ok(value.into())
     }
 
@@ -601,30 +581,27 @@ impl ast::ScopedVariable {
         if mutable {
             return Err(ExecutionError::CannotDefineMutableScopedVariable(format!(
                 "{}",
-                self.display_with(exec.ctx)
+                self
             )));
         }
         let scope = self.scope.evaluate_lazy(exec)?;
-        let variable = exec
-            .store
-            .add(value, self.location.into(), exec.ctx, exec.graph);
+        let variable = exec.store.add(value, self.location.into());
         exec.scoped_store.add(
             scope,
-            self.name,
+            self.name.clone(),
             variable.into(),
             self.location.into(),
-            exec.ctx,
         )
     }
 
     fn set_lazy(
         &self,
-        exec: &mut ExecutionContext,
+        _exec: &mut ExecutionContext,
         _value: LazyValue,
     ) -> Result<(), ExecutionError> {
         Err(ExecutionError::CannotAssignScopedVariable(format!(
             "{}",
-            self.display_with(exec.ctx)
+            self
         )))
     }
 }
@@ -636,9 +613,7 @@ impl ast::UnscopedVariable {
         } else {
             exec.locals.get(&self.name).map(|value| value.clone())
         }
-        .ok_or_else(|| {
-            ExecutionError::UndefinedVariable(format!("{}", self.display_with(exec.ctx)))
-        })
+        .ok_or_else(|| ExecutionError::UndefinedVariable(format!("{}", self)))
     }
 }
 
@@ -652,17 +627,13 @@ impl ast::UnscopedVariable {
         if exec.globals.get(&self.name).is_some() {
             return Err(ExecutionError::DuplicateVariable(format!(
                 " global {}",
-                self.display_with(exec.ctx)
+                self
             )));
         }
-        let value = exec
-            .store
-            .add(value, self.location.into(), exec.ctx, exec.graph);
+        let value = exec.store.add(value, self.location.into());
         exec.locals
-            .add(self.name, value.into(), mutable)
-            .map_err(|_| {
-                ExecutionError::DuplicateVariable(format!(" local {}", self.display_with(exec.ctx)))
-            })
+            .add(self.name.clone(), value.into(), mutable)
+            .map_err(|_| ExecutionError::DuplicateVariable(format!(" local {}", self)))
     }
 
     fn set_lazy(
@@ -673,69 +644,26 @@ impl ast::UnscopedVariable {
         if exec.globals.get(&self.name).is_some() {
             return Err(ExecutionError::CannotAssignImmutableVariable(format!(
                 " global {}",
-                self.display_with(exec.ctx)
+                self
             )));
         }
-        let value = exec
-            .store
-            .add(value, self.location.into(), exec.ctx, exec.graph);
-        exec.locals.set(self.name, value.into()).map_err(|_| {
-            if exec.locals.get(&self.name).is_some() {
-                ExecutionError::CannotAssignImmutableVariable(format!(
-                    "{}",
-                    self.display_with(exec.ctx)
-                ))
-            } else {
-                ExecutionError::UndefinedVariable(format!("{}", self.display_with(exec.ctx)))
-            }
-        })
+        let value = exec.store.add(value, self.location.into());
+        exec.locals
+            .set(self.name.clone(), value.into())
+            .map_err(|_| {
+                if exec.locals.get(&self.name).is_some() {
+                    ExecutionError::CannotAssignImmutableVariable(format!("{}", self))
+                } else {
+                    ExecutionError::UndefinedVariable(format!("{}", self))
+                }
+            })
     }
 }
 
 impl ast::Attribute {
     fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<LazyAttribute, ExecutionError> {
         let value = self.value.evaluate_lazy(exec)?;
-        let attribute = LazyAttribute::new(self.name, value);
+        let attribute = LazyAttribute::new(self.name.clone(), value);
         Ok(attribute)
-    }
-}
-
-/// Trait to Display with a given Context and Graph
-pub trait DisplayWithContextAndGraph
-where
-    Self: Sized,
-{
-    fn fmt<'tree>(
-        &self,
-        f: &mut fmt::Formatter,
-        ctx: &Context,
-        graph: &Graph<'tree>,
-    ) -> fmt::Result;
-
-    fn display_with<'a, 'tree>(
-        &'a self,
-        ctx: &'a Context,
-        graph: &'a Graph<'tree>,
-    ) -> Box<dyn fmt::Display + 'a> {
-        struct Impl<'a, 'tree, T: DisplayWithContextAndGraph>(&'a T, &'a Context, &'a Graph<'tree>);
-
-        impl<'a, 'tree, T: DisplayWithContextAndGraph> fmt::Display for Impl<'a, 'tree, T> {
-            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                self.0.fmt(f, self.1, self.2)
-            }
-        }
-
-        Box::new(Impl(self, ctx, graph))
-    }
-}
-
-impl<T: DisplayWithContextAndGraph> DisplayWithContextAndGraph for Box<T> {
-    fn fmt<'tree>(
-        &self,
-        f: &mut fmt::Formatter,
-        ctx: &Context,
-        graph: &Graph<'tree>,
-    ) -> fmt::Result {
-        self.as_ref().fmt(f, ctx, graph)
     }
 }

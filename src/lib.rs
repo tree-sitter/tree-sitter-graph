@@ -42,73 +42,74 @@ pub use execution::Globals as Variables;
 pub use parser::Location;
 pub use parser::ParseError;
 
-use string_interner::symbol::SymbolU32;
-use string_interner::StringInterner;
+use std::borrow::Borrow;
+use std::hash::Hash;
+use std::ops::Deref;
+use std::rc::Rc;
 
-use std::fmt;
+use serde::Serialize;
+use serde::Serializer;
 
 /// An identifier that appears in a graph DSL file or in the graph that is produced as an output.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Identifier(SymbolU32);
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct Identifier(Rc<String>);
 
-impl DisplayWithContext for Identifier {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
-        write!(f, "{}", ctx.identifiers.resolve(self.0).unwrap())
+impl Identifier {
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+
+    pub fn into_string(mut self) -> String {
+        Rc::make_mut(&mut self.0);
+        Rc::try_unwrap(self.0).unwrap()
     }
 }
 
-/// A context in which graph DSL files are executed.
-#[derive(Default)]
-pub struct Context {
-    identifiers: StringInterner,
-}
-
-impl Context {
-    /// Creates a new, empty execution context.
-    pub fn new() -> Context {
-        Context::default()
-    }
-
-    /// Adds an identifier to the context.
-    #[inline(always)]
-    pub fn add_identifier<T: AsRef<str>>(&mut self, identifier: T) -> Identifier {
-        Identifier(self.identifiers.get_or_intern(identifier))
-    }
-
-    /// Returns the [`Identifier`][] instance for an identifier, if it has already been added to
-    /// the context.  Returns `None` otherwise.
-    #[inline(always)]
-    pub fn get_identifier<T: AsRef<str>>(&self, identifier: T) -> Option<Identifier> {
-        self.identifiers.get(identifier).map(Identifier)
-    }
-
-    pub fn resolve(&self, identifier: Identifier) -> &str {
-        self.identifiers.resolve(identifier.0).unwrap()
+impl Borrow<str> for Identifier {
+    fn borrow(&self) -> &str {
+        self.as_str()
     }
 }
 
-/// Trait to Display with a given Context
-pub trait DisplayWithContext
-where
-    Self: Sized,
-{
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result;
-
-    fn display_with<'a>(&'a self, ctx: &'a Context) -> Box<dyn fmt::Display + 'a> {
-        struct Impl<'a, T: DisplayWithContext>(&'a T, &'a Context);
-
-        impl<'a, T: DisplayWithContext> fmt::Display for Impl<'a, T> {
-            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                self.0.fmt(f, self.1)
-            }
-        }
-
-        Box::new(Impl(self, ctx))
+impl Deref for Identifier {
+    type Target = str;
+    fn deref(&self) -> &str {
+        self.as_str()
     }
 }
 
-impl<T: DisplayWithContext> DisplayWithContext for Box<T> {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
-        self.as_ref().fmt(f, ctx)
+impl std::fmt::Display for Identifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl From<&str> for Identifier {
+    fn from(value: &str) -> Identifier {
+        Identifier(Rc::new(String::from(value)))
+    }
+}
+
+impl Hash for Identifier {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
+
+impl PartialEq<str> for Identifier {
+    fn eq(&self, other: &str) -> bool {
+        self.as_str() == other
+    }
+}
+
+impl<'a> PartialEq<&'a str> for Identifier {
+    fn eq(&self, other: &&'a str) -> bool {
+        self.as_str() == *other
+    }
+}
+
+impl Serialize for Identifier {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
     }
 }

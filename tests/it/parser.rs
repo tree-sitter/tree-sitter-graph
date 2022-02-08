@@ -8,12 +8,11 @@
 use tree_sitter::CaptureQuantifier::*;
 
 use tree_sitter_graph::ast::*;
-use tree_sitter_graph::Context;
+use tree_sitter_graph::Identifier;
 use tree_sitter_graph::Location;
 
 #[test]
 fn can_parse_blocks() {
-    let mut ctx = Context::new();
     let source = r#"
         (function_definition
           name: (identifier) @cap1) @cap2
@@ -27,16 +26,15 @@ fn can_parse_blocks() {
           set @cap2.var1 = loc1
         }
     "#;
-    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
-        .expect("Cannot parse file");
+    let file = File::from_str(tree_sitter_python::language(), source).expect("Cannot parse file");
 
-    let loc1 = ctx.add_identifier("loc1");
-    let precedence = ctx.add_identifier("precedence");
-    let pop = ctx.add_identifier("pop");
-    let prop1 = ctx.add_identifier("prop1");
-    let push = ctx.add_identifier("push");
-    let cap2 = ctx.add_identifier("cap2");
-    let var1 = ctx.add_identifier("var1");
+    let loc1 = Identifier::from("loc1");
+    let precedence = Identifier::from("precedence");
+    let pop = Identifier::from("pop");
+    let prop1 = Identifier::from("prop1");
+    let push = Identifier::from("push");
+    let cap2 = Identifier::from("cap2");
+    let var1 = Identifier::from("var1");
 
     let statements = file
         .stanzas
@@ -48,7 +46,7 @@ fn can_parse_blocks() {
         vec![vec![
             CreateGraphNode {
                 node: UnscopedVariable {
-                    name: loc1,
+                    name: loc1.clone(),
                     location: Location { row: 4, column: 15 }
                 }
                 .into(),
@@ -60,14 +58,14 @@ fn can_parse_blocks() {
                     scope: Box::new(
                         Capture {
                             quantifier: One,
-                            name: cap2,
+                            name: cap2.clone(),
                             file_capture_index: 1,
                             stanza_capture_index: 1,
                             location: Location { row: 5, column: 15 }
                         }
                         .into()
                     ),
-                    name: prop1,
+                    name: prop1.clone(),
                     location: Location { row: 5, column: 21 }
                 }
                 .into(),
@@ -79,19 +77,19 @@ fn can_parse_blocks() {
                     scope: Box::new(
                         Capture {
                             quantifier: One,
-                            name: cap2,
+                            name: cap2.clone(),
                             file_capture_index: 1,
                             stanza_capture_index: 1,
                             location: Location { row: 6, column: 15 }
                         }
                         .into()
                     ),
-                    name: prop1,
+                    name: prop1.clone(),
                     location: Location { row: 6, column: 21 }
                 }
                 .into(),
                 sink: UnscopedVariable {
-                    name: loc1,
+                    name: loc1.clone(),
                     location: Location { row: 6, column: 30 },
                 }
                 .into(),
@@ -103,19 +101,19 @@ fn can_parse_blocks() {
                     scope: Box::new(
                         Capture {
                             quantifier: One,
-                            name: cap2,
+                            name: cap2.clone(),
                             file_capture_index: 1,
                             stanza_capture_index: 1,
                             location: Location { row: 7, column: 16 }
                         }
                         .into()
                     ),
-                    name: prop1,
+                    name: prop1.clone(),
                     location: Location { row: 7, column: 22 },
                 }
                 .into(),
                 sink: UnscopedVariable {
-                    name: loc1.into(),
+                    name: loc1.clone(),
                     location: Location { row: 7, column: 31 },
                 }
                 .into(),
@@ -131,25 +129,25 @@ fn can_parse_blocks() {
                     scope: Box::new(
                         Capture {
                             quantifier: One,
-                            name: cap2,
+                            name: cap2.clone(),
                             file_capture_index: 1,
                             stanza_capture_index: 1,
                             location: Location { row: 8, column: 16 }
                         }
                         .into()
                     ),
-                    name: prop1,
+                    name: prop1.clone(),
                     location: Location { row: 8, column: 22 },
                 }
                 .into(),
                 attributes: vec![
                     Attribute {
-                        name: push,
+                        name: push.clone(),
                         value: String::from("str2").into(),
                     },
                     Attribute {
-                        name: pop,
-                        value: Expression::TrueLiteral
+                        name: pop.clone(),
+                        value: Expression::TrueLiteral,
                     },
                 ],
                 location: Location { row: 8, column: 10 },
@@ -160,19 +158,19 @@ fn can_parse_blocks() {
                     scope: Box::new(
                         Capture {
                             quantifier: One,
-                            name: cap2,
+                            name: cap2.clone(),
                             file_capture_index: 1,
                             stanza_capture_index: 1,
                             location: Location { row: 9, column: 14 }
                         }
                         .into()
                     ),
-                    name: var1,
+                    name: var1.clone(),
                     location: Location { row: 9, column: 20 },
                 }
                 .into(),
                 value: UnscopedVariable {
-                    name: loc1,
+                    name: loc1.clone(),
                     location: Location { row: 9, column: 27 },
                 }
                 .into(),
@@ -184,7 +182,7 @@ fn can_parse_blocks() {
                     scope: Box::new(
                         Capture {
                             quantifier: One,
-                            name: cap2,
+                            name: cap2.clone(),
                             file_capture_index: 1,
                             stanza_capture_index: 1,
                             location: Location {
@@ -194,7 +192,7 @@ fn can_parse_blocks() {
                         }
                         .into()
                     ),
-                    name: var1,
+                    name: var1.clone(),
                     location: Location {
                         row: 10,
                         column: 20
@@ -202,7 +200,7 @@ fn can_parse_blocks() {
                 }
                 .into(),
                 value: UnscopedVariable {
-                    name: loc1,
+                    name: loc1.clone(),
                     location: Location {
                         row: 10,
                         column: 27
@@ -221,7 +219,6 @@ fn can_parse_blocks() {
 
 #[test]
 fn can_parse_literals() {
-    let mut ctx = Context::new();
     let source = r#"
         (identifier)
         {
@@ -230,12 +227,11 @@ fn can_parse_literals() {
           let t = #true
         }
     "#;
-    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
-        .expect("Cannot parse file");
+    let file = File::from_str(tree_sitter_python::language(), source).expect("Cannot parse file");
 
-    let f = ctx.add_identifier("f");
-    let n = ctx.add_identifier("n");
-    let t = ctx.add_identifier("t");
+    let f = Identifier::from("f");
+    let n = Identifier::from("n");
+    let t = Identifier::from("t");
 
     let statements = file
         .stanzas
@@ -247,7 +243,7 @@ fn can_parse_literals() {
         vec![vec![
             DeclareImmutable {
                 variable: UnscopedVariable {
-                    name: f,
+                    name: f.clone(),
                     location: Location { row: 3, column: 14 }
                 }
                 .into(),
@@ -257,7 +253,7 @@ fn can_parse_literals() {
             .into(),
             DeclareImmutable {
                 variable: UnscopedVariable {
-                    name: n,
+                    name: n.clone(),
                     location: Location { row: 4, column: 14 }
                 }
                 .into(),
@@ -267,7 +263,7 @@ fn can_parse_literals() {
             .into(),
             DeclareImmutable {
                 variable: UnscopedVariable {
-                    name: t,
+                    name: t.clone(),
                     location: Location { row: 5, column: 14 }
                 }
                 .into(),
@@ -281,17 +277,15 @@ fn can_parse_literals() {
 
 #[test]
 fn can_parse_strings() {
-    let mut ctx = Context::new();
     let source = r#"
         (identifier)
         {
           let loc1 = "\"abc,\ndef\\"
         }
     "#;
-    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
-        .expect("Cannot parse file");
+    let file = File::from_str(tree_sitter_python::language(), source).expect("Cannot parse file");
 
-    let loc1 = ctx.add_identifier("loc1");
+    let loc1 = Identifier::from("loc1");
 
     let statements = file
         .stanzas
@@ -302,7 +296,7 @@ fn can_parse_strings() {
         statements,
         vec![vec![DeclareImmutable {
             variable: UnscopedVariable {
-                name: loc1,
+                name: loc1.clone(),
                 location: Location { row: 3, column: 14 }
             }
             .into(),
@@ -315,7 +309,6 @@ fn can_parse_strings() {
 
 #[test]
 fn can_parse_lists() {
-    let mut ctx = Context::new();
     let source = r#"
         (identifier)
         {
@@ -324,12 +317,11 @@ fn can_parse_lists() {
           let list3 = ["hello", "world",]
         }
     "#;
-    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
-        .expect("Cannot parse file");
+    let file = File::from_str(tree_sitter_python::language(), source).expect("Cannot parse file");
 
-    let list1 = ctx.add_identifier("list1");
-    let list2 = ctx.add_identifier("list2");
-    let list3 = ctx.add_identifier("list3");
+    let list1 = Identifier::from("list1");
+    let list2 = Identifier::from("list2");
+    let list3 = Identifier::from("list3");
 
     let statements = file
         .stanzas
@@ -341,7 +333,7 @@ fn can_parse_lists() {
         vec![vec![
             DeclareImmutable {
                 variable: UnscopedVariable {
-                    name: list1,
+                    name: list1.clone(),
                     location: Location { row: 3, column: 14 }
                 }
                 .into(),
@@ -358,7 +350,7 @@ fn can_parse_lists() {
             .into(),
             DeclareImmutable {
                 variable: UnscopedVariable {
-                    name: list2,
+                    name: list2.clone(),
                     location: Location { row: 4, column: 14 }
                 }
                 .into(),
@@ -368,7 +360,7 @@ fn can_parse_lists() {
             .into(),
             DeclareImmutable {
                 variable: UnscopedVariable {
-                    name: list3,
+                    name: list3.clone(),
                     location: Location { row: 5, column: 14 }
                 }
                 .into(),
@@ -394,7 +386,6 @@ fn can_parse_lists() {
 
 #[test]
 fn can_parse_sets() {
-    let mut ctx = Context::new();
     let source = r#"
         (identifier)
         {
@@ -403,12 +394,11 @@ fn can_parse_sets() {
           let set3 = {"hello", "world",}
         }
     "#;
-    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
-        .expect("Cannot parse file");
+    let file = File::from_str(tree_sitter_python::language(), source).expect("Cannot parse file");
 
-    let set1 = ctx.add_identifier("set1");
-    let set2 = ctx.add_identifier("set2");
-    let set3 = ctx.add_identifier("set3");
+    let set1 = Identifier::from("set1");
+    let set2 = Identifier::from("set2");
+    let set3 = Identifier::from("set3");
 
     let statements = file
         .stanzas
@@ -420,7 +410,7 @@ fn can_parse_sets() {
         vec![vec![
             DeclareImmutable {
                 variable: UnscopedVariable {
-                    name: set1,
+                    name: set1.clone(),
                     location: Location { row: 3, column: 14 }
                 }
                 .into(),
@@ -437,7 +427,7 @@ fn can_parse_sets() {
             .into(),
             DeclareImmutable {
                 variable: UnscopedVariable {
-                    name: set2,
+                    name: set2.clone(),
                     location: Location { row: 4, column: 14 }
                 }
                 .into(),
@@ -447,7 +437,7 @@ fn can_parse_sets() {
             .into(),
             DeclareImmutable {
                 variable: UnscopedVariable {
-                    name: set3,
+                    name: set3.clone(),
                     location: Location { row: 5, column: 14 }
                 }
                 .into(),
@@ -473,15 +463,13 @@ fn can_parse_sets() {
 
 #[test]
 fn can_parse_print() {
-    let mut ctx = Context::new();
     let source = r#"
         (identifier)
         {
           print "x =", 5
         }    
     "#;
-    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
-        .expect("Cannot parse file");
+    let file = File::from_str(tree_sitter_python::language(), source).expect("Cannot parse file");
 
     let statements = file
         .stanzas
@@ -506,7 +494,6 @@ fn can_parse_print() {
 
 #[test]
 fn cannot_parse_nullable_regex() {
-    let mut ctx = Context::new();
     let source = r#"
         (module) @root
         {
@@ -517,24 +504,22 @@ fn cannot_parse_nullable_regex() {
           node n
         }
     "#;
-    if let Ok(_) = File::from_str(tree_sitter_python::language(), &mut ctx, source) {
+    if let Ok(_) = File::from_str(tree_sitter_python::language(), source) {
         panic!("Parse succeeded unexpectedly");
     }
 }
 
 #[test]
 fn can_parse_star_capture() {
-    let mut ctx = Context::new();
     let source = r#"
         (module (_)* @stmts)
         {
           print @stmts
         }
     "#;
-    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
-        .expect("Cannot parse file");
+    let file = File::from_str(tree_sitter_python::language(), source).expect("Cannot parse file");
 
-    let stmts = ctx.add_identifier("stmts");
+    let stmts = Identifier::from("stmts");
 
     let statements = file
         .stanzas
@@ -560,7 +545,6 @@ fn can_parse_star_capture() {
 
 #[test]
 fn can_parse_star_multiple_capture() {
-    let mut ctx = Context::new();
     let source = r#"
         (module (_) @stmt * @stmts)
         {
@@ -568,11 +552,10 @@ fn can_parse_star_multiple_capture() {
           print @stmts
         }
     "#;
-    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
-        .expect("Cannot parse file");
+    let file = File::from_str(tree_sitter_python::language(), source).expect("Cannot parse file");
 
-    let stmt = ctx.add_identifier("stmt");
-    let stmts = ctx.add_identifier("stmts");
+    let stmt = Identifier::from("stmt");
+    let stmts = Identifier::from("stmts");
 
     let statements = file
         .stanzas
@@ -612,17 +595,15 @@ fn can_parse_star_multiple_capture() {
 
 #[test]
 fn can_parse_plus_capture() {
-    let mut ctx = Context::new();
     let source = r#"
         (module (_)+ @stmts)
         {
           print @stmts
         }
     "#;
-    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
-        .expect("Cannot parse file");
+    let file = File::from_str(tree_sitter_python::language(), source).expect("Cannot parse file");
 
-    let stmts = ctx.add_identifier("stmts");
+    let stmts = Identifier::from("stmts");
 
     let statements = file
         .stanzas
@@ -648,17 +629,15 @@ fn can_parse_plus_capture() {
 
 #[test]
 fn can_parse_optional_capture() {
-    let mut ctx = Context::new();
     let source = r#"
         (module (_)? @stmt)
         {
           print @stmt
         }
     "#;
-    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
-        .expect("Cannot parse file");
+    let file = File::from_str(tree_sitter_python::language(), source).expect("Cannot parse file");
 
-    let stmt = ctx.add_identifier("stmt");
+    let stmt = Identifier::from("stmt");
 
     let statements = file
         .stanzas
@@ -684,17 +663,15 @@ fn can_parse_optional_capture() {
 
 #[test]
 fn can_parse_parent_optional_capture() {
-    let mut ctx = Context::new();
     let source = r#"
         (module (_) @stmt) ?
         {
           print @stmt
         }
     "#;
-    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
-        .expect("Cannot parse file");
+    let file = File::from_str(tree_sitter_python::language(), source).expect("Cannot parse file");
 
-    let stmt = ctx.add_identifier("stmt");
+    let stmt = Identifier::from("stmt");
 
     let statements = file
         .stanzas
@@ -720,17 +697,15 @@ fn can_parse_parent_optional_capture() {
 
 #[test]
 fn can_parse_alternative_capture() {
-    let mut ctx = Context::new();
     let source = r#"
         (module [(_) (_) @stmt])
         {
           print @stmt
         }
     "#;
-    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
-        .expect("Cannot parse file");
+    let file = File::from_str(tree_sitter_python::language(), source).expect("Cannot parse file");
 
-    let stmt = ctx.add_identifier("stmt");
+    let stmt = Identifier::from("stmt");
 
     let statements = file
         .stanzas
@@ -756,17 +731,15 @@ fn can_parse_alternative_capture() {
 
 #[test]
 fn can_parse_nested_plus_and_optional_capture() {
-    let mut ctx = Context::new();
     let source = r#"
         (module (_)+ @stmt) ?
         {
           print @stmt
         }
     "#;
-    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
-        .expect("Cannot parse file");
+    let file = File::from_str(tree_sitter_python::language(), source).expect("Cannot parse file");
 
-    let stmt = ctx.add_identifier("stmt");
+    let stmt = Identifier::from("stmt");
 
     let statements = file
         .stanzas
@@ -792,7 +765,6 @@ fn can_parse_nested_plus_and_optional_capture() {
 
 #[test]
 fn can_parse_if() {
-    let mut ctx = Context::new();
     let source = r#"
         (module (pass_statement)? @x)
         {
@@ -801,10 +773,9 @@ fn can_parse_if() {
           }
         }
     "#;
-    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
-        .expect("Cannot parse file");
+    let file = File::from_str(tree_sitter_python::language(), source).expect("Cannot parse file");
 
-    let x = ctx.add_identifier("x");
+    let x = Identifier::from("x");
 
     let statements = file
         .stanzas
@@ -844,7 +815,6 @@ fn can_parse_if() {
 
 #[test]
 fn can_parse_if_elif() {
-    let mut ctx = Context::new();
     let source = r#"
         (module (pass_statement)? @x)
         {
@@ -855,10 +825,9 @@ fn can_parse_if_elif() {
           }
         }
     "#;
-    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
-        .expect("Cannot parse file");
+    let file = File::from_str(tree_sitter_python::language(), source).expect("Cannot parse file");
 
-    let x = ctx.add_identifier("x");
+    let x = Identifier::from("x");
 
     let statements = file
         .stanzas
@@ -873,7 +842,7 @@ fn can_parse_if_elif() {
                     conditions: vec![Condition::None {
                         value: Capture {
                             quantifier: ZeroOrOne,
-                            name: x,
+                            name: x.clone(),
                             file_capture_index: 0,
                             stanza_capture_index: 0,
                             location: Location { row: 3, column: 18 },
@@ -896,7 +865,7 @@ fn can_parse_if_elif() {
                     conditions: vec![Condition::Some {
                         value: Capture {
                             quantifier: ZeroOrOne,
-                            name: x,
+                            name: x.clone(),
                             file_capture_index: 0,
                             stanza_capture_index: 0,
                             location: Location { row: 5, column: 22 },
@@ -923,7 +892,6 @@ fn can_parse_if_elif() {
 
 #[test]
 fn can_parse_if_else() {
-    let mut ctx = Context::new();
     let source = r#"
         (module (pass_statement)? @x)
         {
@@ -934,10 +902,9 @@ fn can_parse_if_else() {
           }
         }
     "#;
-    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
-        .expect("Cannot parse file");
+    let file = File::from_str(tree_sitter_python::language(), source).expect("Cannot parse file");
 
-    let x = ctx.add_identifier("x");
+    let x = Identifier::from("x");
 
     let statements = file
         .stanzas
@@ -991,7 +958,6 @@ fn can_parse_if_else() {
 
 #[test]
 fn cannot_parse_if_some_list_capture() {
-    let mut ctx = Context::new();
     let source = r#"
         (module (_)+ @xs) @root
         {
@@ -1000,14 +966,13 @@ fn cannot_parse_if_some_list_capture() {
           }
         }
     "#;
-    if let Ok(_) = File::from_str(tree_sitter_python::language(), &mut ctx, source) {
+    if let Ok(_) = File::from_str(tree_sitter_python::language(), source) {
         panic!("Parse succeeded unexpectedly");
     }
 }
 
 #[test]
 fn can_parse_for_in() {
-    let mut ctx = Context::new();
     let source = r#"
         (module (_)* @xs)
         {
@@ -1016,11 +981,10 @@ fn can_parse_for_in() {
           }
         }
     "#;
-    let file = File::from_str(tree_sitter_python::language(), &mut ctx, source)
-        .expect("Cannot parse file");
+    let file = File::from_str(tree_sitter_python::language(), source).expect("Cannot parse file");
 
-    let xs = ctx.add_identifier("xs");
-    let x = ctx.add_identifier("x");
+    let xs = Identifier::from("xs");
+    let x = Identifier::from("x");
 
     let statements = file
         .stanzas
@@ -1031,12 +995,12 @@ fn can_parse_for_in() {
         statements,
         vec![vec![ForIn {
             variable: UnscopedVariable {
-                name: x,
+                name: x.clone(),
                 location: Location { row: 3, column: 14 }
             },
             value: Capture {
                 quantifier: ZeroOrMore,
-                name: xs,
+                name: xs.clone(),
                 file_capture_index: 0,
                 stanza_capture_index: 0,
                 location: Location { row: 3, column: 19 },
@@ -1044,7 +1008,7 @@ fn can_parse_for_in() {
             .into(),
             statements: vec![Print {
                 values: vec![UnscopedVariable {
-                    name: x,
+                    name: x.clone(),
                     location: Location { row: 4, column: 18 },
                 }
                 .into()],
@@ -1059,7 +1023,6 @@ fn can_parse_for_in() {
 
 #[test]
 fn cannot_parse_for_in_optional_capture() {
-    let mut ctx = Context::new();
     let source = r#"
         (module (_)? @xs) @root
         {
@@ -1068,14 +1031,13 @@ fn cannot_parse_for_in_optional_capture() {
           }
         }
     "#;
-    if let Ok(_) = File::from_str(tree_sitter_python::language(), &mut ctx, source) {
+    if let Ok(_) = File::from_str(tree_sitter_python::language(), source) {
         panic!("Parse succeeded unexpectedly");
     }
 }
 
 #[test]
 fn cannot_parse_scan_of_nonlocal_call_expression() {
-    let mut ctx = Context::new();
     let source = r#"
       (function_definition
       name: (identifier) @name)
@@ -1088,14 +1050,13 @@ fn cannot_parse_scan_of_nonlocal_call_expression() {
         }
       }
     "#;
-    if let Ok(_) = File::from_str(tree_sitter_python::language(), &mut ctx, source) {
+    if let Ok(_) = File::from_str(tree_sitter_python::language(), source) {
         panic!("Parse succeeded unexpectedly");
     }
 }
 
 #[test]
 fn cannot_parse_scan_of_nonlocal_variable() {
-    let mut ctx = Context::new();
     let source = r#"
       (function_definition
       name: (identifier) @name)
@@ -1109,7 +1070,7 @@ fn cannot_parse_scan_of_nonlocal_variable() {
         }
       }
     "#;
-    if let Ok(_) = File::from_str(tree_sitter_python::language(), &mut ctx, source) {
+    if let Ok(_) = File::from_str(tree_sitter_python::language(), source) {
         panic!("Parse succeeded unexpectedly");
     }
 }

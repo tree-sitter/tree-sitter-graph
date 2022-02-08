@@ -13,15 +13,10 @@ use std::convert::From;
 use std::fmt;
 
 use crate::execution::ExecutionError;
-use crate::graph::DisplayWithGraph;
-use crate::graph::Graph;
-use crate::Context;
-use crate::DisplayWithContext as _;
 use crate::Identifier;
 
 use super::store::DebugInfo;
 use super::values::*;
-use super::DisplayWithContextAndGraph;
 use super::EvaluationContext;
 use super::GraphElementKey;
 
@@ -36,7 +31,7 @@ pub(super) enum LazyStatement {
 
 impl LazyStatement {
     pub(super) fn evaluate(&self, exec: &mut EvaluationContext) -> Result<(), ExecutionError> {
-        debug!("eval {}", self.display_with(exec.ctx, exec.graph));
+        debug!("eval {}", self);
         trace!("{{");
         let result = match self {
             Self::AddGraphNodeAttribute(stmt) => stmt.evaluate(exec),
@@ -73,13 +68,13 @@ impl From<LazyPrint> for LazyStatement {
     }
 }
 
-impl DisplayWithContextAndGraph for LazyStatement {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context, graph: &Graph) -> fmt::Result {
+impl fmt::Display for LazyStatement {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::AddGraphNodeAttribute(stmt) => stmt.fmt(f, ctx, graph),
-            Self::CreateEdge(stmt) => stmt.fmt(f, ctx, graph),
-            Self::AddEdgeAttribute(stmt) => stmt.fmt(f, ctx, graph),
-            Self::Print(stmt) => stmt.fmt(f, ctx, graph),
+            Self::AddGraphNodeAttribute(stmt) => stmt.fmt(f),
+            Self::CreateEdge(stmt) => stmt.fmt(f),
+            Self::AddEdgeAttribute(stmt) => stmt.fmt(f),
+            Self::Print(stmt) => stmt.fmt(f),
         }
     }
 }
@@ -110,17 +105,17 @@ impl LazyAddGraphNodeAttribute {
         for attribute in &self.attributes {
             let value = attribute.value.evaluate(exec)?;
             let prev_debug_info = exec.prev_element_debug_info.insert(
-                GraphElementKey::NodeAttribute(node, attribute.name),
+                GraphElementKey::NodeAttribute(node, attribute.name.clone()),
                 self.debug_info,
             );
             exec.graph[node]
                 .attributes
-                .add(attribute.name, value)
+                .add(attribute.name.clone(), value)
                 .map_err(|_| {
                     ExecutionError::DuplicateAttribute(format!(
                         "{} on {} at {} and {}",
-                        attribute.name.display_with(exec.ctx),
-                        node.display_with(exec.graph),
+                        attribute.name,
+                        node,
                         prev_debug_info.unwrap(),
                         self.debug_info,
                     ))
@@ -130,11 +125,11 @@ impl LazyAddGraphNodeAttribute {
     }
 }
 
-impl DisplayWithContextAndGraph for LazyAddGraphNodeAttribute {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context, graph: &Graph) -> fmt::Result {
-        write!(f, "attr ({})", self.node.display_with(ctx, graph))?;
+impl fmt::Display for LazyAddGraphNodeAttribute {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "attr ({})", self.node)?;
         for attr in &self.attributes {
-            write!(f, " {}", attr.display_with(ctx, graph))?;
+            write!(f, " {}", attr)?;
         }
         write!(f, " at {}", self.debug_info)
     }
@@ -166,8 +161,8 @@ impl LazyCreateEdge {
         if let Err(_) = exec.graph[source].add_edge(sink) {
             Err(ExecutionError::DuplicateEdge(format!(
                 "({} -> {}) at {} and {}",
-                source.display_with(exec.graph),
-                sink.display_with(exec.graph),
+                source,
+                sink,
                 prev_debug_info.unwrap(),
                 self.debug_info,
             )))?;
@@ -176,14 +171,12 @@ impl LazyCreateEdge {
     }
 }
 
-impl DisplayWithContextAndGraph for LazyCreateEdge {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context, graph: &Graph) -> fmt::Result {
+impl fmt::Display for LazyCreateEdge {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
             "edge {} -> {} at {}",
-            self.source.display_with(ctx, graph),
-            self.sink.display_with(ctx, graph),
-            self.debug_info,
+            self.source, self.sink, self.debug_info,
         )
     }
 }
@@ -221,40 +214,35 @@ impl LazyAddEdgeAttribute {
                 Some(edge) => Ok(edge),
                 None => Err(ExecutionError::UndefinedEdge(format!(
                     "({} -> {}) at {}",
-                    source.display_with(exec.graph),
-                    sink.display_with(exec.graph),
-                    self.debug_info,
+                    source, sink, self.debug_info,
                 ))),
             }?;
             let prev_debug_info = exec.prev_element_debug_info.insert(
-                GraphElementKey::EdgeAttribute(source, sink, attribute.name),
+                GraphElementKey::EdgeAttribute(source, sink, attribute.name.clone()),
                 self.debug_info,
             );
-            edge.attributes.add(attribute.name, value).map_err(|_| {
-                ExecutionError::DuplicateAttribute(format!(
-                    "{} on edge ({} -> {}) at {} and {}",
-                    attribute.name.display_with(exec.ctx),
-                    source.display_with(exec.graph),
-                    sink.display_with(exec.graph),
-                    prev_debug_info.unwrap(),
-                    self.debug_info,
-                ))
-            })?;
+            edge.attributes
+                .add(attribute.name.clone(), value)
+                .map_err(|_| {
+                    ExecutionError::DuplicateAttribute(format!(
+                        "{} on edge ({} -> {}) at {} and {}",
+                        attribute.name,
+                        source,
+                        sink,
+                        prev_debug_info.unwrap(),
+                        self.debug_info,
+                    ))
+                })?;
         }
         Ok(())
     }
 }
 
-impl DisplayWithContextAndGraph for LazyAddEdgeAttribute {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context, graph: &Graph) -> fmt::Result {
-        write!(
-            f,
-            "attr ({} -> {})",
-            self.source.display_with(ctx, graph),
-            self.sink.display_with(ctx, graph),
-        )?;
+impl fmt::Display for LazyAddEdgeAttribute {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "attr ({} -> {})", self.source, self.sink,)?;
         for attr in &self.attributes {
-            write!(f, " {}", attr.display_with(ctx, graph),)?;
+            write!(f, " {}", attr,)?;
         }
         write!(f, " at {}", self.debug_info)
     }
@@ -287,7 +275,7 @@ impl LazyPrint {
                 LazyPrintArgument::Text(string) => eprint!("{}", string),
                 LazyPrintArgument::Value(value) => {
                     let value = value.evaluate(exec)?;
-                    eprint!("{}", value.display_with(exec.graph));
+                    eprint!("{}", value);
                 }
             }
         }
@@ -296,8 +284,8 @@ impl LazyPrint {
     }
 }
 
-impl DisplayWithContextAndGraph for LazyPrint {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context, graph: &Graph) -> fmt::Result {
+impl fmt::Display for LazyPrint {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "print")?;
         let mut first = true;
         for argument in &self.arguments {
@@ -308,7 +296,7 @@ impl DisplayWithContextAndGraph for LazyPrint {
             }
             match argument {
                 LazyPrintArgument::Text(string) => write!(f, "\"{}\"", string)?,
-                LazyPrintArgument::Value(value) => write!(f, "{}", value.display_with(ctx, graph))?,
+                LazyPrintArgument::Value(value) => write!(f, "{}", value)?,
             };
         }
         write!(f, " at {}", self.debug_info)
@@ -328,13 +316,8 @@ impl LazyAttribute {
     }
 }
 
-impl DisplayWithContextAndGraph for LazyAttribute {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context, graph: &Graph) -> fmt::Result {
-        write!(
-            f,
-            "{} = {}",
-            self.name.display_with(ctx),
-            self.value.display_with(ctx, graph),
-        )
+impl fmt::Display for LazyAttribute {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} = {}", self.name, self.value,)
     }
 }

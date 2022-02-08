@@ -16,7 +16,6 @@ use tree_sitter::Parser;
 use tree_sitter_config::Config;
 use tree_sitter_graph::ast::File;
 use tree_sitter_graph::functions::Functions;
-use tree_sitter_graph::Context;
 use tree_sitter_graph::Variables;
 use tree_sitter_loader::Loader;
 
@@ -68,22 +67,21 @@ fn main() -> Result<()> {
     let tree = parser
         .parse(&source, None)
         .ok_or_else(|| anyhow!("Could not parse {}", source_path.display()))?;
-    let mut ctx = Context::new();
-    let file = File::from_str(language, &mut ctx, &tsg)
-        .with_context(|| anyhow!("Error parsing TSG file {}", tsg_path.display()))?;
-    let mut functions = Functions::stdlib(&mut ctx);
+    let file = File::from_str(language, &tsg)
+        .with_context(|| format!("Error parsing TSG file {}", tsg_path.display()))?;
+    let mut functions = Functions::stdlib();
     let globals = Variables::new();
     let graph = if lazy {
-        file.execute_lazy(&mut ctx, &tree, &source, &mut functions, &globals)
+        file.execute_lazy(&tree, &source, &mut functions, &globals)
     } else {
-        file.execute(&mut ctx, &tree, &source, &mut functions, &globals)
+        file.execute(&tree, &source, &mut functions, &globals)
     }
-    .with_context(|| anyhow!("Could not execute TSG file {}", tsg_path.display()))?;
+    .with_context(|| format!("Could not execute TSG file {}", tsg_path.display()))?;
     let json = matches.is_present("json");
     if json {
-        graph.display_json(&ctx);
+        graph.display_json();
     } else if !quiet {
-        print!("{}", graph.display_with(&ctx));
+        print!("{}", graph.pretty_print());
     }
     Ok(())
 }

@@ -18,8 +18,6 @@ use crate::parser::FULL_MATCH;
 use crate::variables::VariableError;
 use crate::variables::VariableMap;
 use crate::variables::Variables;
-use crate::Context;
-use crate::DisplayWithContext as _;
 use crate::Location;
 
 #[derive(Debug, Error)]
@@ -40,7 +38,6 @@ pub enum CheckError {
 
 /// Checker context
 struct CheckContext<'a> {
-    ctx: &'a Context,
     locals: &'a mut dyn Variables<ExpressionResult>,
     file_query: &'a Query,
     stanza_index: usize,
@@ -51,10 +48,10 @@ struct CheckContext<'a> {
 // File
 
 impl ast::File {
-    pub fn check(&mut self, ctx: &Context) -> Result<(), CheckError> {
+    pub fn check(&mut self) -> Result<(), CheckError> {
         let file_query = self.query.as_ref().unwrap();
         for (index, stanza) in self.stanzas.iter_mut().enumerate() {
-            stanza.check(ctx, file_query, index)?;
+            stanza.check(file_query, index)?;
         }
         Ok(())
     }
@@ -64,15 +61,9 @@ impl ast::File {
 // Stanza
 
 impl ast::Stanza {
-    fn check(
-        &mut self,
-        ctx: &Context,
-        file_query: &Query,
-        stanza_index: usize,
-    ) -> Result<(), CheckError> {
+    fn check(&mut self, file_query: &Query, stanza_index: usize) -> Result<(), CheckError> {
         let mut locals = VariableMap::new();
         let mut ctx = CheckContext {
-            ctx,
             locals: &mut locals,
             file_query,
             stanza_index,
@@ -197,7 +188,6 @@ impl ast::Scan {
 
             let mut arm_locals = VariableMap::new_child(ctx.locals);
             let mut arm_ctx = CheckContext {
-                ctx: ctx.ctx,
                 locals: &mut arm_locals,
                 file_query: ctx.file_query,
                 stanza_index: ctx.stanza_index,
@@ -230,7 +220,6 @@ impl ast::If {
 
             let mut arm_locals = VariableMap::new_child(ctx.locals);
             let mut arm_ctx = CheckContext {
-                ctx: ctx.ctx,
                 locals: &mut arm_locals,
                 file_query: ctx.file_query,
                 stanza_index: ctx.stanza_index,
@@ -280,7 +269,6 @@ impl ast::ForIn {
 
         let mut loop_locals = VariableMap::new_child(ctx.locals);
         let mut loop_ctx = CheckContext {
-            ctx: ctx.ctx,
             locals: &mut loop_locals,
             file_query: ctx.file_query,
             stanza_index: ctx.stanza_index,
@@ -380,13 +368,13 @@ impl ast::SetComprehension {
 
 impl ast::Capture {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
-        let name = ctx.ctx.resolve(self.name);
+        let name = self.name.to_string();
         self.stanza_capture_index = ctx
             .stanza_query
-            .capture_index_for_name(name)
-            .ok_or_else(|| CheckError::UndefinedSyntaxCapture(name.to_string(), self.location))?
+            .capture_index_for_name(&name)
+            .ok_or_else(|| CheckError::UndefinedSyntaxCapture(name.clone(), self.location))?
             as usize;
-        self.file_capture_index = ctx.file_query.capture_index_for_name(name).unwrap() as usize;
+        self.file_capture_index = ctx.file_query.capture_index_for_name(&name).unwrap() as usize;
         self.quantifier =
             ctx.file_query.capture_quantifiers(ctx.stanza_index)[self.file_capture_index];
         Ok(ExpressionResult {
@@ -470,8 +458,8 @@ impl ast::UnscopedVariable {
             value.is_local = false;
         }
         ctx.locals
-            .add(self.name, value, mutable)
-            .map_err(|e| CheckError::Variable(e, format!("{}", self.name.display_with(ctx.ctx))))
+            .add(self.name.clone(), value, mutable)
+            .map_err(|e| CheckError::Variable(e, format!("{}", self.name)))
     }
 
     fn check_set(
@@ -486,8 +474,8 @@ impl ast::UnscopedVariable {
         // assignments, and can assume non-local to be sound.
         value.is_local = false;
         ctx.locals
-            .set(self.name, value)
-            .map_err(|e| CheckError::Variable(e, format!("{}", self.name.display_with(ctx.ctx))))
+            .set(self.name.clone(), value)
+            .map_err(|e| CheckError::Variable(e, format!("{}", self.name)))
     }
 
     fn check_get(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {

@@ -19,16 +19,11 @@ use std::rc::Rc;
 
 use crate::execution::ExecutionError;
 use crate::graph;
-use crate::graph::DisplayWithGraph;
-use crate::graph::Graph;
 use crate::graph::SyntaxNodeRef;
 use crate::parser::Location;
-use crate::Context;
-use crate::DisplayWithContext;
 use crate::Identifier;
 
 use super::values::*;
-use super::DisplayWithContextAndGraph;
 use super::EvaluationContext;
 
 /// Variable that points to a thunk in the store
@@ -50,8 +45,8 @@ impl LazyVariable {
     }
 }
 
-impl DisplayWithContextAndGraph for LazyVariable {
-    fn fmt(&self, f: &mut fmt::Formatter, _ctx: &Context, _graph: &Graph) -> fmt::Result {
+impl fmt::Display for LazyVariable {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "(load {})", self.store_location)
     }
 }
@@ -69,20 +64,10 @@ impl LazyStore {
         }
     }
 
-    pub(super) fn add(
-        &mut self,
-        value: LazyValue,
-        debug_info: DebugInfo,
-        ctx: &Context,
-        graph: &Graph,
-    ) -> LazyVariable {
+    pub(super) fn add(&mut self, value: LazyValue, debug_info: DebugInfo) -> LazyVariable {
         let store_location = self.elements.len();
         let variable = LazyVariable::new(store_location);
-        trace!(
-            "store {} = {}",
-            store_location,
-            value.display_with(ctx, graph)
-        );
+        trace!("store {} = {}", store_location, value);
         self.elements.push(Thunk::new(value, debug_info));
         variable
     }
@@ -94,13 +79,9 @@ impl LazyStore {
     ) -> Result<graph::Value, ExecutionError> {
         let variable = &self.elements[variable.store_location];
         let debug_info = variable.debug_info;
-        let value = variable.force(exec).with_context(|| {
-            format!(
-                "via {} at {}",
-                (*variable.state.borrow()).display_with(exec.ctx, exec.graph),
-                debug_info
-            )
-        })?;
+        let value = variable
+            .force(exec)
+            .with_context(|| format!("via {} at {}", (*variable.state.borrow()), debug_info))?;
         Ok(value)
     }
 }
@@ -123,11 +104,10 @@ impl LazyScopedVariables {
         name: Identifier,
         value: LazyValue,
         debug_info: DebugInfo,
-        ctx: &Context,
     ) -> Result<(), ExecutionError> {
         let values = self
             .variables
-            .entry(name)
+            .entry(name.clone())
             .or_insert_with(|| Cell::new(ScopedValues::new()));
         match values.replace(ScopedValues::Forcing) {
             ScopedValues::Unforced(mut pairs) => {
@@ -136,13 +116,13 @@ impl LazyScopedVariables {
                 Ok(())
             }
             ScopedValues::Forcing => Err(ExecutionError::RecursivelyDefinedScopedVariable(
-                format!("{}", name.display_with(ctx)),
+                format!("{}", name),
             )),
             ScopedValues::Forced(map) => {
                 values.replace(ScopedValues::Forced(map));
                 Err(ExecutionError::VariableScopesAlreadyForced(format!(
                     "{}",
-                    name.display_with(ctx)
+                    name
                 )))
             }
         }
@@ -150,17 +130,16 @@ impl LazyScopedVariables {
 
     pub(super) fn evaluate(
         &self,
-        scope: SyntaxNodeRef,
-        name: Identifier,
+        scope: &SyntaxNodeRef,
+        name: &Identifier,
         exec: &mut EvaluationContext,
     ) -> Result<LazyValue, ExecutionError> {
-        let values = match self.variables.get(&name) {
+        let values = match self.variables.get(name) {
             Some(v) => v,
             None => {
                 return Err(ExecutionError::UndefinedScopedVariable(format!(
                     "{}.{}",
-                    scope.display_with(exec.graph),
-                    name.display_with(exec.ctx),
+                    scope, name,
                 )));
             }
         };
@@ -175,8 +154,8 @@ impl LazyScopedVariables {
                         Some(_) => {
                             return Err(ExecutionError::DuplicateVariable(format!(
                                 "{}.{} set at {} and {}",
-                                node.display_with(exec.graph),
-                                name.display_with(exec.ctx),
+                                node,
+                                name,
                                 prev_debug_info.unwrap(),
                                 debug_info,
                             )));
@@ -188,27 +167,21 @@ impl LazyScopedVariables {
                     .get(&scope)
                     .ok_or(ExecutionError::UndefinedScopedVariable(format!(
                         "{}.{}",
-                        scope.display_with(exec.graph),
-                        name.display_with(exec.ctx),
+                        scope, name,
                     )))?
                     .clone();
                 values.replace(ScopedValues::Forced(map));
                 Ok(result)
             }
-            ScopedValues::Forcing => {
-                Err(ExecutionError::RecursivelyDefinedScopedVariable(format!(
-                    "_.{} requested on {}",
-                    name.display_with(exec.ctx),
-                    scope.display_with(exec.graph)
-                )))
-            }
+            ScopedValues::Forcing => Err(ExecutionError::RecursivelyDefinedScopedVariable(
+                format!("_.{} requested on {}", name, scope),
+            )),
             ScopedValues::Forced(map) => {
                 let result = map
                     .get(&scope)
                     .ok_or(ExecutionError::UndefinedScopedVariable(format!(
                         "{}.{}",
-                        scope.display_with(exec.graph),
-                        name.display_with(exec.ctx),
+                        scope, name,
                     )))?
                     .clone();
                 values.replace(ScopedValues::Forced(map));
@@ -242,12 +215,12 @@ enum ThunkState {
     Forced(graph::Value),
 }
 
-impl DisplayWithContextAndGraph for ThunkState {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context, graph: &Graph) -> fmt::Result {
+impl fmt::Display for ThunkState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Unforced(value) => write!(f, "?{{{}}}", value.display_with(ctx, graph)),
+            Self::Unforced(value) => write!(f, "?{{{}}}", value),
             Self::Forcing => write!(f, "~{{?}}"),
-            Self::Forced(value) => write!(f, "!{{{}}}", value.display_with(graph)),
+            Self::Forced(value) => write!(f, "!{{{}}}", value),
         }
     }
 }
@@ -262,7 +235,7 @@ impl Thunk {
 
     fn force(&self, exec: &mut EvaluationContext) -> Result<graph::Value, ExecutionError> {
         let state = self.state.replace(ThunkState::Forcing);
-        trace!("force {}", state.display_with(exec.ctx, exec.graph));
+        trace!("force {}", state);
         let value = match state {
             ThunkState::Unforced(value) => {
                 // it is important that we do not hold a borrow of self.forced_values when executing self.value.evaluate

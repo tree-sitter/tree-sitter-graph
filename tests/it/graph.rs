@@ -9,18 +9,17 @@ use indoc::indoc;
 use tree_sitter::Parser;
 use tree_sitter_graph::graph::Graph;
 use tree_sitter_graph::graph::Value;
-use tree_sitter_graph::Context;
+use tree_sitter_graph::Identifier;
 
 #[test]
 fn can_overwrite_attributes() {
-    let mut ctx = Context::new();
     let mut graph = Graph::new();
     let node = graph.add_graph_node();
     let attrs = &mut graph[node].attributes;
-    let name = ctx.add_identifier("name");
-    attrs.add(name, "node0").unwrap();
-    attrs.add(name, "overwritten").unwrap_err();
-    assert_eq!(*attrs.get(name).unwrap(), Value::from("overwritten"));
+    let name = Identifier::from("name");
+    attrs.add(name.clone(), "node0").unwrap();
+    attrs.add(name.clone(), "overwritten").unwrap_err();
+    assert_eq!(*attrs.get(&name).unwrap(), Value::from("overwritten"));
 }
 
 #[test]
@@ -55,41 +54,40 @@ fn can_display_graph() {
     parser.set_language(tree_sitter_python::language()).unwrap();
     let tree = parser.parse(python_source, None).unwrap();
 
-    let mut ctx = Context::new();
     let mut graph = Graph::new();
     let root = graph.add_syntax_node(tree.root_node());
     let node0 = graph.add_graph_node();
     graph[node0]
         .attributes
-        .add(ctx.add_identifier("name"), "node0")
+        .add(Identifier::from("name"), "node0")
         .unwrap();
     graph[node0]
         .attributes
-        .add(ctx.add_identifier("source"), root)
+        .add(Identifier::from("source"), root)
         .unwrap();
     let node1 = graph.add_graph_node();
     graph[node1]
         .attributes
-        .add(ctx.add_identifier("name"), "node1")
+        .add(Identifier::from("name"), "node1")
         .unwrap();
     let node2 = graph.add_graph_node();
     graph[node2]
         .attributes
-        .add(ctx.add_identifier("name"), "node2")
+        .add(Identifier::from("name"), "node2")
         .unwrap();
     graph[node2]
         .attributes
-        .add(ctx.add_identifier("parent"), node1)
+        .add(Identifier::from("parent"), node1)
         .unwrap();
     let edge01 = graph[node0]
         .add_edge(node1)
         .unwrap_or_else(|_| unreachable!());
     edge01
         .attributes
-        .add(ctx.add_identifier("precedence"), 14)
+        .add(Identifier::from("precedence"), 14)
         .unwrap();
     assert_eq!(
-        graph.display_with(&ctx).to_string(),
+        graph.pretty_print().to_string(),
         indoc! {r#"
           node 0
             name: "node0"

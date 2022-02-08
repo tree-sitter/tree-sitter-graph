@@ -17,22 +17,17 @@ use tree_sitter::Query;
 use tree_sitter::QueryError;
 
 use crate::ast;
-use crate::Context;
 use crate::Identifier;
 
 pub const FULL_MATCH: &str = "__tsg__full_match";
 
 impl ast::File {
     /// Parses a graph DSL file, returning a new `File` instance.
-    pub fn from_str(
-        language: Language,
-        ctx: &mut Context,
-        source: &str,
-    ) -> Result<Self, ParseError> {
+    pub fn from_str(language: Language, source: &str) -> Result<Self, ParseError> {
         let mut file = ast::File::new(language);
         #[allow(deprecated)]
-        file.parse(ctx, source)?;
-        file.check(ctx)?;
+        file.parse(source)?;
+        file.check()?;
         Ok(file)
     }
 
@@ -40,8 +35,8 @@ impl ast::File {
     #[deprecated(
         note = "Parsing multiple times into the same `File` instance is unsound. Use `File::from_str` instead."
     )]
-    pub fn parse(&mut self, ctx: &mut Context, content: &str) -> Result<(), ParseError> {
-        Parser::new(ctx, content).parse_into_file(self)
+    pub fn parse(&mut self, content: &str) -> Result<(), ParseError> {
+        Parser::new(content).parse_into_file(self)
     }
 }
 
@@ -72,6 +67,18 @@ pub enum ParseError {
     UnexpectedLiteral(String, Location),
     #[error(transparent)]
     Check(#[from] crate::checker::CheckError),
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
+}
+
+impl ParseError {
+    /// Wraps an existing [`std::error::Error`][] as an execution error
+    pub fn other<E>(err: E) -> ParseError
+    where
+        E: Into<anyhow::Error>,
+    {
+        Self::Other(err.into())
+    }
 }
 
 /// The location of a graph DSL entity within its file
@@ -99,26 +106,11 @@ impl Display for Location {
 }
 
 struct Parser<'a> {
-    ctx: &'a mut Context,
     source: &'a str,
     chars: Peekable<Chars<'a>>,
     offset: usize,
     location: Location,
     query_source: String,
-    // Keywords
-    attr_keyword: Identifier,
-    edge_keyword: Identifier,
-    false_keyword: Identifier,
-    for_keyword: Identifier,
-    if_keyword: Identifier,
-    let_keyword: Identifier,
-    node_keyword: Identifier,
-    null_keyword: Identifier,
-    print_keyword: Identifier,
-    scan_keyword: Identifier,
-    set_keyword: Identifier,
-    true_keyword: Identifier,
-    var_keyword: Identifier,
 }
 
 fn is_ident_start(c: char) -> bool {
@@ -130,49 +122,20 @@ fn is_ident(c: char) -> bool {
 }
 
 impl<'a> Parser<'a> {
-    fn new(ctx: &'a mut Context, source: &'a str) -> Parser<'a> {
+    fn new(source: &'a str) -> Parser<'a> {
         let chars = source.chars().peekable();
         let query_source = String::with_capacity(source.len());
-        // Keywords
-        let attr_keyword = ctx.add_identifier("attr");
-        let edge_keyword = ctx.add_identifier("edge");
-        let false_keyword = ctx.add_identifier("false");
-        let for_keyword = ctx.add_identifier("for");
-        let if_keyword = ctx.add_identifier("if");
-        let let_keyword = ctx.add_identifier("let");
-        let node_keyword = ctx.add_identifier("node");
-        let null_keyword = ctx.add_identifier("null");
-        let print_keyword = ctx.add_identifier("print");
-        let scan_keyword = ctx.add_identifier("scan");
-        let set_keyword = ctx.add_identifier("set");
-        let true_keyword = ctx.add_identifier("true");
-        let var_keyword = ctx.add_identifier("var");
         Parser {
-            ctx,
             source,
             chars,
             offset: 0,
             location: Location::default(),
             query_source,
-            // Keywords
-            attr_keyword,
-            edge_keyword,
-            false_keyword,
-            for_keyword,
-            let_keyword,
-            if_keyword,
-            node_keyword,
-            null_keyword,
-            print_keyword,
-            scan_keyword,
-            set_keyword,
-            true_keyword,
-            var_keyword,
         }
     }
 }
 
-impl Parser<'_> {
+impl<'a> Parser<'a> {
     fn peek(&mut self) -> Result<char, ParseError> {
         self.chars
             .peek()
@@ -331,11 +294,22 @@ impl Parser<'_> {
         Ok(statements)
     }
 
+    fn parse_name(&mut self, within: &'static str) -> Result<&'a str, ParseError> {
+        let start = self.offset;
+        let ch = self.next()?;
+        if !is_ident_start(ch) {
+            return Err(ParseError::UnexpectedCharacter(ch, within, self.location));
+        }
+        self.consume_while(is_ident);
+        let end = self.offset;
+        Ok(&self.source[start..end])
+    }
+
     fn parse_statement(&mut self) -> Result<ast::Statement, ParseError> {
         let keyword_location = self.location;
-        let keyword = self.parse_identifier("keyword")?;
+        let keyword = self.parse_name("keyword")?;
         self.consume_whitespace();
-        if keyword == self.let_keyword {
+        if keyword == "let" {
             let variable = self.parse_variable()?;
             self.consume_whitespace();
             self.consume_token("=")?;
@@ -347,7 +321,7 @@ impl Parser<'_> {
                 location: keyword_location,
             }
             .into())
-        } else if keyword == self.var_keyword {
+        } else if keyword == "var" {
             let variable = self.parse_variable()?;
             self.consume_whitespace();
             self.consume_token("=")?;
@@ -359,7 +333,7 @@ impl Parser<'_> {
                 location: keyword_location,
             }
             .into())
-        } else if keyword == self.set_keyword {
+        } else if keyword == "set" {
             let variable = self.parse_variable()?;
             self.consume_whitespace();
             self.consume_token("=")?;
@@ -371,14 +345,14 @@ impl Parser<'_> {
                 location: keyword_location,
             }
             .into())
-        } else if keyword == self.node_keyword {
+        } else if keyword == "node" {
             let node = self.parse_variable()?;
             Ok(ast::CreateGraphNode {
                 node,
                 location: keyword_location,
             }
             .into())
-        } else if keyword == self.edge_keyword {
+        } else if keyword == "edge" {
             let source = self.parse_expression()?;
             self.consume_whitespace();
             self.consume_token("->")?;
@@ -390,7 +364,7 @@ impl Parser<'_> {
                 location: keyword_location,
             }
             .into())
-        } else if keyword == self.attr_keyword {
+        } else if keyword == "attr" {
             self.consume_token("(")?;
             self.consume_whitespace();
             let node_or_source = self.parse_expression()?;
@@ -425,7 +399,7 @@ impl Parser<'_> {
                 }
                 .into())
             }
-        } else if keyword == self.print_keyword {
+        } else if keyword == "print" {
             let mut values = vec![self.parse_expression()?];
             self.consume_whitespace();
             while self.try_peek() == Some(',') {
@@ -440,7 +414,7 @@ impl Parser<'_> {
                 location: keyword_location,
             }
             .into())
-        } else if keyword == self.scan_keyword {
+        } else if keyword == "scan" {
             let value = self.parse_expression()?;
             self.consume_whitespace();
             self.consume_token("{")?;
@@ -467,7 +441,7 @@ impl Parser<'_> {
                 location: keyword_location,
             }
             .into())
-        } else if keyword == self.if_keyword {
+        } else if keyword == "if" {
             let mut arms = Vec::new();
 
             // if
@@ -520,7 +494,7 @@ impl Parser<'_> {
                 location: keyword_location,
             }
             .into())
-        } else if keyword == self.for_keyword {
+        } else if keyword == "for" {
             self.consume_whitespace();
             let variable = match self.parse_variable()? {
                 ast::Variable::Unscoped(variable) => Ok(variable),
@@ -543,7 +517,7 @@ impl Parser<'_> {
             .into())
         } else {
             Err(ParseError::UnexpectedKeyword(
-                self.ctx.resolve(keyword).into(),
+                keyword.into(),
                 keyword_location,
             ))
         }
@@ -590,14 +564,8 @@ impl Parser<'_> {
     }
 
     fn parse_identifier(&mut self, within: &'static str) -> Result<Identifier, ParseError> {
-        let start = self.offset;
-        let ch = self.next()?;
-        if !is_ident_start(ch) {
-            return Err(ParseError::UnexpectedCharacter(ch, within, self.location));
-        }
-        self.consume_while(is_ident);
-        let end = self.offset;
-        Ok(self.ctx.add_identifier(&self.source[start..end]))
+        let content = self.parse_name(within)?;
+        Ok(Identifier::from(content))
     }
 
     fn parse_string(&mut self) -> Result<String, ParseError> {
@@ -727,8 +695,7 @@ impl Parser<'_> {
         }
         self.consume_while(is_ident);
         let end = self.offset;
-        let name = &self.source[start + 1..end];
-        let name = self.ctx.add_identifier(name);
+        let name = Identifier::from(&self.source[start + 1..end]);
         Ok(ast::Capture {
             name,
             quantifier: Zero,                 // set in checker
@@ -751,16 +718,16 @@ impl Parser<'_> {
     fn parse_literal(&mut self) -> Result<ast::Expression, ParseError> {
         let literal_location = self.location;
         self.consume_token("#")?;
-        let literal = self.parse_identifier("literal")?;
-        if literal == self.false_keyword {
+        let literal = self.parse_name("literal")?;
+        if literal == "false" {
             return Ok(ast::Expression::FalseLiteral);
-        } else if literal == self.null_keyword {
+        } else if literal == "null" {
             return Ok(ast::Expression::NullLiteral);
-        } else if literal == self.true_keyword {
+        } else if literal == "true" {
             return Ok(ast::Expression::TrueLiteral);
         } else {
             Err(ParseError::UnexpectedLiteral(
-                self.ctx.resolve(literal).into(),
+                literal.into(),
                 literal_location,
             ))
         }
