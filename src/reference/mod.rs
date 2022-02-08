@@ -91,11 +91,17 @@
 //! [attributes](#attributes), [functions](#functions), and [variables](#variables).
 //!
 //! To execute a graph DSL file against a concrete syntax tree, we execute each stanza in the graph
-//! DSL file _in order_.  For each stanza, we identify each place where the concrete syntax tree
+//! DSL file exhaustively.  For each stanza, we identify each place where the concrete syntax tree
 //! matches the query pattern.  For each of these places, we end up with a different set of syntax
 //! nodes assigned to the query pattern's captures.  We execute the block of statements for each of
 //! these capture assignments, creating any graph nodes, edges, or attributes mentioned in the
 //! block.
+//!
+//! Regular execution will apply the stanzas _in order_, and it is important to make sure that scoped variables
+//! have been assigned before they are used.  This is not a requirement when using the lazy evaluation strategy,
+//! which handles this implicitly.  The lazy evaluation strategy is also more efficient when there are many stanzas,
+//! because it can reduce tree traversals.  Therefore, using the lazy evaluation strategy is recommended, and will
+//! likely become the only supported strategy in future releases.
 //!
 //! For instance, the following stanza would match all of the identifiers in our example syntax
 //! tree:
