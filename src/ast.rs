@@ -45,6 +45,8 @@ pub struct Stanza {
     pub query: Query,
     /// The list of statements in the stanza
     pub statements: Vec<Statement>,
+    /// Capture index of the full match in the file query
+    pub full_match_file_capture_index: usize,
     pub location: Location,
 }
 
@@ -315,7 +317,7 @@ impl DisplayWithContext for Print {
 /// A `scan` statement that matches regular expressions against a string
 #[derive(Debug, Eq, PartialEq)]
 pub struct Scan {
-    pub value: ScanExpression,
+    pub value: Expression,
     pub arms: Vec<ScanArm>,
     pub location: Location,
 }
@@ -334,61 +336,6 @@ impl DisplayWithContext for Scan {
             self.value.display_with(ctx),
             self.location
         )
-    }
-}
-
-/// Subset of expressions that are allowed in scan
-#[derive(Debug, Eq, PartialEq)]
-pub enum ScanExpression {
-    StringConstant(StringConstant),
-    Capture(Capture),
-    Variable(UnscopedVariable),
-    RegexCapture(RegexCapture),
-}
-
-impl From<String> for ScanExpression {
-    fn from(value: String) -> Self {
-        Self::StringConstant(StringConstant { value }.into())
-    }
-}
-
-impl From<Capture> for ScanExpression {
-    fn from(value: Capture) -> Self {
-        Self::Capture(value)
-    }
-}
-
-impl From<UnscopedVariable> for ScanExpression {
-    fn from(value: UnscopedVariable) -> Self {
-        Self::Variable(value.into())
-    }
-}
-
-impl From<RegexCapture> for ScanExpression {
-    fn from(value: RegexCapture) -> Self {
-        Self::RegexCapture(value)
-    }
-}
-
-impl From<ScanExpression> for Expression {
-    fn from(value: ScanExpression) -> Self {
-        match value {
-            ScanExpression::StringConstant(value) => Self::StringConstant(value),
-            ScanExpression::Capture(value) => Self::Capture(value),
-            ScanExpression::Variable(value) => Self::Variable(value.into()),
-            ScanExpression::RegexCapture(value) => Self::RegexCapture(value),
-        }
-    }
-}
-
-impl DisplayWithContext for ScanExpression {
-    fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
-        match self {
-            Self::StringConstant(value) => value.fmt(f, ctx),
-            Self::Capture(value) => value.fmt(f, ctx),
-            Self::Variable(value) => value.fmt(f, ctx),
-            Self::RegexCapture(value) => value.fmt(f, ctx),
-        }
     }
 }
 
@@ -456,8 +403,18 @@ pub struct IfArm {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Condition {
-    Some(Vec<Capture>),
-    None(Vec<Capture>),
+    Some {
+        value: Expression,
+        location: Location,
+    },
+    None {
+        value: Expression,
+        location: Location,
+    },
+    Bool {
+        value: Expression,
+        location: Location,
+    },
 }
 
 impl DisplayWithContext for Vec<Condition> {
@@ -477,20 +434,17 @@ impl DisplayWithContext for Vec<Condition> {
 
 impl DisplayWithContext for Condition {
     fn fmt(&self, f: &mut fmt::Formatter, ctx: &Context) -> fmt::Result {
-        let captures = match self {
-            Condition::Some(captures) => {
-                write!(f, "some")?;
-                Ok(captures)
+        match self {
+            Condition::Some { value, .. } => {
+                write!(f, "some {}", value.display_with(ctx))
             }
-            Condition::None(captures) => {
-                write!(f, "none")?;
-                Ok(captures)
+            Condition::None { value, .. } => {
+                write!(f, "none {}", value.display_with(ctx))
             }
-        }?;
-        for capture in captures {
-            write!(f, " {}", capture.display_with(ctx))?;
+            Condition::Bool { value, .. } => {
+                write!(f, "{}", value.display_with(ctx))
+            }
         }
-        Ok(())
     }
 }
 
@@ -498,7 +452,7 @@ impl DisplayWithContext for Condition {
 #[derive(Debug, Eq, PartialEq)]
 pub struct ForIn {
     pub variable: UnscopedVariable,
-    pub capture: Capture,
+    pub value: Expression,
     pub statements: Vec<Statement>,
     pub location: Location,
 }
@@ -515,7 +469,7 @@ impl DisplayWithContext for ForIn {
             f,
             "for {} in {} {{ ... }} at {}",
             self.variable.display_with(ctx),
-            self.capture.display_with(ctx),
+            self.value.display_with(ctx),
             self.location,
         )
     }
@@ -648,10 +602,15 @@ impl DisplayWithContext for Call {
 /// A capture expression that references a syntax node
 #[derive(Debug, Eq, PartialEq)]
 pub struct Capture {
-    /// The suffix of the capture
-    pub quantifier: CaptureQuantifier,
     /// The name of the capture
     pub name: Identifier,
+    /// The suffix of the capture
+    pub quantifier: CaptureQuantifier,
+    /// Capture index in the merged file query
+    pub file_capture_index: usize,
+    /// Capture index in the stanza query
+    pub stanza_capture_index: usize,
+    pub location: Location,
 }
 
 impl From<Capture> for Expression {

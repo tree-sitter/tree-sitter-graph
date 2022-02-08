@@ -27,8 +27,8 @@ fn can_parse_blocks() {
           set @cap2.var1 = loc1
         }
     "#;
-    let mut file = File::new(tree_sitter_python::language());
-    file.parse(&mut ctx, source).expect("Cannot parse file");
+    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+        .expect("Cannot parse file");
 
     let loc1 = ctx.add_identifier("loc1");
     let precedence = ctx.add_identifier("precedence");
@@ -61,6 +61,9 @@ fn can_parse_blocks() {
                         Capture {
                             quantifier: One,
                             name: cap2,
+                            file_capture_index: 1,
+                            stanza_capture_index: 1,
+                            location: Location { row: 5, column: 15 }
                         }
                         .into()
                     ),
@@ -77,6 +80,9 @@ fn can_parse_blocks() {
                         Capture {
                             quantifier: One,
                             name: cap2,
+                            file_capture_index: 1,
+                            stanza_capture_index: 1,
+                            location: Location { row: 6, column: 15 }
                         }
                         .into()
                     ),
@@ -98,6 +104,9 @@ fn can_parse_blocks() {
                         Capture {
                             quantifier: One,
                             name: cap2,
+                            file_capture_index: 1,
+                            stanza_capture_index: 1,
+                            location: Location { row: 7, column: 16 }
                         }
                         .into()
                     ),
@@ -123,6 +132,9 @@ fn can_parse_blocks() {
                         Capture {
                             quantifier: One,
                             name: cap2,
+                            file_capture_index: 1,
+                            stanza_capture_index: 1,
+                            location: Location { row: 8, column: 16 }
                         }
                         .into()
                     ),
@@ -149,6 +161,9 @@ fn can_parse_blocks() {
                         Capture {
                             quantifier: One,
                             name: cap2,
+                            file_capture_index: 1,
+                            stanza_capture_index: 1,
+                            location: Location { row: 9, column: 14 }
                         }
                         .into()
                     ),
@@ -170,6 +185,12 @@ fn can_parse_blocks() {
                         Capture {
                             quantifier: One,
                             name: cap2,
+                            file_capture_index: 1,
+                            stanza_capture_index: 1,
+                            location: Location {
+                                row: 10,
+                                column: 14
+                            }
                         }
                         .into()
                     ),
@@ -209,8 +230,8 @@ fn can_parse_literals() {
           let t = #true
         }
     "#;
-    let mut file = File::new(tree_sitter_python::language());
-    file.parse(&mut ctx, source).expect("Cannot parse file");
+    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+        .expect("Cannot parse file");
 
     let f = ctx.add_identifier("f");
     let n = ctx.add_identifier("n");
@@ -267,8 +288,8 @@ fn can_parse_strings() {
           let loc1 = "\"abc,\ndef\\"
         }
     "#;
-    let mut file = File::new(tree_sitter_python::language());
-    file.parse(&mut ctx, source).expect("Cannot parse file");
+    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+        .expect("Cannot parse file");
 
     let loc1 = ctx.add_identifier("loc1");
 
@@ -303,8 +324,8 @@ fn can_parse_lists() {
           let list3 = ["hello", "world",]
         }
     "#;
-    let mut file = File::new(tree_sitter_python::language());
-    file.parse(&mut ctx, source).expect("Cannot parse file");
+    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+        .expect("Cannot parse file");
 
     let list1 = ctx.add_identifier("list1");
     let list2 = ctx.add_identifier("list2");
@@ -382,8 +403,8 @@ fn can_parse_sets() {
           let set3 = {"hello", "world",}
         }
     "#;
-    let mut file = File::new(tree_sitter_python::language());
-    file.parse(&mut ctx, source).expect("Cannot parse file");
+    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+        .expect("Cannot parse file");
 
     let set1 = ctx.add_identifier("set1");
     let set2 = ctx.add_identifier("set2");
@@ -459,8 +480,8 @@ fn can_parse_print() {
           print "x =", 5
         }    
     "#;
-    let mut file = File::new(tree_sitter_python::language());
-    file.parse(&mut ctx, source).expect("Cannot parse file");
+    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+        .expect("Cannot parse file");
 
     let statements = file
         .stanzas
@@ -496,8 +517,7 @@ fn cannot_parse_nullable_regex() {
           node n
         }
     "#;
-    let mut file = File::new(tree_sitter_python::language());
-    if let Ok(_) = file.parse(&mut ctx, source) {
+    if let Ok(_) = File::from_source(tree_sitter_python::language(), &mut ctx, source) {
         panic!("Parse succeeded unexpectedly");
     }
 }
@@ -511,8 +531,8 @@ fn can_parse_star_capture() {
           print @stmts
         }
     "#;
-    let mut file = File::new(tree_sitter_python::language());
-    file.parse(&mut ctx, source).expect("Cannot parse file");
+    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+        .expect("Cannot parse file");
 
     let stmts = ctx.add_identifier("stmts");
 
@@ -527,6 +547,9 @@ fn can_parse_star_capture() {
             values: vec![Capture {
                 quantifier: ZeroOrMore,
                 name: stmts,
+                file_capture_index: 0,
+                stanza_capture_index: 0,
+                location: Location { row: 3, column: 16 },
             }
             .into()],
             location: Location { row: 3, column: 10 },
@@ -545,8 +568,8 @@ fn can_parse_star_multiple_capture() {
           print @stmts
         }
     "#;
-    let mut file = File::new(tree_sitter_python::language());
-    file.parse(&mut ctx, source).expect("Cannot parse file");
+    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+        .expect("Cannot parse file");
 
     let stmt = ctx.add_identifier("stmt");
     let stmts = ctx.add_identifier("stmts");
@@ -563,6 +586,9 @@ fn can_parse_star_multiple_capture() {
                 values: vec![Capture {
                     quantifier: ZeroOrMore,
                     name: stmt,
+                    file_capture_index: 0,
+                    stanza_capture_index: 0,
+                    location: Location { row: 3, column: 16 },
                 }
                 .into()],
                 location: Location { row: 3, column: 10 },
@@ -572,6 +598,9 @@ fn can_parse_star_multiple_capture() {
                 values: vec![Capture {
                     quantifier: ZeroOrMore,
                     name: stmts,
+                    file_capture_index: 1,
+                    stanza_capture_index: 1,
+                    location: Location { row: 4, column: 16 },
                 }
                 .into()],
                 location: Location { row: 4, column: 10 },
@@ -590,8 +619,8 @@ fn can_parse_plus_capture() {
           print @stmts
         }
     "#;
-    let mut file = File::new(tree_sitter_python::language());
-    file.parse(&mut ctx, source).expect("Cannot parse file");
+    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+        .expect("Cannot parse file");
 
     let stmts = ctx.add_identifier("stmts");
 
@@ -606,6 +635,9 @@ fn can_parse_plus_capture() {
             values: vec![Capture {
                 quantifier: OneOrMore,
                 name: stmts,
+                file_capture_index: 0,
+                stanza_capture_index: 0,
+                location: Location { row: 3, column: 16 },
             }
             .into()],
             location: Location { row: 3, column: 10 },
@@ -623,8 +655,8 @@ fn can_parse_optional_capture() {
           print @stmt
         }
     "#;
-    let mut file = File::new(tree_sitter_python::language());
-    file.parse(&mut ctx, source).expect("Cannot parse file");
+    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+        .expect("Cannot parse file");
 
     let stmt = ctx.add_identifier("stmt");
 
@@ -639,6 +671,9 @@ fn can_parse_optional_capture() {
             values: vec![Capture {
                 quantifier: ZeroOrOne,
                 name: stmt,
+                file_capture_index: 0,
+                stanza_capture_index: 0,
+                location: Location { row: 3, column: 16 },
             }
             .into()],
             location: Location { row: 3, column: 10 },
@@ -656,8 +691,8 @@ fn can_parse_parent_optional_capture() {
           print @stmt
         }
     "#;
-    let mut file = File::new(tree_sitter_python::language());
-    file.parse(&mut ctx, source).expect("Cannot parse file");
+    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+        .expect("Cannot parse file");
 
     let stmt = ctx.add_identifier("stmt");
 
@@ -672,6 +707,9 @@ fn can_parse_parent_optional_capture() {
             values: vec![Capture {
                 quantifier: ZeroOrOne,
                 name: stmt,
+                file_capture_index: 0,
+                stanza_capture_index: 0,
+                location: Location { row: 3, column: 16 },
             }
             .into()],
             location: Location { row: 3, column: 10 },
@@ -689,8 +727,8 @@ fn can_parse_alternative_capture() {
           print @stmt
         }
     "#;
-    let mut file = File::new(tree_sitter_python::language());
-    file.parse(&mut ctx, source).expect("Cannot parse file");
+    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+        .expect("Cannot parse file");
 
     let stmt = ctx.add_identifier("stmt");
 
@@ -705,6 +743,9 @@ fn can_parse_alternative_capture() {
             values: vec![Capture {
                 quantifier: ZeroOrOne,
                 name: stmt,
+                file_capture_index: 0,
+                stanza_capture_index: 0,
+                location: Location { row: 3, column: 16 },
             }
             .into()],
             location: Location { row: 3, column: 10 },
@@ -722,8 +763,8 @@ fn can_parse_nested_plus_and_optional_capture() {
           print @stmt
         }
     "#;
-    let mut file = File::new(tree_sitter_python::language());
-    file.parse(&mut ctx, source).expect("Cannot parse file");
+    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+        .expect("Cannot parse file");
 
     let stmt = ctx.add_identifier("stmt");
 
@@ -738,6 +779,9 @@ fn can_parse_nested_plus_and_optional_capture() {
             values: vec![Capture {
                 quantifier: ZeroOrMore,
                 name: stmt,
+                file_capture_index: 0,
+                stanza_capture_index: 0,
+                location: Location { row: 3, column: 16 },
             }
             .into()],
             location: Location { row: 3, column: 10 },
@@ -757,8 +801,8 @@ fn can_parse_if() {
           }
         }
     "#;
-    let mut file = File::new(tree_sitter_python::language());
-    file.parse(&mut ctx, source).expect("Cannot parse file");
+    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+        .expect("Cannot parse file");
 
     let x = ctx.add_identifier("x");
 
@@ -771,10 +815,17 @@ fn can_parse_if() {
         statements,
         vec![vec![If {
             arms: vec![IfArm {
-                conditions: vec![Condition::Some(vec![Capture {
-                    quantifier: ZeroOrOne,
-                    name: x,
-                }])],
+                conditions: vec![Condition::Some {
+                    value: Capture {
+                        quantifier: ZeroOrOne,
+                        name: x,
+                        file_capture_index: 0,
+                        stanza_capture_index: 0,
+                        location: Location { row: 3, column: 18 },
+                    }
+                    .into(),
+                    location: Location { row: 3, column: 13 },
+                }],
                 statements: vec![Print {
                     values: vec![StringConstant {
                         value: "x is not null".into()
@@ -804,8 +855,8 @@ fn can_parse_if_elif() {
           }
         }
     "#;
-    let mut file = File::new(tree_sitter_python::language());
-    file.parse(&mut ctx, source).expect("Cannot parse file");
+    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+        .expect("Cannot parse file");
 
     let x = ctx.add_identifier("x");
 
@@ -819,10 +870,18 @@ fn can_parse_if_elif() {
         vec![vec![If {
             arms: vec![
                 IfArm {
-                    conditions: vec![Condition::None(vec![Capture {
-                        quantifier: ZeroOrOne,
-                        name: x,
-                    }])],
+                    conditions: vec![Condition::None {
+                        value: Capture {
+                            quantifier: ZeroOrOne,
+                            name: x,
+                            file_capture_index: 0,
+                            stanza_capture_index: 0,
+                            location: Location { row: 3, column: 18 },
+                        }
+                        .into(),
+                        location: Location { row: 3, column: 13 },
+                    }
+                    .into(),],
                     statements: vec![Print {
                         values: vec![StringConstant {
                             value: "x is null".into()
@@ -834,10 +893,17 @@ fn can_parse_if_elif() {
                     location: Location { row: 3, column: 10 }
                 },
                 IfArm {
-                    conditions: vec![Condition::Some(vec![Capture {
-                        quantifier: ZeroOrOne,
-                        name: x,
-                    }])],
+                    conditions: vec![Condition::Some {
+                        value: Capture {
+                            quantifier: ZeroOrOne,
+                            name: x,
+                            file_capture_index: 0,
+                            stanza_capture_index: 0,
+                            location: Location { row: 5, column: 22 },
+                        }
+                        .into(),
+                        location: Location { row: 5, column: 17 },
+                    }],
                     statements: vec![Print {
                         values: vec![StringConstant {
                             value: "x is not null".into()
@@ -868,8 +934,8 @@ fn can_parse_if_else() {
           }
         }
     "#;
-    let mut file = File::new(tree_sitter_python::language());
-    file.parse(&mut ctx, source).expect("Cannot parse file");
+    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+        .expect("Cannot parse file");
 
     let x = ctx.add_identifier("x");
 
@@ -883,10 +949,17 @@ fn can_parse_if_else() {
         vec![vec![If {
             arms: vec![
                 IfArm {
-                    conditions: vec![Condition::None(vec![Capture {
-                        quantifier: ZeroOrOne,
-                        name: x,
-                    }])],
+                    conditions: vec![Condition::None {
+                        value: Capture {
+                            quantifier: ZeroOrOne,
+                            name: x,
+                            file_capture_index: 0,
+                            stanza_capture_index: 0,
+                            location: Location { row: 3, column: 18 },
+                        }
+                        .into(),
+                        location: Location { row: 3, column: 13 },
+                    }],
                     statements: vec![Print {
                         values: vec![StringConstant {
                             value: "x is null".into()
@@ -917,18 +990,17 @@ fn can_parse_if_else() {
 }
 
 #[test]
-fn cannot_parse_if_list_capture() {
+fn cannot_parse_if_some_list_capture() {
     let mut ctx = Context::new();
     let source = r#"
         (module (_)+ @xs) @root
         {
-          if @xs {
+          if some @xs {
             node n
           }
         }
     "#;
-    let mut file = File::new(tree_sitter_python::language());
-    if let Ok(_) = file.parse(&mut ctx, source) {
+    if let Ok(_) = File::from_source(tree_sitter_python::language(), &mut ctx, source) {
         panic!("Parse succeeded unexpectedly");
     }
 }
@@ -944,8 +1016,8 @@ fn can_parse_for_in() {
           }
         }
     "#;
-    let mut file = File::new(tree_sitter_python::language());
-    file.parse(&mut ctx, source).expect("Cannot parse file");
+    let file = File::from_source(tree_sitter_python::language(), &mut ctx, source)
+        .expect("Cannot parse file");
 
     let xs = ctx.add_identifier("xs");
     let x = ctx.add_identifier("x");
@@ -962,9 +1034,12 @@ fn can_parse_for_in() {
                 name: x,
                 location: Location { row: 3, column: 14 }
             },
-            capture: Capture {
+            value: Capture {
                 quantifier: ZeroOrMore,
                 name: xs,
+                file_capture_index: 0,
+                stanza_capture_index: 0,
+                location: Location { row: 3, column: 19 },
             }
             .into(),
             statements: vec![Print {
@@ -993,8 +1068,48 @@ fn cannot_parse_for_in_optional_capture() {
           }
         }
     "#;
-    let mut file = File::new(tree_sitter_python::language());
-    if let Ok(_) = file.parse(&mut ctx, source) {
+    if let Ok(_) = File::from_source(tree_sitter_python::language(), &mut ctx, source) {
+        panic!("Parse succeeded unexpectedly");
+    }
+}
+
+#[test]
+fn cannot_parse_scan_of_nonlocal_call_expression() {
+    let mut ctx = Context::new();
+    let source = r#"
+      (function_definition
+      name: (identifier) @name)
+      {
+        node n
+        scan (source-text @name.val) {
+          "get_.*" {
+            attr (n) is_getter = #true
+          }
+        }
+      }
+    "#;
+    if let Ok(_) = File::from_source(tree_sitter_python::language(), &mut ctx, source) {
+        panic!("Parse succeeded unexpectedly");
+    }
+}
+
+#[test]
+fn cannot_parse_scan_of_nonlocal_variable() {
+    let mut ctx = Context::new();
+    let source = r#"
+      (function_definition
+      name: (identifier) @name)
+      {
+        node n
+        let val = (source-text @name.val)
+        scan val {
+          "get_.*" {
+            attr (n) is_getter = #true
+          }
+        }
+      }
+    "#;
+    if let Ok(_) = File::from_source(tree_sitter_python::language(), &mut ctx, source) {
         panic!("Parse succeeded unexpectedly");
     }
 }

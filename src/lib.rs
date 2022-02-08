@@ -29,11 +29,13 @@
 pub mod reference;
 
 pub mod ast;
+mod checker;
 mod execution;
 pub mod functions;
 pub mod graph;
 mod lazy_execution;
 mod parser;
+mod variables;
 
 pub use execution::ExecutionError;
 pub use execution::Globals as Variables;
