@@ -38,9 +38,9 @@ mod parser;
 mod variables;
 
 pub use execution::ExecutionError;
-pub use execution::Globals as Variables;
 pub use parser::Location;
 pub use parser::ParseError;
+pub use variables::Globals as Variables;
 
 use std::borrow::Borrow;
 use std::hash::Hash;

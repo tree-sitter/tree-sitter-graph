@@ -43,7 +43,7 @@ use crate::functions::Functions;
 use crate::graph::Graph;
 use crate::graph::SyntaxNodeRef;
 use crate::graph::Value;
-pub use crate::variables::Globals;
+use crate::variables::Globals;
 use crate::variables::VariableMap;
 use crate::variables::Variables;
 
