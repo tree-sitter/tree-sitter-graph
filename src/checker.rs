@@ -186,7 +186,7 @@ impl ast::Scan {
                 ));
             }
 
-            let mut arm_locals = VariableMap::new_child(ctx.locals);
+            let mut arm_locals = VariableMap::nested(ctx.locals);
             let mut arm_ctx = CheckContext {
                 locals: &mut arm_locals,
                 file_query: ctx.file_query,
@@ -218,7 +218,7 @@ impl ast::If {
                 condition.check(ctx)?;
             }
 
-            let mut arm_locals = VariableMap::new_child(ctx.locals);
+            let mut arm_locals = VariableMap::nested(ctx.locals);
             let mut arm_ctx = CheckContext {
                 locals: &mut arm_locals,
                 file_query: ctx.file_query,
@@ -267,7 +267,7 @@ impl ast::ForIn {
             return Err(CheckError::ExpectedListValue(self.location));
         }
 
-        let mut loop_locals = VariableMap::new_child(ctx.locals);
+        let mut loop_locals = VariableMap::nested(ctx.locals);
         let mut loop_ctx = CheckContext {
             locals: &mut loop_locals,
             file_query: ctx.file_query,

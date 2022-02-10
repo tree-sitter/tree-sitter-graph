@@ -380,7 +380,7 @@ impl Scan {
                     .push(regex_capture.map(|m| m.as_str()).unwrap_or("").to_string());
             }
 
-            let mut arm_locals = VariableMap::new_child(exec.locals);
+            let mut arm_locals = VariableMap::nested(exec.locals);
             let mut arm_exec = ExecutionContext {
                 source: exec.source,
                 graph: exec.graph,
@@ -435,7 +435,7 @@ impl If {
                 result &= condition.test(exec)?;
             }
             if result {
-                let mut arm_locals = VariableMap::new_child(exec.locals);
+                let mut arm_locals = VariableMap::nested(exec.locals);
                 let mut arm_exec = ExecutionContext {
                     source: exec.source,
                     graph: exec.graph,
@@ -470,7 +470,7 @@ impl Condition {
 impl ForIn {
     fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
         let values = self.value.evaluate(exec)?.into_list()?;
-        let mut loop_locals = VariableMap::new_child(exec.locals);
+        let mut loop_locals = VariableMap::nested(exec.locals);
         for value in values {
             loop_locals.clear();
             let mut loop_exec = ExecutionContext {

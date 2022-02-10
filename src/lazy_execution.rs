@@ -311,7 +311,7 @@ impl ast::Scan {
                     .push(regex_capture.map(|m| m.as_str()).unwrap_or("").to_string());
             }
 
-            let mut arm_locals = VariableMap::new_child(exec.locals);
+            let mut arm_locals = VariableMap::nested(exec.locals);
             let mut arm_exec = ExecutionContext {
                 source: exec.source,
                 graph: exec.graph,
@@ -371,7 +371,7 @@ impl ast::If {
                 result &= condition.test_eager(exec)?;
             }
             if result {
-                let mut arm_locals = VariableMap::new_child(exec.locals);
+                let mut arm_locals = VariableMap::nested(exec.locals);
                 let mut arm_exec = ExecutionContext {
                     source: exec.source,
                     graph: exec.graph,
@@ -411,7 +411,7 @@ impl ast::Condition {
 impl ast::ForIn {
     fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
         let values = self.value.evaluate_eager(exec)?.into_list()?;
-        let mut loop_locals = VariableMap::new_child(exec.locals);
+        let mut loop_locals = VariableMap::nested(exec.locals);
         for value in values {
             loop_locals.clear();
             let mut loop_exec = ExecutionContext {
