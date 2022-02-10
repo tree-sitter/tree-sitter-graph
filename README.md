@@ -5,6 +5,7 @@ structures from source code that has been parsed using [tree-sitter][].
 
 [tree-sitter]: https://tree-sitter.github.io/
 
+- [Language Reference](https://docs.rs/tree-sitter-graph/*/tree_sitter_graph/reference/)
 - [API documentation](https://docs.rs/tree-sitter-graph/)
 - [Release notes](https://github.com/tree-sitter/tree-sitter-graph/blob/main/CHANGELOG.md)
 
