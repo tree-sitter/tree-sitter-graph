@@ -192,20 +192,24 @@
 //!     to stanza.  Scoped variables are referenced by using a syntax node expression (typically a
 //!     query capture) and a variable name, separated by a period: `@node.variable`.
 //!
+//! Global variables are declared using a `global` declaration.  The external process that executes the
+//! graph DSL file must provide values for all declared global variables.  (It is not possible to define
+//! a global variable and give it a value from within the graph DSL.) The name of the global variable can
+//! be suffixed by a quantifier: '*' and '+' for lists, and '?' for optional values, which allows them to
+//! be used in iteration and conditional statements, respectively.
+//!
 //! Local and scoped variables are created using `var` or `let` statements.  A `let` statement
 //! creates an **_immutable variable_**, whose value cannot be changed.  A `var` statement creates
 //! a **_mutable variable_**.  You use a `set` statement to change the value of a mutable variable.
+//! Local variables are not allowed to have the same name as a declared global variable.
 //!
 //! Local variables are block scoped.  For example, a local variable defined in a `scan` arm is not
 //! visible in other scan arms, or after the `scan` statement.  If you need to persist a value for use
 //! after a block, introduce a mutable variable before the block and assign to it inside the block.
 //!
-//! (All global variables are immutable, and cannot be created by any graph DSL statement; they are
-//! only provided by the external process that executes the graph DSL file.  If you need to create
-//! your own "global" variable from within the graph DSL, create a scoped variable on the root
-//! syntax node.)
-//!
 //! ``` tsg
+//! global global_variable
+//!
 //! (identifier) @id
 //! {
 //!   let local_variable = "a string"
@@ -216,8 +220,12 @@
 //!   ; doesn't exist:
 //!   ; set missing_variable = 42
 //!
+//!   ; The following is an error, since you cannot hide a global variable with
+//!   ; a local one:
+//!   ; let global_variable = "a new value"
+//!
 //!   var mutable_variable = "first value"
-//!   set mutable_variable = "second value"
+//!   set mutable_variable = global_variable ; we can refer to the global variable
 //!
 //!   var @id.kind = "id"
 //! }
@@ -381,6 +389,8 @@
 //! module defined in the file:
 //!
 //! ``` tsg
+//! global filepath
+//!
 //! (module) @mod
 //! {
 //!   var new_node = #null

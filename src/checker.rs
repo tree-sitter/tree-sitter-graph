@@ -22,6 +22,12 @@ use crate::Location;
 
 #[derive(Debug, Error)]
 pub enum CheckError {
+    #[error("Cannot hide global variable {0} at {1}")]
+    CannotHideGlobalVariable(String, Location),
+    #[error("Cannot set global variable {0} at {1}")]
+    CannotSetGlobalVariable(String, Location),
+    #[error("Duplicate global variable {0} at {1}")]
+    DuplicateGlobalVariable(String, Location),
     #[error("Expected list value at {0}")]
     ExpectedListValue(Location),
     #[error("Expected local value at {0}")]
@@ -32,16 +38,19 @@ pub enum CheckError {
     NullableRegex(String, Location),
     #[error("Undefined syntax capture @{0} at {1}")]
     UndefinedSyntaxCapture(String, Location),
+    #[error("Undefined variable {0} at {1}")]
+    UndefinedVariable(String, Location),
     #[error("{0}: {1}")]
     Variable(VariableError, String),
 }
 
 /// Checker context
 struct CheckContext<'a> {
-    locals: &'a mut dyn Variables<ExpressionResult>,
+    globals: &'a dyn Variables<ExpressionResult>,
     file_query: &'a Query,
     stanza_index: usize,
     stanza_query: &'a Query,
+    locals: &'a mut dyn Variables<ExpressionResult>,
 }
 
 //-----------------------------------------------------------------------------
@@ -49,9 +58,27 @@ struct CheckContext<'a> {
 
 impl ast::File {
     pub fn check(&mut self) -> Result<(), CheckError> {
+        let mut globals = VariableMap::new();
+        for global in &self.globals {
+            globals
+                .add(
+                    global.name.clone(),
+                    ExpressionResult {
+                        quantifier: global.quantifier,
+                        is_local: true,
+                    },
+                    false,
+                )
+                .map_err(|_| {
+                    CheckError::DuplicateGlobalVariable(
+                        global.name.as_str().to_string(),
+                        global.location,
+                    )
+                })?;
+        }
         let file_query = self.query.as_ref().unwrap();
         for (index, stanza) in self.stanzas.iter_mut().enumerate() {
-            stanza.check(file_query, index)?;
+            stanza.check(&globals, file_query, index)?;
         }
         Ok(())
     }
@@ -61,13 +88,19 @@ impl ast::File {
 // Stanza
 
 impl ast::Stanza {
-    fn check(&mut self, file_query: &Query, stanza_index: usize) -> Result<(), CheckError> {
+    fn check(
+        &mut self,
+        globals: &dyn Variables<ExpressionResult>,
+        file_query: &Query,
+        stanza_index: usize,
+    ) -> Result<(), CheckError> {
         let mut locals = VariableMap::new();
         let mut ctx = CheckContext {
-            locals: &mut locals,
+            globals,
             file_query,
             stanza_index,
             stanza_query: &self.query,
+            locals: &mut locals,
         };
         self.full_match_file_capture_index =
             ctx.file_query.capture_index_for_name(FULL_MATCH).unwrap() as usize;
@@ -188,10 +221,11 @@ impl ast::Scan {
 
             let mut arm_locals = VariableMap::nested(ctx.locals);
             let mut arm_ctx = CheckContext {
-                locals: &mut arm_locals,
+                globals: ctx.globals,
                 file_query: ctx.file_query,
                 stanza_index: ctx.stanza_index,
                 stanza_query: ctx.stanza_query,
+                locals: &mut arm_locals,
             };
 
             for statement in &mut arm.statements {
@@ -220,10 +254,11 @@ impl ast::If {
 
             let mut arm_locals = VariableMap::nested(ctx.locals);
             let mut arm_ctx = CheckContext {
-                locals: &mut arm_locals,
+                globals: ctx.globals,
                 file_query: ctx.file_query,
                 stanza_index: ctx.stanza_index,
                 stanza_query: ctx.stanza_query,
+                locals: &mut arm_locals,
             };
 
             for statement in &mut arm.statements {
@@ -269,10 +304,11 @@ impl ast::ForIn {
 
         let mut loop_locals = VariableMap::nested(ctx.locals);
         let mut loop_ctx = CheckContext {
-            locals: &mut loop_locals,
+            globals: ctx.globals,
             file_query: ctx.file_query,
             stanza_index: ctx.stanza_index,
             stanza_query: ctx.stanza_query,
+            locals: &mut loop_locals,
         };
         self.variable
             .check_add(&mut loop_ctx, value_result, false)?;
@@ -449,6 +485,12 @@ impl ast::UnscopedVariable {
         value: ExpressionResult,
         mutable: bool,
     ) -> Result<(), CheckError> {
+        if ctx.globals.get(&self.name).is_some() {
+            return Err(CheckError::CannotHideGlobalVariable(
+                self.name.as_str().to_string(),
+                self.location,
+            ));
+        }
         let mut value = value;
         // Mutable variables are not considered local, because a non-local
         // assignment in a loop could invalidate an earlier local assignment.
@@ -467,6 +509,12 @@ impl ast::UnscopedVariable {
         ctx: &mut CheckContext,
         value: ExpressionResult,
     ) -> Result<(), CheckError> {
+        if ctx.globals.get(&self.name).is_some() {
+            return Err(CheckError::CannotSetGlobalVariable(
+                self.name.as_str().to_string(),
+                self.location,
+            ));
+        }
         let mut value = value;
         // Mutable variables are not considered local, because a non-local
         // assignment in a loop could invalidate an earlier local assignment.
@@ -479,16 +527,21 @@ impl ast::UnscopedVariable {
     }
 
     fn check_get(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
-        // If the variable is not found, we return a default value for a possible global variable.
-        let value = ctx
-            .locals
-            .get(&self.name)
-            .cloned()
-            .unwrap_or_else(|| ExpressionResult {
+        if let Some(result) = ctx.globals.get(&self.name) {
+            Some(result)
+        } else {
+            ctx.locals.get(&self.name)
+        }
+        .cloned()
+        // TODO deprecated support for undeclared globals
+        .or_else(|| {
+            eprintln!("Use of undeclared global variable {} is deprecated. Fix by adding an explicit declaration `global {}`", self.name, self.name);
+            Some(ExpressionResult {
+                quantifier: One,
                 is_local: true,
-                quantifier: One, // FIXME we don't really know
-            });
-        Ok(value)
+            })
+        })
+        .ok_or_else(|| CheckError::UndefinedVariable(self.name.as_str().to_string(), self.location))
     }
 }
 

@@ -11,7 +11,12 @@ use std::str::Chars;
 
 use regex::Regex;
 use thiserror::Error;
+use tree_sitter::CaptureQuantifier;
+use tree_sitter::CaptureQuantifier::One;
+use tree_sitter::CaptureQuantifier::OneOrMore;
 use tree_sitter::CaptureQuantifier::Zero;
+use tree_sitter::CaptureQuantifier::ZeroOrMore;
+use tree_sitter::CaptureQuantifier::ZeroOrOne;
 use tree_sitter::Language;
 use tree_sitter::Query;
 use tree_sitter::QueryError;
@@ -43,6 +48,8 @@ impl ast::File {
 /// An error that can occur while parsing a graph DSL file
 #[derive(Debug, Error)]
 pub enum ParseError {
+    #[error("Expected quantifier at {0}")]
+    ExpectedQuantifier(Location),
     #[error("Expected '{0}' at {1}")]
     ExpectedToken(&'static str, Location),
     #[error("Expected variable name at {0}")]
@@ -206,12 +213,46 @@ impl<'a> Parser<'a> {
     fn parse_into_file(&mut self, file: &mut ast::File) -> Result<(), ParseError> {
         self.consume_whitespace();
         while self.try_peek().is_some() {
-            let stanza = self.parse_stanza(file.language)?;
-            file.stanzas.push(stanza);
+            if let Ok(_) = self.consume_token("global") {
+                self.consume_whitespace();
+                let global = self.parse_global()?;
+                file.globals.push(global);
+            } else {
+                let stanza = self.parse_stanza(file.language)?;
+                file.stanzas.push(stanza);
+            }
             self.consume_whitespace();
         }
         file.query = Some(Query::new(file.language, &self.query_source)?);
         Ok(())
+    }
+
+    fn parse_global(&mut self) -> Result<ast::Global, ParseError> {
+        let location = self.location;
+        let name = self.parse_identifier("global variable")?;
+        let quantifier = self.parse_quantifier()?;
+        Ok(ast::Global {
+            name,
+            quantifier,
+            location,
+        })
+    }
+
+    fn parse_quantifier(&mut self) -> Result<CaptureQuantifier, ParseError> {
+        let mut quantifier = One;
+        if let Some(c) = self.try_peek() {
+            self.skip().unwrap();
+            if c == '?' {
+                quantifier = ZeroOrOne;
+            } else if c == '*' {
+                quantifier = ZeroOrMore;
+            } else if c == '+' {
+                quantifier = OneOrMore;
+            } else if !c.is_whitespace() {
+                return Err(ParseError::ExpectedQuantifier(self.location));
+            }
+        }
+        Ok(quantifier)
     }
 
     fn parse_stanza(&mut self, language: Language) -> Result<ast::Stanza, ParseError> {
@@ -496,12 +537,7 @@ impl<'a> Parser<'a> {
             .into())
         } else if keyword == "for" {
             self.consume_whitespace();
-            let variable = match self.parse_variable()? {
-                ast::Variable::Unscoped(variable) => Ok(variable),
-                ast::Variable::Scoped(variable) => {
-                    Err(ParseError::ExpectedUnscopedVariable(variable.location))
-                }
-            }?;
+            let variable = self.parse_unscoped_variable()?;
             self.consume_whitespace();
             self.consume_token("in")?;
             self.consume_whitespace();
@@ -776,6 +812,15 @@ impl<'a> Parser<'a> {
         match self.parse_expression()? {
             ast::Expression::Variable(variable) => Ok(variable),
             _ => Err(ParseError::ExpectedVariable(expression_location)),
+        }
+    }
+
+    fn parse_unscoped_variable(&mut self) -> Result<ast::UnscopedVariable, ParseError> {
+        match self.parse_variable()? {
+            ast::Variable::Unscoped(variable) => Ok(variable),
+            ast::Variable::Scoped(variable) => {
+                Err(ParseError::ExpectedUnscopedVariable(variable.location))
+            }
         }
     }
 }

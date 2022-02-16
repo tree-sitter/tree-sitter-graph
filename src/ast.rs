@@ -20,6 +20,8 @@ use crate::Location;
 #[derive(Debug)]
 pub struct File {
     pub language: Language,
+    /// The expected global variables used in this file
+    pub globals: Vec<Global>,
     /// The combined query of all stanzas in the file
     pub query: Option<Query>,
     /// The list of stanzas in the file
@@ -30,10 +32,21 @@ impl File {
     pub fn new(language: Language) -> File {
         File {
             language,
+            globals: Vec::new(),
             query: None,
             stanzas: Vec::new(),
         }
     }
+}
+
+/// A global variable
+#[derive(Debug, Eq, PartialEq)]
+pub struct Global {
+    /// The name of the global variable
+    pub name: Identifier,
+    /// The quantifier of the global variable
+    pub quantifier: CaptureQuantifier,
+    pub location: Location,
 }
 
 /// One stanza within a file
