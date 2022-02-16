@@ -224,9 +224,7 @@
 //! ```
 //!
 //! Variables can be referenced anywhere that you can provide an expression.  It's an error if you
-//! try to reference a variable that hasn't been defined yet.  (Remember that stanzas are processed
-//! in the order they appear in the file, and each stanza's matches are processed in the order they
-//! appear in the syntax tree.)
+//! try to reference a variable that hasn't been defined.
 //!
 //! # Functions
 //!
