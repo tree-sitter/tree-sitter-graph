@@ -224,9 +224,7 @@
 //! ```
 //!
 //! Variables can be referenced anywhere that you can provide an expression.  It's an error if you
-//! try to reference a variable that hasn't been defined yet.  (Remember that stanzas are processed
-//! in the order they appear in the file, and each stanza's matches are processed in the order they
-//! appear in the syntax tree.)
+//! try to reference a variable that hasn't been defined.
 //!
 //! # Functions
 //!
@@ -372,12 +370,6 @@
 //! starting _after_ the text that was just matched.  We continue this process, applying the
 //! earliest matching regular expression in each iteration, until we have exhausted the entire
 //! string, or none of the regular expressions match.
-//!
-//! Regular expression matching is subject to the following restrictions:
-//!
-//!   - The regular expressions are not allowed to match an empty string. Any regular expression
-//!     that does match empty strings results in an error.
-//!   - The string value must be a capture, a reference to a global variable, or a literal string.
 //!
 //! Within each regular expression's block, you can use `$0`, `$1`, etc., to refer to any capture
 //! groups in the regular expression.

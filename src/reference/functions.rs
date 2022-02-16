@@ -83,6 +83,22 @@
 //! [`Regex::new`]: https://docs.rs/regex/*/regex/struct.Regex.html#method.new
 //! [`Regex::replace_all`]: https://docs.rs/regex/*/regex/struct.Regex.html#method.replace_all
 //!
+//! # List functions
+//!
+//! ## `is-empty`
+//!
+//! Test whether a list is empty or not.
+//!
+//!   - Input parameters: a list value
+//!   - Output parameters: a boolean indicating whether the list is empty or not
+//!
+//! ## `length`
+//!
+//! Determine the length of a list.
+//!
+//!   - Input parameters: a list value
+//!   - Output parameters: an integer indicating the length of the list
+//!
 //! # Syntax manipulation functions
 //!
 //! ## `named-child-index`

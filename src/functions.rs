@@ -128,6 +128,9 @@ impl Functions {
         functions.add(Identifier::from("plus"), stdlib::math::Plus);
         // string functions
         functions.add(Identifier::from("replace"), stdlib::string::Replace);
+        // list functions
+        functions.add(Identifier::from("is-empty"), stdlib::list::IsEmpty);
+        functions.add(Identifier::from("length"), stdlib::list::Length);
         functions
     }
 
@@ -460,6 +463,40 @@ pub mod stdlib {
                 Ok(Value::String(
                     pattern.replace_all(&text, replacement).to_string(),
                 ))
+            }
+        }
+    }
+
+    pub mod list {
+        use super::*;
+
+        /// The implementation of the standard [`is-empty`][`crate::reference::functions#is-empty`] function.
+        pub struct IsEmpty;
+
+        impl Function for IsEmpty {
+            fn call(
+                &mut self,
+                _graph: &mut Graph,
+                _source: &str,
+                parameters: &mut dyn Parameters,
+            ) -> Result<Value, ExecutionError> {
+                let list = parameters.param()?.into_list()?;
+                Ok(list.is_empty().into())
+            }
+        }
+
+        /// The implementation of the standard [`length`][`crate::reference::functions#length`] function.
+        pub struct Length;
+
+        impl Function for Length {
+            fn call(
+                &mut self,
+                _graph: &mut Graph,
+                _source: &str,
+                parameters: &mut dyn Parameters,
+            ) -> Result<Value, ExecutionError> {
+                let list = parameters.param()?.into_list()?;
+                Ok((list.len() as u32).into())
             }
         }
     }
