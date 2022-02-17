@@ -63,7 +63,6 @@ impl ast::File {
         functions: &mut Functions,
         globals: &Globals,
     ) -> Result<(), ExecutionError> {
-        self.check_tree(tree, source)?;
         self.check_globals(globals)?;
         let mut locals = VariableMap::new();
         let mut cursor = QueryCursor::new();

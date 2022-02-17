@@ -19,7 +19,11 @@ use tree_sitter_graph::functions::Functions;
 use tree_sitter_graph::Variables;
 use tree_sitter_loader::Loader;
 
+use crate::util::ParseErrors;
+
 const BUILD_VERSION: &'static str = env!("CARGO_PKG_VERSION");
+
+mod util;
 
 fn main() -> Result<()> {
     init_log();
@@ -67,6 +71,14 @@ fn main() -> Result<()> {
     let tree = parser
         .parse(&source, None)
         .ok_or_else(|| anyhow!("Could not parse {}", source_path.display()))?;
+    let parse_errors = ParseErrors::from_tree(&tree, &source);
+    if !parse_errors.is_empty() {
+        return Err(anyhow!(
+            "Cannot parse {}\n{}",
+            source_path.display(),
+            parse_errors
+        ));
+    }
     let file = File::from_str(language, &tsg)
         .with_context(|| format!("Error parsing TSG file {}", tsg_path.display()))?;
     let mut functions = Functions::stdlib();
