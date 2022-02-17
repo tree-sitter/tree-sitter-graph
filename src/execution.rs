@@ -80,9 +80,7 @@ impl File {
         functions: &mut Functions,
         globals: &Globals,
     ) -> Result<(), ExecutionError> {
-        if tree.root_node().has_error() {
-            return Err(ExecutionError::ParseTreeHasErrors);
-        }
+        self.check_tree(tree, source)?;
         self.check_globals(globals)?;
         let mut locals = VariableMap::new();
         let mut scoped = ScopedVariables::new();
@@ -129,6 +127,42 @@ impl File {
             }
         }
         Ok(())
+    }
+
+    pub(crate) fn check_tree(&self, tree: &Tree, source: &str) -> Result<(), ExecutionError> {
+        let mut errors = ParseErrors::default();
+
+        let mut cursor = tree.walk();
+        let mut did_visit_children = false;
+        loop {
+            let node = cursor.node();
+            if node.is_error() || node.is_missing() {
+                errors.add(node, source);
+                did_visit_children = true;
+            }
+            if did_visit_children {
+                if cursor.goto_next_sibling() {
+                    did_visit_children = false;
+                } else if cursor.goto_parent() {
+                    did_visit_children = true;
+                } else {
+                    break;
+                }
+            } else {
+                if cursor.goto_first_child() {
+                    did_visit_children = false;
+                } else {
+                    did_visit_children = true;
+                }
+            }
+        }
+        cursor.reset(tree.root_node());
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(ExecutionError::ParseTreeHasErrors(errors))
+        }
     }
 }
 
@@ -185,8 +219,8 @@ pub enum ExecutionError {
     UndefinedVariable(String),
     #[error("Cannot add scoped variable after being forced {0}")]
     VariableScopesAlreadyForced(String),
-    #[error("Parse tree has errors")]
-    ParseTreeHasErrors,
+    #[error("{0}")]
+    ParseTreeHasErrors(ParseErrors),
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
@@ -198,6 +232,46 @@ impl ExecutionError {
         E: Into<anyhow::Error>,
     {
         ExecutionError::Other(err.into())
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct ParseErrors {
+    errors: Vec<(usize, usize, Option<String>)>,
+}
+
+impl ParseErrors {
+    pub(crate) fn add(&mut self, node: tree_sitter::Node, source: &str) {
+        let start = node.start_position();
+        let node_source = if !node.byte_range().is_empty() {
+            Some(source[node.byte_range()].to_string())
+        } else {
+            None
+        };
+        self.errors.push((start.row, start.column, node_source));
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.errors.is_empty()
+    }
+}
+
+impl std::fmt::Display for ParseErrors {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        for error in &self.errors {
+            write!(
+                f,
+                "Parse error on line {} column {} of input file",
+                error.0 + 1,
+                error.1 + 1
+            )?;
+            if let Some(source) = &error.2 {
+                write!(f, ":\n|\n| {}\n|", source)?;
+            } else {
+                write!(f, " (node has no source)")?;
+            }
+        }
+        Ok(())
     }
 }
 

@@ -63,9 +63,7 @@ impl ast::File {
         functions: &mut Functions,
         globals: &Globals,
     ) -> Result<(), ExecutionError> {
-        if tree.root_node().has_error() {
-            return Err(ExecutionError::ParseTreeHasErrors);
-        }
+        self.check_tree(tree, source)?;
         self.check_globals(globals)?;
         let mut locals = VariableMap::new();
         let mut cursor = QueryCursor::new();
