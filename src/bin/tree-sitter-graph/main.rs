@@ -48,6 +48,11 @@ fn main() -> Result<()> {
         )
         .arg(Arg::with_name("scope").long("scope").takes_value(true))
         .arg(Arg::with_name("json").long("json").takes_value(false))
+        .arg(
+            Arg::with_name("allow-parse-errors")
+                .long("allow-parse-errors")
+                .takes_value(false),
+        )
         .get_matches();
 
     let tsg_path = Path::new(matches.value_of("tsg").unwrap());
@@ -71,13 +76,16 @@ fn main() -> Result<()> {
     let tree = parser
         .parse(&source, None)
         .ok_or_else(|| anyhow!("Could not parse {}", source_path.display()))?;
-    let parse_errors = ParseErrors::from_tree(&tree, &source);
-    if !parse_errors.is_empty() {
-        return Err(anyhow!(
-            "Cannot parse {}\n{}",
-            source_path.display(),
-            parse_errors
-        ));
+    let allow_parse_errors = matches.is_present("allow-parse-errors");
+    if !allow_parse_errors {
+        let parse_errors = ParseErrors::from_tree(&tree, &source);
+        if !parse_errors.is_empty() {
+            return Err(anyhow!(
+                "Cannot parse {}\n{}",
+                source_path.display(),
+                parse_errors
+            ));
+        }
     }
     let file = File::from_str(language, &tsg)
         .with_context(|| format!("Error parsing TSG file {}", tsg_path.display()))?;
