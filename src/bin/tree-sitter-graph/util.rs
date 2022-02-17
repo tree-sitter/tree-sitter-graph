@@ -15,6 +15,10 @@ pub(crate) struct ParseErrors {
 impl ParseErrors {
     pub(crate) fn from_tree(tree: &Tree, source: &str) -> Self {
         let mut errors = ParseErrors { errors: Vec::new() };
+        // do not walk the tree unless there actually are errors
+        if !tree.root_node().has_error() {
+            return errors;
+        }
 
         let mut cursor = tree.walk();
         let mut did_visit_children = false;
