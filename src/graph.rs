@@ -288,6 +288,10 @@ impl Attributes {
     {
         self.values.get(name.borrow())
     }
+
+    pub fn iter(&self) -> std::collections::hash_map::Iter<'_, Identifier, Value> {
+        self.values.iter()
+    }
 }
 
 impl std::fmt::Display for Attributes {

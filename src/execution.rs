@@ -43,6 +43,7 @@ use crate::ast::StringConstant;
 use crate::ast::UnscopedVariable;
 use crate::ast::Variable;
 use crate::functions::Functions;
+use crate::graph::Attributes;
 use crate::graph::Graph;
 use crate::graph::SyntaxNodeRef;
 use crate::graph::Value;
@@ -61,9 +62,10 @@ impl File {
         source: &'tree str,
         functions: &mut Functions,
         globals: &Globals,
+        options: &ExecutionOptions,
     ) -> Result<Graph<'tree>, ExecutionError> {
         let mut graph = Graph::new();
-        self.execute_into(&mut graph, tree, source, functions, globals)?;
+        self.execute_into(&mut graph, tree, source, functions, globals, options)?;
         Ok(graph)
     }
 
@@ -79,6 +81,7 @@ impl File {
         source: &'tree str,
         functions: &mut Functions,
         globals: &Globals,
+        options: &ExecutionOptions,
     ) -> Result<(), ExecutionError> {
         self.check_globals(globals)?;
         let mut locals = VariableMap::new();
@@ -93,6 +96,7 @@ impl File {
                 graph,
                 functions,
                 globals,
+                options,
                 &mut locals,
                 &mut scoped,
                 &current_regex_captures,
@@ -126,6 +130,23 @@ impl File {
             }
         }
         Ok(())
+    }
+}
+
+pub struct ExecutionOptions {
+    pub(crate) implicit_debug_attrs: bool,
+}
+
+impl ExecutionOptions {
+    pub fn new() -> Self {
+        Self {
+            implicit_debug_attrs: false,
+        }
+    }
+
+    pub fn implicit_debug_attributes(&mut self, value: bool) -> &mut Self {
+        self.implicit_debug_attrs = value;
+        self
     }
 }
 
@@ -201,6 +222,7 @@ struct ExecutionContext<'a, 'g, 's, 'tree> {
     graph: &'a mut Graph<'tree>,
     functions: &'a mut Functions,
     globals: &'a Globals<'g>,
+    options: &'a ExecutionOptions,
     locals: &'a mut dyn Variables<Value>,
     scoped: &'a mut ScopedVariables<'s>,
     current_regex_captures: &'a Vec<String>,
@@ -233,6 +255,7 @@ impl Stanza {
         graph: &mut Graph<'tree>,
         functions: &mut Functions,
         globals: &Globals,
+        options: &ExecutionOptions,
         locals: &mut VariableMap<'l, Value>,
         scoped: &mut ScopedVariables<'s>,
         current_regex_captures: &Vec<String>,
@@ -248,6 +271,7 @@ impl Stanza {
                 graph,
                 functions,
                 globals,
+                options,
                 locals,
                 scoped,
                 current_regex_captures,
@@ -307,6 +331,10 @@ impl Assign {
 impl CreateGraphNode {
     fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
         let graph_node = exec.graph.add_graph_node();
+        if exec.options.implicit_debug_attrs {
+            self.node
+                .add_debug_attrs(&mut exec.graph[graph_node].attributes);
+        }
         let value = Value::GraphNode(graph_node);
         self.node.add(exec, value, false)
     }
@@ -418,6 +446,7 @@ impl Scan {
                 graph: exec.graph,
                 functions: exec.functions,
                 globals: exec.globals,
+                options: exec.options,
                 locals: &mut arm_locals,
                 scoped: exec.scoped,
                 current_regex_captures: &current_regex_captures,
@@ -474,6 +503,7 @@ impl If {
                     graph: exec.graph,
                     functions: exec.functions,
                     globals: exec.globals,
+                    options: exec.options,
                     locals: &mut arm_locals,
                     scoped: exec.scoped,
                     current_regex_captures: exec.current_regex_captures,
@@ -512,6 +542,7 @@ impl ForIn {
                 graph: exec.graph,
                 functions: exec.functions,
                 globals: exec.globals,
+                options: exec.options,
                 locals: &mut loop_locals,
                 scoped: exec.scoped,
                 current_regex_captures: exec.current_regex_captures,
@@ -760,6 +791,17 @@ impl UnscopedVariable {
     }
 }
 
+impl Variable {
+    pub(crate) fn add_debug_attrs(&self, attributes: &mut Attributes) {
+        let location = match &self {
+            Variable::Scoped(v) => v.location,
+            Variable::Unscoped(v) => v.location,
+        };
+        attributes.add("debug_tsg_variable".into(), format!("{}", self));
+        attributes.add("debug_tsg_location".into(), format!("{}", location));
+    }
+}
+
 impl Attribute {
     fn execute<F>(
         &self,
@@ -794,6 +836,7 @@ impl AttributeShorthand {
             graph: exec.graph,
             functions: exec.functions,
             globals: exec.globals,
+            options: exec.options,
             locals: &mut shorthand_locals,
             scoped: exec.scoped,
             current_regex_captures: exec.current_regex_captures,

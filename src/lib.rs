@@ -39,6 +39,7 @@ mod parser;
 mod variables;
 
 pub use execution::ExecutionError;
+pub use execution::ExecutionOptions;
 pub use parser::Location;
 pub use parser::ParseError;
 pub use variables::Globals as Variables;

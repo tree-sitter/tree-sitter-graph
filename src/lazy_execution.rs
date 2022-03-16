@@ -22,6 +22,7 @@ use tree_sitter::Tree;
 use crate::ast;
 use crate::execution::query_capture_value;
 use crate::execution::ExecutionError;
+use crate::execution::ExecutionOptions;
 use crate::functions::Functions;
 use crate::graph;
 use crate::graph::Graph;
@@ -44,9 +45,10 @@ impl ast::File {
         source: &'tree str,
         functions: &mut Functions,
         globals: &Globals,
+        options: &ExecutionOptions,
     ) -> Result<Graph<'tree>, ExecutionError> {
         let mut graph = Graph::new();
-        self.execute_lazy_into(&mut graph, tree, source, functions, globals)?;
+        self.execute_lazy_into(&mut graph, tree, source, functions, globals, options)?;
         Ok(graph)
     }
 
@@ -62,6 +64,7 @@ impl ast::File {
         source: &'tree str,
         functions: &mut Functions,
         globals: &Globals,
+        options: &ExecutionOptions,
     ) -> Result<(), ExecutionError> {
         self.check_globals(globals)?;
         let mut locals = VariableMap::new();
@@ -82,6 +85,7 @@ impl ast::File {
                 graph,
                 functions,
                 globals,
+                options,
                 &mut locals,
                 &mut store,
                 &mut scoped_store,
@@ -116,6 +120,7 @@ struct ExecutionContext<'a, 'g, 'tree> {
     graph: &'a mut Graph<'tree>,
     functions: &'a mut Functions,
     globals: &'a Globals<'g>,
+    options: &'a ExecutionOptions,
     locals: &'a mut dyn Variables<LazyValue>,
     current_regex_captures: &'a Vec<String>,
     mat: &'a QueryMatch<'a, 'tree>,
@@ -153,6 +158,7 @@ impl ast::Stanza {
         graph: &mut Graph<'tree>,
         functions: &mut Functions,
         globals: &Globals<'g>,
+        options: &ExecutionOptions,
         locals: &mut VariableMap<'l, LazyValue>,
         store: &mut LazyStore,
         scoped_store: &mut LazyScopedVariables,
@@ -168,6 +174,7 @@ impl ast::Stanza {
             graph,
             functions,
             globals,
+            options,
             locals,
             current_regex_captures: &current_regex_captures,
             mat,
@@ -233,6 +240,10 @@ impl ast::Assign {
 impl ast::CreateGraphNode {
     fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
         let graph_node = exec.graph.add_graph_node();
+        if exec.options.implicit_debug_attrs {
+            self.node
+                .add_debug_attrs(&mut exec.graph[graph_node].attributes);
+        }
         self.node.add_lazy(exec, graph_node.into(), false)
     }
 }
@@ -321,6 +332,7 @@ impl ast::Scan {
                 graph: exec.graph,
                 functions: exec.functions,
                 globals: exec.globals,
+                options: exec.options,
                 locals: &mut arm_locals,
                 current_regex_captures: &current_regex_captures,
                 mat: exec.mat,
@@ -382,6 +394,7 @@ impl ast::If {
                     graph: exec.graph,
                     functions: exec.functions,
                     globals: exec.globals,
+                    options: exec.options,
                     locals: &mut arm_locals,
                     current_regex_captures: exec.current_regex_captures,
                     mat: exec.mat,
@@ -425,6 +438,7 @@ impl ast::ForIn {
                 graph: exec.graph,
                 functions: exec.functions,
                 globals: exec.globals,
+                options: exec.options,
                 locals: &mut loop_locals,
                 current_regex_captures: exec.current_regex_captures,
                 mat: exec.mat,
@@ -702,6 +716,7 @@ impl ast::AttributeShorthand {
             graph: exec.graph,
             functions: exec.functions,
             globals: exec.globals,
+            options: exec.options,
             locals: &mut shorthand_locals,
             current_regex_captures: exec.current_regex_captures,
             mat: exec.mat,
