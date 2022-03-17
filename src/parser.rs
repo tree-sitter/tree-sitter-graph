@@ -217,6 +217,10 @@ impl<'a> Parser<'a> {
                 self.consume_whitespace();
                 let global = self.parse_global()?;
                 file.globals.push(global);
+            } else if let Ok(_) = self.consume_token("attribute") {
+                self.consume_whitespace();
+                let shorthand = self.parse_shorthand()?;
+                file.shorthands.add(shorthand);
             } else {
                 let stanza = self.parse_stanza(file.language)?;
                 file.stanzas.push(stanza);
@@ -234,6 +238,25 @@ impl<'a> Parser<'a> {
         Ok(ast::Global {
             name,
             quantifier,
+            location,
+        })
+    }
+
+    fn parse_shorthand(&mut self) -> Result<ast::AttributeShorthand, ParseError> {
+        let location = self.location;
+        let name = self.parse_identifier("shorthand name")?;
+        self.consume_whitespace();
+        self.consume_token("=")?;
+        self.consume_whitespace();
+        let variable = self.parse_unscoped_variable()?;
+        self.consume_whitespace();
+        self.consume_token("=>")?;
+        self.consume_whitespace();
+        let attributes = self.parse_attributes()?;
+        Ok(ast::AttributeShorthand {
+            name,
+            variable,
+            attributes,
             location,
         })
     }

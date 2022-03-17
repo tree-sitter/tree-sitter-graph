@@ -847,3 +847,25 @@ fn can_execute_scan_of_local_variable() {
         "#},
     );
 }
+
+#[test]
+fn can_execute_shorthand() {
+    check_execution(
+        indoc! { r#"
+          def get_f():
+            pass
+        "#},
+        indoc! {r#"
+            attribute def = x => source_node = x, symbol = (source-text x)
+            (function_definition name: (identifier) @name) {
+              node n
+              attr (n) def = @name
+            }
+        "#},
+        indoc! {r#"
+          node 0
+            source_node: [syntax node identifier (1, 5)]
+            symbol: "get_f"
+        "#},
+    );
+}

@@ -1366,3 +1366,50 @@ fn cannot_parse_set_global() {
         panic!("Parse succeeded unexpectedly");
     }
 }
+
+#[test]
+fn can_parse_shorthand() {
+    let source = r#"
+        attribute def = x => source_node = x, symbol = (source-text x)
+        (function_definition name: (identifier) @name) {
+          node n
+          attr (n) sh = @name
+        }
+    "#;
+    let file = File::from_str(tree_sitter_python::language(), source).expect("Cannot parse file");
+
+    let shorthands = file.shorthands.into_iter().collect::<Vec<_>>();
+    assert_eq!(
+        shorthands,
+        vec![AttributeShorthand {
+            name: "def".into(),
+            variable: UnscopedVariable {
+                name: "x".into(),
+                location: Location { row: 1, column: 24 }
+            },
+            attributes: vec![
+                Attribute {
+                    name: "source_node".into(),
+                    value: UnscopedVariable {
+                        name: "x".into(),
+                        location: Location { row: 1, column: 43 }
+                    }
+                    .into()
+                },
+                Attribute {
+                    name: "symbol".into(),
+                    value: Call {
+                        function: "source-text".into(),
+                        parameters: vec![UnscopedVariable {
+                            name: "x".into(),
+                            location: Location { row: 1, column: 68 }
+                        }
+                        .into()]
+                    }
+                    .into(),
+                }
+            ],
+            location: Location { row: 1, column: 18 }
+        }]
+    );
+}

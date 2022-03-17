@@ -16,6 +16,9 @@ use tree_sitter::Tree;
 use crate::ast::AddEdgeAttribute;
 use crate::ast::AddGraphNodeAttribute;
 use crate::ast::Assign;
+use crate::ast::Attribute;
+use crate::ast::AttributeShorthand;
+use crate::ast::AttributeShorthands;
 use crate::ast::Call;
 use crate::ast::Capture;
 use crate::ast::Condition;
@@ -46,6 +49,7 @@ use crate::graph::Value;
 use crate::variables::Globals;
 use crate::variables::VariableMap;
 use crate::variables::Variables;
+use crate::Identifier;
 
 impl File {
     /// Executes this graph DSL file against a source file.  You must provide the parsed syntax
@@ -97,6 +101,7 @@ impl File {
                 &current_regex_captures,
                 &mut function_parameters,
                 &mut cursor,
+                &self.shorthands,
             )?;
         }
         Ok(())
@@ -206,6 +211,7 @@ struct ExecutionContext<'a, 'g, 's, 'tree> {
     current_regex_captures: &'a Vec<String>,
     function_parameters: &'a mut Vec<Value>,
     mat: &'a QueryMatch<'a, 'tree>,
+    shorthands: &'a AttributeShorthands,
 }
 
 struct ScopedVariables<'a> {
@@ -237,6 +243,7 @@ impl Stanza {
         current_regex_captures: &Vec<String>,
         function_parameters: &mut Vec<Value>,
         cursor: &mut QueryCursor,
+        shorthands: &AttributeShorthands,
     ) -> Result<(), ExecutionError> {
         let matches = cursor.matches(&self.query, tree.root_node(), source.as_bytes());
         for mat in matches {
@@ -251,6 +258,7 @@ impl Stanza {
                 current_regex_captures,
                 function_parameters,
                 mat: &mat,
+                shorthands: shorthands,
             };
             for statement in &self.statements {
                 statement
@@ -312,17 +320,19 @@ impl CreateGraphNode {
 impl AddGraphNodeAttribute {
     fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
         let node = self.node.evaluate(exec)?.into_graph_node_ref()?;
-        for attribute in &self.attributes {
-            let value = attribute.value.evaluate(exec)?;
+        let add_attribute = |exec: &mut ExecutionContext, name: Identifier, value: Value| {
             exec.graph[node]
                 .attributes
-                .add(attribute.name.clone(), value)
+                .add(name.clone(), value)
                 .map_err(|_| {
                     ExecutionError::DuplicateAttribute(format!(
                         " {} on graph node ({}) in {}",
-                        attribute.name, node, self,
+                        name, node, self,
                     ))
-                })?;
+                })
+        };
+        for attribute in &self.attributes {
+            attribute.execute(exec, &add_attribute)?;
         }
         Ok(())
     }
@@ -346,8 +356,7 @@ impl AddEdgeAttribute {
     fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
         let source = self.source.evaluate(exec)?.into_graph_node_ref()?;
         let sink = self.sink.evaluate(exec)?.into_graph_node_ref()?;
-        for attribute in &self.attributes {
-            let value = attribute.value.evaluate(exec)?;
+        let add_attribute = |exec: &mut ExecutionContext, name: Identifier, value: Value| {
             let edge = match exec.graph[source].get_edge_mut(sink) {
                 Some(edge) => Ok(edge),
                 None => Err(ExecutionError::UndefinedEdge(format!(
@@ -355,14 +364,15 @@ impl AddEdgeAttribute {
                     source, sink, self,
                 ))),
             }?;
-            edge.attributes
-                .add(attribute.name.clone(), value)
-                .map_err(|_| {
-                    ExecutionError::DuplicateAttribute(format!(
-                        " {} on edge ({} -> {}) in {}",
-                        attribute.name, source, sink, self,
-                    ))
-                })?;
+            edge.attributes.add(name.clone(), value).map_err(|_| {
+                ExecutionError::DuplicateAttribute(format!(
+                    " {} on edge ({} -> {}) in {}",
+                    name, source, sink, self,
+                ))
+            })
+        };
+        for attribute in &self.attributes {
+            attribute.execute(exec, &add_attribute)?;
         }
         Ok(())
     }
@@ -418,6 +428,7 @@ impl Scan {
                 current_regex_captures: &current_regex_captures,
                 function_parameters: exec.function_parameters,
                 mat: exec.mat,
+                shorthands: exec.shorthands,
             };
 
             for statement in &arm.statements {
@@ -473,6 +484,7 @@ impl If {
                     current_regex_captures: exec.current_regex_captures,
                     function_parameters: exec.function_parameters,
                     mat: exec.mat,
+                    shorthands: exec.shorthands,
                 };
                 for stmt in &arm.statements {
                     stmt.execute(&mut arm_exec)?;
@@ -510,6 +522,7 @@ impl ForIn {
                 current_regex_captures: exec.current_regex_captures,
                 function_parameters: exec.function_parameters,
                 mat: exec.mat,
+                shorthands: exec.shorthands,
             };
             self.variable.add(&mut loop_exec, value, false)?;
             for stmt in &self.statements {
@@ -749,6 +762,55 @@ impl UnscopedVariable {
                 ExecutionError::UndefinedVariable(format!("{}", self))
             }
         })
+    }
+}
+
+impl Attribute {
+    fn execute<F>(
+        &self,
+        exec: &mut ExecutionContext,
+        add_attribute: &F,
+    ) -> Result<(), ExecutionError>
+    where
+        F: Fn(&mut ExecutionContext, Identifier, Value) -> Result<(), ExecutionError>,
+    {
+        let value = self.value.evaluate(exec)?;
+        if let Some(shorthand) = exec.shorthands.get(&self.name) {
+            shorthand.execute(exec, add_attribute, value)
+        } else {
+            add_attribute(exec, self.name.clone(), value)
+        }
+    }
+}
+
+impl AttributeShorthand {
+    fn execute<F>(
+        &self,
+        exec: &mut ExecutionContext,
+        add_attribute: &F,
+        value: Value,
+    ) -> Result<(), ExecutionError>
+    where
+        F: Fn(&mut ExecutionContext, Identifier, Value) -> Result<(), ExecutionError>,
+    {
+        let mut shorthand_locals = VariableMap::new();
+        let mut shorthand_exec = ExecutionContext {
+            source: exec.source,
+            graph: exec.graph,
+            functions: exec.functions,
+            globals: exec.globals,
+            locals: &mut shorthand_locals,
+            scoped: exec.scoped,
+            current_regex_captures: exec.current_regex_captures,
+            function_parameters: exec.function_parameters,
+            mat: exec.mat,
+            shorthands: exec.shorthands,
+        };
+        self.variable.add(&mut shorthand_exec, value, false)?;
+        for attr in &self.attributes {
+            attr.execute(&mut shorthand_exec, add_attribute)?;
+        }
+        Ok(())
     }
 }
 
