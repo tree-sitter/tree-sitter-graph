@@ -60,12 +60,10 @@ impl File {
         &self,
         tree: &'tree Tree,
         source: &'tree str,
-        functions: &mut Functions,
-        globals: &Globals,
-        options: &ExecutionOptions,
+        config: &mut ExecutionConfig,
     ) -> Result<Graph<'tree>, ExecutionError> {
         let mut graph = Graph::new();
-        self.execute_into(&mut graph, tree, source, functions, globals, options)?;
+        self.execute_into(&mut graph, tree, source, config)?;
         Ok(graph)
     }
 
@@ -79,11 +77,30 @@ impl File {
         graph: &mut Graph<'tree>,
         tree: &'tree Tree,
         source: &'tree str,
-        functions: &mut Functions,
-        globals: &Globals,
-        options: &ExecutionOptions,
+        config: &mut ExecutionConfig,
     ) -> Result<(), ExecutionError> {
-        self.check_globals(globals)?;
+        if config.lazy {
+            self.execute_lazy_into(graph, tree, source, config)
+        } else {
+            self.execute_strict_into(graph, tree, source, config)
+        }
+    }
+}
+
+impl File {
+    /// Executes this graph DSL file against a source file, saving the results into an existing
+    /// `Graph` instance.  You must provide the parsed syntax tree (`tree`) as well as the source
+    /// text that it was parsed from (`source`).  You also provide the set of functions and global
+    /// variables that are available during execution. This variant is useful when you need to
+    /// “pre-seed” the graph with some predefined nodes and/or edges before executing the DSL file.
+    fn execute_strict_into<'tree>(
+        &self,
+        graph: &mut Graph<'tree>,
+        tree: &'tree Tree,
+        source: &'tree str,
+        config: &mut ExecutionConfig,
+    ) -> Result<(), ExecutionError> {
+        self.check_globals(config.globals)?;
         let mut locals = VariableMap::new();
         let mut scoped = ScopedVariables::new();
         let current_regex_captures = Vec::new();
@@ -94,9 +111,7 @@ impl File {
                 tree,
                 source,
                 graph,
-                functions,
-                globals,
-                options,
+                config,
                 &mut locals,
                 &mut scoped,
                 &current_regex_captures,
@@ -133,20 +148,48 @@ impl File {
     }
 }
 
-pub struct ExecutionOptions {
-    pub(crate) implicit_debug_attrs: bool,
+/// Configuration for the execution of a File
+pub struct ExecutionConfig<'a, 'g> {
+    pub(crate) functions: &'a mut Functions,
+    pub(crate) globals: &'a Globals<'g>,
+    pub(crate) lazy: bool,
+    pub(crate) location_attr: Option<Identifier>,
+    pub(crate) variable_name_attr: Option<Identifier>,
 }
 
-impl ExecutionOptions {
-    pub fn new() -> Self {
+impl<'a, 'g> ExecutionConfig<'a, 'g> {
+    pub fn new(functions: &'a mut Functions, globals: &'a Globals<'g>) -> Self {
         Self {
-            implicit_debug_attrs: false,
+            functions,
+            globals,
+            lazy: false,
+            location_attr: None,
+            variable_name_attr: None,
         }
     }
 
-    pub fn implicit_debug_attributes(&mut self, value: bool) -> &mut Self {
-        self.implicit_debug_attrs = value;
-        self
+    pub fn debug_attributes(
+        self,
+        location_attr: Identifier,
+        variable_name_attr: Identifier,
+    ) -> Self {
+        Self {
+            functions: self.functions,
+            globals: self.globals,
+            lazy: self.lazy,
+            location_attr: location_attr.into(),
+            variable_name_attr: variable_name_attr.into(),
+        }
+    }
+
+    pub fn lazy(self, lazy: bool) -> Self {
+        Self {
+            functions: self.functions,
+            globals: self.globals,
+            lazy,
+            location_attr: self.location_attr,
+            variable_name_attr: self.variable_name_attr,
+        }
     }
 }
 
@@ -217,12 +260,10 @@ impl ExecutionError {
     }
 }
 
-struct ExecutionContext<'a, 'g, 's, 'tree> {
+struct ExecutionContext<'a, 'c, 'g, 's, 'tree> {
     source: &'tree str,
     graph: &'a mut Graph<'tree>,
-    functions: &'a mut Functions,
-    globals: &'a Globals<'g>,
-    options: &'a ExecutionOptions,
+    config: &'a mut ExecutionConfig<'c, 'g>,
     locals: &'a mut dyn Variables<Value>,
     scoped: &'a mut ScopedVariables<'s>,
     current_regex_captures: &'a Vec<String>,
@@ -248,14 +289,12 @@ impl<'a> ScopedVariables<'a> {
 }
 
 impl Stanza {
-    fn execute<'l, 's, 'tree>(
+    fn execute<'g, 'l, 's, 'tree>(
         &self,
         tree: &'tree Tree,
         source: &'tree str,
         graph: &mut Graph<'tree>,
-        functions: &mut Functions,
-        globals: &Globals,
-        options: &ExecutionOptions,
+        config: &mut ExecutionConfig<'_, 'g>,
         locals: &mut VariableMap<'l, Value>,
         scoped: &mut ScopedVariables<'s>,
         current_regex_captures: &Vec<String>,
@@ -269,9 +308,7 @@ impl Stanza {
             let mut exec = ExecutionContext {
                 source,
                 graph,
-                functions,
-                globals,
-                options,
+                config,
                 locals,
                 scoped,
                 current_regex_captures,
@@ -331,10 +368,8 @@ impl Assign {
 impl CreateGraphNode {
     fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
         let graph_node = exec.graph.add_graph_node();
-        if exec.options.implicit_debug_attrs {
-            self.node
-                .add_debug_attrs(&mut exec.graph[graph_node].attributes);
-        }
+        self.node
+            .add_debug_attrs(&mut exec.graph[graph_node].attributes, exec.config)?;
         let value = Value::GraphNode(graph_node);
         self.node.add(exec, value, false)
     }
@@ -444,9 +479,7 @@ impl Scan {
             let mut arm_exec = ExecutionContext {
                 source: exec.source,
                 graph: exec.graph,
-                functions: exec.functions,
-                globals: exec.globals,
-                options: exec.options,
+                config: exec.config,
                 locals: &mut arm_locals,
                 scoped: exec.scoped,
                 current_regex_captures: &current_regex_captures,
@@ -501,9 +534,7 @@ impl If {
                 let mut arm_exec = ExecutionContext {
                     source: exec.source,
                     graph: exec.graph,
-                    functions: exec.functions,
-                    globals: exec.globals,
-                    options: exec.options,
+                    config: exec.config,
                     locals: &mut arm_locals,
                     scoped: exec.scoped,
                     current_regex_captures: exec.current_regex_captures,
@@ -540,9 +571,7 @@ impl ForIn {
             let mut loop_exec = ExecutionContext {
                 source: exec.source,
                 graph: exec.graph,
-                functions: exec.functions,
-                globals: exec.globals,
-                options: exec.options,
+                config: exec.config,
                 locals: &mut loop_locals,
                 scoped: exec.scoped,
                 current_regex_captures: exec.current_regex_captures,
@@ -628,7 +657,7 @@ impl Call {
             let parameter = parameter.evaluate(exec)?;
             exec.function_parameters.push(parameter);
         }
-        exec.functions.call(
+        exec.config.functions.call(
             &self.function,
             exec.graph,
             exec.source,
@@ -749,7 +778,7 @@ impl ScopedVariable {
 
 impl UnscopedVariable {
     fn get<'a>(&self, exec: &'a mut ExecutionContext) -> Result<&'a Value, ExecutionError> {
-        if let Some(value) = exec.globals.get(&self.name) {
+        if let Some(value) = exec.config.globals.get(&self.name) {
             Some(value)
         } else {
             exec.locals.get(&self.name)
@@ -763,7 +792,7 @@ impl UnscopedVariable {
         value: Value,
         mutable: bool,
     ) -> Result<(), ExecutionError> {
-        if exec.globals.get(&self.name).is_some() {
+        if exec.config.globals.get(&self.name).is_some() {
             return Err(ExecutionError::DuplicateVariable(format!(
                 " global {}",
                 self,
@@ -775,7 +804,7 @@ impl UnscopedVariable {
     }
 
     fn set(&self, exec: &mut ExecutionContext, value: Value) -> Result<(), ExecutionError> {
-        if exec.globals.get(&self.name).is_some() {
+        if exec.config.globals.get(&self.name).is_some() {
             return Err(ExecutionError::CannotAssignImmutableVariable(format!(
                 " global {}",
                 self,
@@ -792,13 +821,28 @@ impl UnscopedVariable {
 }
 
 impl Variable {
-    pub(crate) fn add_debug_attrs(&self, attributes: &mut Attributes) {
-        let location = match &self {
-            Variable::Scoped(v) => v.location,
-            Variable::Unscoped(v) => v.location,
-        };
-        attributes.add("debug_tsg_variable".into(), format!("{}", self));
-        attributes.add("debug_tsg_location".into(), format!("{}", location));
+    pub(crate) fn add_debug_attrs(
+        &self,
+        attributes: &mut Attributes,
+        config: &ExecutionConfig,
+    ) -> Result<(), ExecutionError> {
+        if let Some(variable_name_attr) = &config.variable_name_attr {
+            attributes
+                .add(variable_name_attr.clone(), format!("{}", self))
+                .map_err(|_| {
+                    ExecutionError::DuplicateAttribute(variable_name_attr.as_str().into())
+                })?;
+        }
+        if let Some(location_attr) = &config.location_attr {
+            let location = match &self {
+                Variable::Scoped(v) => v.location,
+                Variable::Unscoped(v) => v.location,
+            };
+            attributes
+                .add(location_attr.clone(), format!("{}", location))
+                .map_err(|_| ExecutionError::DuplicateAttribute(location_attr.as_str().into()))?;
+        }
+        Ok(())
     }
 }
 
@@ -834,9 +878,7 @@ impl AttributeShorthand {
         let mut shorthand_exec = ExecutionContext {
             source: exec.source,
             graph: exec.graph,
-            functions: exec.functions,
-            globals: exec.globals,
-            options: exec.options,
+            config: exec.config,
             locals: &mut shorthand_locals,
             scoped: exec.scoped,
             current_regex_captures: exec.current_regex_captures,

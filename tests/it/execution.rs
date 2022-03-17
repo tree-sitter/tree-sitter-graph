@@ -9,8 +9,8 @@ use indoc::indoc;
 use tree_sitter::Parser;
 use tree_sitter_graph::ast::File;
 use tree_sitter_graph::functions::Functions;
+use tree_sitter_graph::ExecutionConfig;
 use tree_sitter_graph::ExecutionError;
-use tree_sitter_graph::ExecutionOptions;
 use tree_sitter_graph::Identifier;
 use tree_sitter_graph::Variables;
 
@@ -35,8 +35,8 @@ fn execute(python_source: &str, dsl_source: &str) -> Result<String, ExecutionErr
     globals
         .add(Identifier::from("filename"), "test.py".into())
         .map_err(|_| ExecutionError::DuplicateVariable("filename".into()))?;
-    let options = ExecutionOptions::new();
-    let graph = file.execute(&tree, python_source, &mut functions, &globals, &options)?;
+    let mut config = ExecutionConfig::new(&mut functions, &globals);
+    let graph = file.execute(&tree, python_source, &mut config)?;
     let result = graph.pretty_print().to_string();
     Ok(result)
 }

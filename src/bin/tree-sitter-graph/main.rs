@@ -100,13 +100,10 @@ fn main() -> Result<()> {
 
     let mut functions = Functions::stdlib();
     let globals = Variables::new();
-    let options = ExecutionOptions::new();
-    let graph = if lazy {
-        file.execute_lazy(&tree, &source, &mut functions, &globals, &options)
-    } else {
-        file.execute(&tree, &source, &mut functions, &globals, &options)
-    }
-    .with_context(|| format!("Error executing TSG file {}", tsg_path.display()))?;
+    let mut config = ExecutionConfig::new(&mut functions, &globals).lazy(lazy);
+    let graph = file
+        .execute(&tree, &source, &mut config)
+        .with_context(|| format!("Cannot execute TSG file {}", tsg_path.display()))?;
 
     let json = matches.is_present("json");
     if json {
