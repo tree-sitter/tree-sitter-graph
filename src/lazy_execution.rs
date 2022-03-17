@@ -432,8 +432,8 @@ impl ast::Expression {
             Self::TrueLiteral => Ok(true.into()),
             Self::IntegerConstant(expr) => expr.evaluate_lazy(exec),
             Self::StringConstant(expr) => expr.evaluate_lazy(exec),
-            Self::List(expr) => expr.evaluate_lazy(exec),
-            Self::Set(expr) => expr.evaluate_lazy(exec),
+            Self::ListLiteral(expr) => expr.evaluate_lazy(exec),
+            Self::SetLiteral(expr) => expr.evaluate_lazy(exec),
             Self::Capture(expr) => expr.evaluate_lazy(exec),
             Self::Variable(expr) => expr.evaluate_lazy(exec),
             Self::Call(expr) => expr.evaluate_lazy(exec),
@@ -468,7 +468,7 @@ impl ast::StringConstant {
     }
 }
 
-impl ast::ListComprehension {
+impl ast::ListLiteral {
     fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<LazyValue, ExecutionError> {
         let mut elements = Vec::new();
         for element in &self.elements {
@@ -478,7 +478,7 @@ impl ast::ListComprehension {
     }
 }
 
-impl ast::SetComprehension {
+impl ast::SetLiteral {
     fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<LazyValue, ExecutionError> {
         let mut elements = Vec::new();
         for element in &self.elements {

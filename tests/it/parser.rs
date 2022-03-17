@@ -337,7 +337,7 @@ fn can_parse_lists() {
                     location: Location { row: 3, column: 14 }
                 }
                 .into(),
-                value: ListComprehension {
+                value: ListLiteral {
                     elements: vec![
                         IntegerConstant { value: 1 }.into(),
                         IntegerConstant { value: 2 }.into(),
@@ -354,7 +354,7 @@ fn can_parse_lists() {
                     location: Location { row: 4, column: 14 }
                 }
                 .into(),
-                value: ListComprehension { elements: vec![] }.into(),
+                value: ListLiteral { elements: vec![] }.into(),
                 location: Location { row: 4, column: 10 },
             }
             .into(),
@@ -364,7 +364,7 @@ fn can_parse_lists() {
                     location: Location { row: 5, column: 14 }
                 }
                 .into(),
-                value: ListComprehension {
+                value: ListLiteral {
                     elements: vec![
                         StringConstant {
                             value: String::from("hello")
@@ -414,7 +414,7 @@ fn can_parse_sets() {
                     location: Location { row: 3, column: 14 }
                 }
                 .into(),
-                value: SetComprehension {
+                value: SetLiteral {
                     elements: vec![
                         IntegerConstant { value: 1 }.into(),
                         IntegerConstant { value: 2 }.into(),
@@ -431,7 +431,7 @@ fn can_parse_sets() {
                     location: Location { row: 4, column: 14 }
                 }
                 .into(),
-                value: SetComprehension { elements: vec![] }.into(),
+                value: SetLiteral { elements: vec![] }.into(),
                 location: Location { row: 4, column: 10 },
             }
             .into(),
@@ -441,7 +441,7 @@ fn can_parse_sets() {
                     location: Location { row: 5, column: 14 }
                 }
                 .into(),
-                value: SetComprehension {
+                value: SetLiteral {
                     elements: vec![
                         StringConstant {
                             value: String::from("hello")

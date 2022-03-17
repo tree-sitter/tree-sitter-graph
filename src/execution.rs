@@ -31,12 +31,12 @@ use crate::ast::File;
 use crate::ast::ForIn;
 use crate::ast::If;
 use crate::ast::IntegerConstant;
-use crate::ast::ListComprehension;
+use crate::ast::ListLiteral;
 use crate::ast::Print;
 use crate::ast::RegexCapture;
 use crate::ast::Scan;
 use crate::ast::ScopedVariable;
-use crate::ast::SetComprehension;
+use crate::ast::SetLiteral;
 use crate::ast::Stanza;
 use crate::ast::Statement;
 use crate::ast::StringConstant;
@@ -596,8 +596,8 @@ impl Expression {
             Expression::TrueLiteral => Ok(Value::Boolean(true)),
             Expression::IntegerConstant(expr) => expr.evaluate(exec),
             Expression::StringConstant(expr) => expr.evaluate(exec),
-            Expression::List(expr) => expr.evaluate(exec),
-            Expression::Set(expr) => expr.evaluate(exec),
+            Expression::ListLiteral(expr) => expr.evaluate(exec),
+            Expression::SetLiteral(expr) => expr.evaluate(exec),
             Expression::Capture(expr) => expr.evaluate(exec),
             Expression::Variable(expr) => expr.evaluate(exec),
             Expression::Call(expr) => expr.evaluate(exec),
@@ -618,7 +618,7 @@ impl StringConstant {
     }
 }
 
-impl ListComprehension {
+impl ListLiteral {
     fn evaluate(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
         let elements = self
             .elements
@@ -629,7 +629,7 @@ impl ListComprehension {
     }
 }
 
-impl SetComprehension {
+impl SetLiteral {
     fn evaluate(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
         let elements = self
             .elements

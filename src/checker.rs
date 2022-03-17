@@ -346,8 +346,8 @@ impl ast::Expression {
             }),
             Self::IntegerConstant(expr) => expr.check(ctx),
             Self::StringConstant(expr) => expr.check(ctx),
-            Self::List(expr) => expr.check(ctx),
-            Self::Set(expr) => expr.check(ctx),
+            Self::ListLiteral(expr) => expr.check(ctx),
+            Self::SetLiteral(expr) => expr.check(ctx),
             Self::Capture(expr) => expr.check(ctx),
             Self::Variable(expr) => expr.check_get(ctx),
             Self::Call(expr) => expr.check(ctx),
@@ -374,7 +374,7 @@ impl ast::StringConstant {
     }
 }
 
-impl ast::ListComprehension {
+impl ast::ListLiteral {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
         let mut is_local = true;
         for element in &mut self.elements {
@@ -388,7 +388,7 @@ impl ast::ListComprehension {
     }
 }
 
-impl ast::SetComprehension {
+impl ast::SetLiteral {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
         let mut is_local = true;
         for element in &mut self.elements {

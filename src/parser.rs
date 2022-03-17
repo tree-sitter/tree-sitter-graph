@@ -729,7 +729,7 @@ impl<'a> Parser<'a> {
         self.consume_whitespace();
         let elements = self.parse_sequence(']')?;
         self.consume_token("]")?;
-        Ok(ast::ListComprehension { elements }.into())
+        Ok(ast::ListLiteral { elements }.into())
     }
 
     fn parse_set(&mut self) -> Result<ast::Expression, ParseError> {
@@ -737,7 +737,7 @@ impl<'a> Parser<'a> {
         self.consume_whitespace();
         let elements = self.parse_sequence('}')?;
         self.consume_token("}")?;
-        Ok(ast::SetComprehension { elements }.into())
+        Ok(ast::SetLiteral { elements }.into())
     }
 
     fn parse_capture(&mut self) -> Result<ast::Capture, ParseError> {

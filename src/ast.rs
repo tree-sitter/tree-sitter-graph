@@ -527,9 +527,9 @@ pub enum Expression {
     // Constants
     IntegerConstant(IntegerConstant),
     StringConstant(StringConstant),
-    // Comprehensions
-    List(ListComprehension),
-    Set(SetComprehension),
+    // Literals
+    ListLiteral(ListLiteral),
+    SetLiteral(SetLiteral),
     // Syntax nodes
     Capture(Capture),
     // Variables
@@ -548,8 +548,8 @@ impl std::fmt::Display for Expression {
             Expression::TrueLiteral => write!(f, "true"),
             Expression::IntegerConstant(expr) => expr.fmt(f),
             Expression::StringConstant(expr) => expr.fmt(f),
-            Expression::List(expr) => expr.fmt(f),
-            Expression::Set(expr) => expr.fmt(f),
+            Expression::ListLiteral(expr) => expr.fmt(f),
+            Expression::SetLiteral(expr) => expr.fmt(f),
             Expression::Capture(expr) => expr.fmt(f),
             Expression::Variable(expr) => expr.fmt(f),
             Expression::Call(expr) => expr.fmt(f),
@@ -627,17 +627,17 @@ impl std::fmt::Display for IntegerConstant {
 
 /// An ordered list of values
 #[derive(Debug, Eq, PartialEq)]
-pub struct ListComprehension {
+pub struct ListLiteral {
     pub elements: Vec<Expression>,
 }
 
-impl From<ListComprehension> for Expression {
-    fn from(expr: ListComprehension) -> Expression {
-        Expression::List(expr)
+impl From<ListLiteral> for Expression {
+    fn from(expr: ListLiteral) -> Expression {
+        Expression::ListLiteral(expr)
     }
 }
 
-impl std::fmt::Display for ListComprehension {
+impl std::fmt::Display for ListLiteral {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "[")?;
         let mut first = true;
@@ -673,17 +673,17 @@ impl std::fmt::Display for RegexCapture {
 
 /// An unordered set of values
 #[derive(Debug, Eq, PartialEq)]
-pub struct SetComprehension {
+pub struct SetLiteral {
     pub elements: Vec<Expression>,
 }
 
-impl From<SetComprehension> for Expression {
-    fn from(expr: SetComprehension) -> Expression {
-        Expression::Set(expr)
+impl From<SetLiteral> for Expression {
+    fn from(expr: SetLiteral) -> Expression {
+        Expression::SetLiteral(expr)
     }
 }
 
-impl std::fmt::Display for SetComprehension {
+impl std::fmt::Display for SetLiteral {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{{")?;
         let mut first = true;
