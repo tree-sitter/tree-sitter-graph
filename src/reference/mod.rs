@@ -126,7 +126,9 @@
 //!   - a reference to a syntax node
 //!   - a reference to a graph node
 //!   - an ordered list of values
+//!   - a list comprehension
 //!   - an unordered set of values
+//!   - a set comprehension
 //!
 //! The null value is spelled `#null`.
 //!
@@ -169,6 +171,25 @@
 //!   @id,
 //! ]
 //! ```
+//!
+//! List comprehensions allow mapping over a list and producing a new list with elements based on the
+//! given element expression:
+//!
+//! ``` tsg
+//! [ (some-function x) for x in @xs ]
+//! [ @x.scoped_var for x in @xs ]
+//! ```
+//!
+//! Set comprehensions have similar syntax, but the resulting value will be a set instead of an ordered list:
+//!
+//! ``` tsg
+//! { (some-function x) for x in @xs }
+//! { @x.scoped_var for x in @xs }
+//! ```
+//!
+//! List and set comprehensions are subject to the same restrictions as for loops, which means the list
+//! value that is iterated over must be local.  It is therefore not possible to iterator over the value
+//! of a scoped variable. Using scoped variables in the element expression however is no problem.
 //!
 //! # Syntax nodes
 //!
