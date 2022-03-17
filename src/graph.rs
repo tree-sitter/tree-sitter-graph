@@ -474,6 +474,12 @@ impl From<Vec<Value>> for Value {
     }
 }
 
+impl From<BTreeSet<Value>> for Value {
+    fn from(value: BTreeSet<Value>) -> Value {
+        Value::Set(value)
+    }
+}
+
 impl std::fmt::Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {

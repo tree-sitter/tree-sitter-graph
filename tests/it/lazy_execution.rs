@@ -794,6 +794,50 @@ fn variables_are_inherited_in_for_in_body() {
 }
 
 #[test]
+fn can_execute_list_comprehension() {
+    check_execution(
+        r#"
+          pass
+          pass
+          pass
+        "#,
+        indoc! {r#"
+          (module (pass_statement)* @xs) @root
+          {
+            node node0
+            attr (node0) val = [ (named-child-index x) for x in @xs ]
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            val: [0, 1, 2]
+        "#},
+    );
+}
+
+#[test]
+fn can_execute_set_comprehension() {
+    check_execution(
+        r#"
+          pass
+          pass
+          pass
+        "#,
+        indoc! {r#"
+          (module (pass_statement)* @xs) @root
+          {
+            node node0
+            attr (node0) val = { (source-text x) for x in @xs }
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            val: {"pass"}
+        "#},
+    );
+}
+
+#[test]
 fn can_execute_scan_of_local_call_expression() {
     check_execution(
         r#"

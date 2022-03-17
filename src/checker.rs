@@ -348,6 +348,8 @@ impl ast::Expression {
             Self::StringConstant(expr) => expr.check(ctx),
             Self::ListLiteral(expr) => expr.check(ctx),
             Self::SetLiteral(expr) => expr.check(ctx),
+            Self::ListComprehension(expr) => expr.check(ctx),
+            Self::SetComprehension(expr) => expr.check(ctx),
             Self::Capture(expr) => expr.check(ctx),
             Self::Variable(expr) => expr.check_get(ctx),
             Self::Call(expr) => expr.check(ctx),
@@ -397,6 +399,64 @@ impl ast::SetLiteral {
         }
         Ok(ExpressionResult {
             is_local,
+            quantifier: ZeroOrMore,
+        })
+    }
+}
+
+impl ast::ListComprehension {
+    fn check(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
+        let value_result = self.value.check(ctx)?;
+        if !value_result.is_local {
+            return Err(CheckError::ExpectedLocalValue(self.location));
+        }
+        if value_result.quantifier != ZeroOrMore && value_result.quantifier != OneOrMore {
+            return Err(CheckError::ExpectedListValue(self.location));
+        }
+
+        let mut loop_locals = VariableMap::nested(ctx.locals);
+        let mut loop_ctx = CheckContext {
+            globals: ctx.globals,
+            file_query: ctx.file_query,
+            stanza_index: ctx.stanza_index,
+            stanza_query: ctx.stanza_query,
+            locals: &mut loop_locals,
+        };
+        self.variable
+            .check_add(&mut loop_ctx, value_result, false)?;
+
+        let element_result = self.element.check(&mut loop_ctx)?;
+        Ok(ExpressionResult {
+            is_local: element_result.is_local,
+            quantifier: ZeroOrMore,
+        })
+    }
+}
+
+impl ast::SetComprehension {
+    fn check(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
+        let value_result = self.value.check(ctx)?;
+        if !value_result.is_local {
+            return Err(CheckError::ExpectedLocalValue(self.location));
+        }
+        if value_result.quantifier != ZeroOrMore && value_result.quantifier != OneOrMore {
+            return Err(CheckError::ExpectedListValue(self.location));
+        }
+
+        let mut loop_locals = VariableMap::nested(ctx.locals);
+        let mut loop_ctx = CheckContext {
+            globals: ctx.globals,
+            file_query: ctx.file_query,
+            stanza_index: ctx.stanza_index,
+            stanza_query: ctx.stanza_query,
+            locals: &mut loop_locals,
+        };
+        self.variable
+            .check_add(&mut loop_ctx, value_result, false)?;
+
+        let element_result = self.element.check(&mut loop_ctx)?;
+        Ok(ExpressionResult {
+            is_local: element_result.is_local,
             quantifier: ZeroOrMore,
         })
     }
