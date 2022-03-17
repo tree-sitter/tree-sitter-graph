@@ -364,6 +364,23 @@
 //! execution has completed, the variables disappear.  Attributes, on the other hand, are part of
 //! the output produced by the graph DSL file, and live on after execution has finished.)
 //!
+//! ## Attribute shorthands
+//!
+//! Commonly used combinations of attributes can be captured in **_shorthands_**.  Each shorthand defines
+//! the attribute name, a variable which captures the attribute value, and a list of attributes to which
+//! it expands.
+//!
+//! Attribute shorthands are defined at the same level as stanzas.  For example, the following shorthand
+//! takes a syntax node as argument, and expands to attributes for its source text and child index:
+//!
+//! ``` tsg
+//! attribute node_props = node => node_text = (source-text node), node_index = (named-child-index node)
+//!
+//! (argument (_)@expr) {
+//!   attr (@expr) node_props = @expr
+//! }
+//! ```
+//!
 //! # Regular expressions
 //!
 //! You can use a `scan` statement to match the content of a string value against a set of regular
