@@ -738,13 +738,10 @@ impl<'a> Parser<'a> {
             Ok(ast::ListLiteral { elements }.into())
         } else if let Ok(_) = self.consume_token(",") {
             self.consume_whitespace();
-            let other_elements = self.parse_sequence(']')?;
+            let mut elements = self.parse_sequence(']')?;
             self.consume_whitespace();
             self.consume_token("]")?;
-            let elements = vec![first_element]
-                .into_iter()
-                .chain(other_elements)
-                .collect();
+            elements.insert(0, first_element);
             Ok(ast::ListLiteral { elements }.into())
         } else {
             self.consume_token("for")?;
@@ -780,13 +777,10 @@ impl<'a> Parser<'a> {
             Ok(ast::SetLiteral { elements }.into())
         } else if let Ok(_) = self.consume_token(",") {
             self.consume_whitespace();
-            let other_elements = self.parse_sequence('}')?;
+            let mut elements = self.parse_sequence('}')?;
             self.consume_whitespace();
             self.consume_token("}")?;
-            let elements = vec![first_element]
-                .into_iter()
-                .chain(other_elements)
-                .collect();
+            elements.insert(0, first_element);
             Ok(ast::SetLiteral { elements }.into())
         } else {
             self.consume_token("for")?;
