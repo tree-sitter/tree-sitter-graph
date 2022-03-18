@@ -289,7 +289,7 @@ impl Attributes {
         self.values.get(name.borrow())
     }
 
-    pub fn iter(&self) -> std::collections::hash_map::Iter<'_, Identifier, Value> {
+    pub fn iter(&self) -> impl Iterator<Item = (&Identifier, &Value)> {
         self.values.iter()
     }
 }
