@@ -8,6 +8,7 @@
 //! Defines the AST structure of a graph DSL file
 
 use regex::Regex;
+use std::collections::HashMap;
 use std::fmt;
 use tree_sitter::CaptureQuantifier;
 use tree_sitter::Language;
@@ -26,6 +27,8 @@ pub struct File {
     pub query: Option<Query>,
     /// The list of stanzas in the file
     pub stanzas: Vec<Stanza>,
+    /// Attribute shorthands defined in the file
+    pub shorthands: AttributeShorthands,
 }
 
 impl File {
@@ -35,6 +38,7 @@ impl File {
             globals: Vec::new(),
             query: None,
             stanzas: Vec::new(),
+            shorthands: AttributeShorthands::new(),
         }
     }
 }
@@ -728,5 +732,50 @@ impl From<UnscopedVariable> for Expression {
 impl From<ScopedVariable> for Expression {
     fn from(variable: ScopedVariable) -> Expression {
         Expression::Variable(variable.into())
+    }
+}
+
+/// Attribute shorthands
+#[derive(Debug, Eq, PartialEq)]
+pub struct AttributeShorthands(HashMap<Identifier, AttributeShorthand>);
+
+impl AttributeShorthands {
+    pub fn new() -> Self {
+        Self(HashMap::new())
+    }
+
+    pub fn get(&self, name: &Identifier) -> Option<&AttributeShorthand> {
+        self.0.get(name)
+    }
+
+    pub fn add(&mut self, shorthand: AttributeShorthand) {
+        self.0.insert(shorthand.name.clone(), shorthand);
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &AttributeShorthand> {
+        self.0.values()
+    }
+
+    pub fn into_iter(self) -> impl Iterator<Item = AttributeShorthand> {
+        self.0.into_values()
+    }
+}
+
+/// An attribute shorthand
+#[derive(Debug, Eq, PartialEq)]
+pub struct AttributeShorthand {
+    pub name: Identifier,
+    pub variable: UnscopedVariable,
+    pub attributes: Vec<Attribute>,
+    pub location: Location,
+}
+
+impl std::fmt::Display for AttributeShorthand {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "attribute {} = {} =>", self.name, self.variable,)?;
+        for attr in &self.attributes {
+            write!(f, " {}", attr)?;
+        }
+        write!(f, " at {}", self.location)
     }
 }

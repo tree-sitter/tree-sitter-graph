@@ -91,6 +91,7 @@ impl ast::File {
                 &mut lazy_graph,
                 &mut function_parameters,
                 &mut prev_element_debug_info,
+                &self.shorthands,
             )?;
         }
 
@@ -126,6 +127,7 @@ struct ExecutionContext<'a, 'g, 'tree> {
     lazy_graph: &'a mut Vec<LazyStatement>,
     function_parameters: &'a mut Vec<graph::Value>, // re-usable buffer to reduce memory allocations
     prev_element_debug_info: &'a mut HashMap<GraphElementKey, DebugInfo>,
+    shorthands: &'a ast::AttributeShorthands,
 }
 
 /// Context for evaluation, which evalautes the lazy graph to build the actual graph
@@ -160,6 +162,7 @@ impl ast::Stanza {
         lazy_graph: &mut Vec<LazyStatement>,
         function_parameters: &mut Vec<graph::Value>,
         prev_element_debug_info: &mut HashMap<GraphElementKey, DebugInfo>,
+        shorthands: &ast::AttributeShorthands,
     ) -> Result<(), ExecutionError> {
         let current_regex_captures = vec![];
         locals.clear();
@@ -176,6 +179,7 @@ impl ast::Stanza {
             lazy_graph,
             function_parameters,
             prev_element_debug_info,
+            shorthands,
         };
         let node = query_capture_value(self.full_match_file_capture_index, One, &mat, exec.graph);
         debug!("match {} at {}", node, self.location);
@@ -240,8 +244,9 @@ impl ast::AddGraphNodeAttribute {
     fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
         let node = self.node.evaluate_lazy(exec)?;
         let mut attributes = Vec::new();
+        let mut add_attribute = |a| attributes.push(a);
         for attribute in &self.attributes {
-            attributes.push(attribute.evaluate_lazy(exec)?);
+            attribute.execute_lazy(exec, &mut add_attribute)?;
         }
         let stmt = LazyAddGraphNodeAttribute::new(node, attributes, self.location.into());
         exec.lazy_graph.push(stmt.into());
@@ -264,8 +269,9 @@ impl ast::AddEdgeAttribute {
         let source = self.source.evaluate_lazy(exec)?;
         let sink = self.sink.evaluate_lazy(exec)?;
         let mut attributes = Vec::new();
+        let mut add_attribute = |a| attributes.push(a);
         for attribute in &self.attributes {
-            attributes.push(attribute.evaluate_lazy(exec)?);
+            attribute.execute_lazy(exec, &mut add_attribute)?;
         }
         let stmt = LazyAddEdgeAttribute::new(source, sink, attributes, self.location.into());
         exec.lazy_graph.push(stmt.into());
@@ -326,6 +332,7 @@ impl ast::Scan {
                 lazy_graph: exec.lazy_graph,
                 function_parameters: exec.function_parameters,
                 prev_element_debug_info: exec.prev_element_debug_info,
+                shorthands: exec.shorthands,
             };
 
             for statement in &arm.statements {
@@ -386,6 +393,7 @@ impl ast::If {
                     lazy_graph: exec.lazy_graph,
                     function_parameters: exec.function_parameters,
                     prev_element_debug_info: exec.prev_element_debug_info,
+                    shorthands: exec.shorthands,
                 };
                 for stmt in &arm.statements {
                     stmt.execute_lazy(&mut arm_exec)?;
@@ -428,6 +436,7 @@ impl ast::ForIn {
                 lazy_graph: exec.lazy_graph,
                 function_parameters: exec.function_parameters,
                 prev_element_debug_info: exec.prev_element_debug_info,
+                shorthands: exec.shorthands,
             };
             self.variable
                 .add_lazy(&mut loop_exec, value.into(), false)?;
@@ -662,9 +671,54 @@ impl ast::UnscopedVariable {
 }
 
 impl ast::Attribute {
-    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<LazyAttribute, ExecutionError> {
+    fn execute_lazy<F>(
+        &self,
+        exec: &mut ExecutionContext,
+        add_attribute: &mut F,
+    ) -> Result<(), ExecutionError>
+    where
+        F: FnMut(LazyAttribute) -> (),
+    {
         let value = self.value.evaluate_lazy(exec)?;
-        let attribute = LazyAttribute::new(self.name.clone(), value);
-        Ok(attribute)
+        if let Some(shorthand) = exec.shorthands.get(&self.name) {
+            shorthand.execute_lazy(exec, add_attribute, value)
+        } else {
+            add_attribute(LazyAttribute::new(self.name.clone(), value));
+            Ok(())
+        }
+    }
+}
+
+impl ast::AttributeShorthand {
+    fn execute_lazy<F>(
+        &self,
+        exec: &mut ExecutionContext,
+        add_attribute: &mut F,
+        value: LazyValue,
+    ) -> Result<(), ExecutionError>
+    where
+        F: FnMut(LazyAttribute) -> (),
+    {
+        let mut shorthand_locals = VariableMap::new();
+        let mut shorthand_exec = ExecutionContext {
+            source: exec.source,
+            graph: exec.graph,
+            functions: exec.functions,
+            globals: exec.globals,
+            locals: &mut shorthand_locals,
+            current_regex_captures: exec.current_regex_captures,
+            mat: exec.mat,
+            store: exec.store,
+            scoped_store: exec.scoped_store,
+            lazy_graph: exec.lazy_graph,
+            function_parameters: exec.function_parameters,
+            prev_element_debug_info: exec.prev_element_debug_info,
+            shorthands: exec.shorthands,
+        };
+        self.variable.add_lazy(&mut shorthand_exec, value, false)?;
+        for attr in &self.attributes {
+            attr.execute_lazy(&mut shorthand_exec, add_attribute)?;
+        }
+        Ok(())
     }
 }
