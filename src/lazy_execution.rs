@@ -21,11 +21,11 @@ use tree_sitter::Tree;
 
 use crate::ast;
 use crate::execution::query_capture_value;
+use crate::execution::ExecutionConfig;
 use crate::execution::ExecutionError;
 use crate::functions::Functions;
 use crate::graph;
 use crate::graph::Graph;
-use crate::variables::Globals;
 use crate::variables::VariableMap;
 use crate::variables::Variables;
 use crate::Identifier;
@@ -35,35 +35,19 @@ use store::*;
 use values::*;
 
 impl ast::File {
-    /// Executes this graph DSL file against a source file.  You must provide the parsed syntax
-    /// tree (`tree`) as well as the source text that it was parsed from (`source`).  You also
-    /// provide the set of functions and global variables that are available during execution.
-    pub fn execute_lazy<'tree>(
-        &self,
-        tree: &'tree Tree,
-        source: &'tree str,
-        functions: &mut Functions,
-        globals: &Globals,
-    ) -> Result<Graph<'tree>, ExecutionError> {
-        let mut graph = Graph::new();
-        self.execute_lazy_into(&mut graph, tree, source, functions, globals)?;
-        Ok(graph)
-    }
-
     /// Executes this graph DSL file against a source file, saving the results into an existing
     /// `Graph` instance.  You must provide the parsed syntax tree (`tree`) as well as the source
     /// text that it was parsed from (`source`).  You also provide the set of functions and global
     /// variables that are available during execution. This variant is useful when you need to
     /// “pre-seed” the graph with some predefined nodes and/or edges before executing the DSL file.
-    pub fn execute_lazy_into<'tree>(
+    pub(crate) fn execute_lazy_into<'tree>(
         &self,
         graph: &mut Graph<'tree>,
         tree: &'tree Tree,
         source: &'tree str,
-        functions: &mut Functions,
-        globals: &Globals,
+        config: &mut ExecutionConfig,
     ) -> Result<(), ExecutionError> {
-        self.check_globals(globals)?;
+        self.check_globals(config.globals)?;
         let mut locals = VariableMap::new();
         let mut cursor = QueryCursor::new();
         let mut store = LazyStore::new();
@@ -80,8 +64,7 @@ impl ast::File {
                 source,
                 &mat,
                 graph,
-                functions,
-                globals,
+                config,
                 &mut locals,
                 &mut store,
                 &mut scoped_store,
@@ -97,7 +80,7 @@ impl ast::File {
                 .evaluate(&mut EvaluationContext {
                     source,
                     graph,
-                    functions,
+                    functions: config.functions,
                     store: &mut store,
                     scoped_store: &mut scoped_store,
                     function_parameters: &mut function_parameters,
@@ -111,11 +94,10 @@ impl ast::File {
 }
 
 /// Context for execution, which executes stanzas to build the lazy graph
-struct ExecutionContext<'a, 'g, 'tree> {
+struct ExecutionContext<'a, 'c, 'g, 'tree> {
     source: &'tree str,
     graph: &'a mut Graph<'tree>,
-    functions: &'a mut Functions,
-    globals: &'a Globals<'g>,
+    config: &'a mut ExecutionConfig<'c, 'g>,
     locals: &'a mut dyn Variables<LazyValue>,
     current_regex_captures: &'a Vec<String>,
     mat: &'a QueryMatch<'a, 'tree>,
@@ -146,13 +128,12 @@ pub(super) enum GraphElementKey {
 }
 
 impl ast::Stanza {
-    fn execute_lazy<'l, 'g, 'q, 'tree>(
+    fn execute_lazy<'a, 'l, 'g, 'q, 'tree>(
         &self,
         source: &'tree str,
         mat: &QueryMatch<'_, 'tree>,
         graph: &mut Graph<'tree>,
-        functions: &mut Functions,
-        globals: &Globals<'g>,
+        config: &mut ExecutionConfig,
         locals: &mut VariableMap<'l, LazyValue>,
         store: &mut LazyStore,
         scoped_store: &mut LazyScopedVariables,
@@ -166,8 +147,7 @@ impl ast::Stanza {
         let mut exec = ExecutionContext {
             source,
             graph,
-            functions,
-            globals,
+            config,
             locals,
             current_regex_captures: &current_regex_captures,
             mat,
@@ -233,6 +213,8 @@ impl ast::Assign {
 impl ast::CreateGraphNode {
     fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
         let graph_node = exec.graph.add_graph_node();
+        self.node
+            .add_debug_attrs(&mut exec.graph[graph_node].attributes, exec.config)?;
         self.node.add_lazy(exec, graph_node.into(), false)
     }
 }
@@ -319,8 +301,7 @@ impl ast::Scan {
             let mut arm_exec = ExecutionContext {
                 source: exec.source,
                 graph: exec.graph,
-                functions: exec.functions,
-                globals: exec.globals,
+                config: exec.config,
                 locals: &mut arm_locals,
                 current_regex_captures: &current_regex_captures,
                 mat: exec.mat,
@@ -380,8 +361,7 @@ impl ast::If {
                 let mut arm_exec = ExecutionContext {
                     source: exec.source,
                     graph: exec.graph,
-                    functions: exec.functions,
-                    globals: exec.globals,
+                    config: exec.config,
                     locals: &mut arm_locals,
                     current_regex_captures: exec.current_regex_captures,
                     mat: exec.mat,
@@ -423,8 +403,7 @@ impl ast::ForIn {
             let mut loop_exec = ExecutionContext {
                 source: exec.source,
                 graph: exec.graph,
-                functions: exec.functions,
-                globals: exec.globals,
+                config: exec.config,
                 locals: &mut loop_locals,
                 current_regex_captures: exec.current_regex_captures,
                 mat: exec.mat,
@@ -468,7 +447,7 @@ impl ast::Expression {
         self.evaluate_lazy(exec)?.evaluate(&mut EvaluationContext {
             source: exec.source,
             graph: exec.graph,
-            functions: exec.functions,
+            functions: exec.config.functions,
             store: exec.store,
             scoped_store: exec.scoped_store,
             function_parameters: exec.function_parameters,
@@ -615,7 +594,7 @@ impl ast::ScopedVariable {
 
 impl ast::UnscopedVariable {
     fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<LazyValue, ExecutionError> {
-        if let Some(value) = exec.globals.get(&self.name) {
+        if let Some(value) = exec.config.globals.get(&self.name) {
             Some(value.clone().into())
         } else {
             exec.locals.get(&self.name).map(|value| value.clone())
@@ -631,7 +610,7 @@ impl ast::UnscopedVariable {
         value: LazyValue,
         mutable: bool,
     ) -> Result<(), ExecutionError> {
-        if exec.globals.get(&self.name).is_some() {
+        if exec.config.globals.get(&self.name).is_some() {
             return Err(ExecutionError::DuplicateVariable(format!(
                 " global {}",
                 self
@@ -648,7 +627,7 @@ impl ast::UnscopedVariable {
         exec: &mut ExecutionContext,
         value: LazyValue,
     ) -> Result<(), ExecutionError> {
-        if exec.globals.get(&self.name).is_some() {
+        if exec.config.globals.get(&self.name).is_some() {
             return Err(ExecutionError::CannotAssignImmutableVariable(format!(
                 " global {}",
                 self
@@ -700,8 +679,7 @@ impl ast::AttributeShorthand {
         let mut shorthand_exec = ExecutionContext {
             source: exec.source,
             graph: exec.graph,
-            functions: exec.functions,
-            globals: exec.globals,
+            config: exec.config,
             locals: &mut shorthand_locals,
             current_regex_captures: exec.current_regex_captures,
             mat: exec.mat,

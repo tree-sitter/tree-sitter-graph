@@ -38,6 +38,7 @@ pub mod parse_error;
 mod parser;
 mod variables;
 
+pub use execution::ExecutionConfig;
 pub use execution::ExecutionError;
 pub use parser::Location;
 pub use parser::ParseError;

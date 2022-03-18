@@ -17,6 +17,7 @@ use tree_sitter_config::Config;
 use tree_sitter_graph::ast::File;
 use tree_sitter_graph::functions::Functions;
 use tree_sitter_graph::parse_error::ParseError;
+use tree_sitter_graph::ExecutionConfig;
 use tree_sitter_graph::Variables;
 use tree_sitter_loader::Loader;
 
@@ -99,12 +100,10 @@ fn main() -> Result<()> {
 
     let mut functions = Functions::stdlib();
     let globals = Variables::new();
-    let graph = if lazy {
-        file.execute_lazy(&tree, &source, &mut functions, &globals)
-    } else {
-        file.execute(&tree, &source, &mut functions, &globals)
-    }
-    .with_context(|| format!("Error executing TSG file {}", tsg_path.display()))?;
+    let mut config = ExecutionConfig::new(&mut functions, &globals).lazy(lazy);
+    let graph = file
+        .execute(&tree, &source, &mut config)
+        .with_context(|| format!("Cannot execute TSG file {}", tsg_path.display()))?;
 
     let json = matches.is_present("json");
     if json {

@@ -288,6 +288,10 @@ impl Attributes {
     {
         self.values.get(name.borrow())
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&Identifier, &Value)> {
+        self.values.iter()
+    }
 }
 
 impl std::fmt::Display for Attributes {

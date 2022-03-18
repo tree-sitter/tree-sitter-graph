@@ -23,11 +23,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Added
 
 - Module `parse_error` for finding and displaying `tree-sitter` parse errors.
+- Option in `ExecutionConfig` to automatically add debug graph node attributes that describe the source location and variable name of the originating `node` statement in the DSL source.
 
 #### Changed
 
 - Calls to `execute` will fail with a runtime error if declared global variables are missing in the global environment.
 - Calls to `execute` will not fail early on parse trees with errors. Errors may occur during query execution if matched parts of the tree are missing.
+- The seperate arguments to `execute` are replaced by a single `ExecutionConfig` argument, which makes it easier to add optional arguments without breaking all use sites.
+
+#### Removed
+
+- The `execute_lazy` method has been removed. Lazy evalaution is enabled by setting the `lazy` flag in the `ExecutionConfig`.
 
 ### CLI
 
