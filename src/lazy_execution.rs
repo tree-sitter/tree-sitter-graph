@@ -66,6 +66,7 @@ impl ast::File {
         if tree.root_node().has_error() {
             return Err(ExecutionError::ParseTreeHasErrors);
         }
+        self.check_globals(globals)?;
         let mut locals = VariableMap::new();
         let mut cursor = QueryCursor::new();
         let mut store = LazyStore::new();

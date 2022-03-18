@@ -1074,3 +1074,295 @@ fn cannot_parse_scan_of_nonlocal_variable() {
         panic!("Parse succeeded unexpectedly");
     }
 }
+
+#[test]
+fn can_parse_global() {
+    let source = r#"
+        global root
+
+        (identifier) {
+          node n
+          edge n -> root
+        }
+    "#;
+    let file = File::from_str(tree_sitter_python::language(), source).expect("Cannot parse file");
+
+    assert_eq!(
+        file.globals,
+        vec![Global {
+            name: "root".into(),
+            quantifier: One,
+            location: Location { row: 1, column: 15 },
+        }]
+    );
+
+    let statements = file
+        .stanzas
+        .into_iter()
+        .map(|s| s.statements)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        statements,
+        vec![vec![
+            CreateGraphNode {
+                node: UnscopedVariable {
+                    name: "n".into(),
+                    location: Location { row: 4, column: 15 },
+                }
+                .into(),
+                location: Location { row: 4, column: 10 },
+            }
+            .into(),
+            CreateEdge {
+                source: UnscopedVariable {
+                    name: "n".into(),
+                    location: Location { row: 5, column: 15 },
+                }
+                .into(),
+                sink: UnscopedVariable {
+                    name: "root".into(),
+                    location: Location { row: 5, column: 20 },
+                }
+                .into(),
+                location: Location { row: 5, column: 10 },
+            }
+            .into(),
+        ]]
+    );
+}
+
+#[test]
+// TODO deprecated support for undeclared globals
+//      change to cannot_parse_undeclared_global once support is removed
+fn can_parse_undeclared_global() {
+    let source = r#"
+        (identifier) {
+          node n
+          edge n -> root
+        }
+    "#;
+    let file = File::from_str(tree_sitter_python::language(), source).expect("Cannot parse file");
+
+    assert_eq!(file.globals, vec![]);
+
+    let statements = file
+        .stanzas
+        .into_iter()
+        .map(|s| s.statements)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        statements,
+        vec![vec![
+            CreateGraphNode {
+                node: UnscopedVariable {
+                    name: "n".into(),
+                    location: Location { row: 2, column: 15 },
+                }
+                .into(),
+                location: Location { row: 2, column: 10 },
+            }
+            .into(),
+            CreateEdge {
+                source: UnscopedVariable {
+                    name: "n".into(),
+                    location: Location { row: 3, column: 15 },
+                }
+                .into(),
+                sink: UnscopedVariable {
+                    name: "root".into(),
+                    location: Location { row: 3, column: 20 },
+                }
+                .into(),
+                location: Location { row: 3, column: 10 },
+            }
+            .into(),
+        ]]
+    );
+}
+
+#[test]
+fn can_parse_list_global() {
+    let source = r#"
+        global roots*
+
+        (identifier) {
+          for root in roots {
+            node n
+            edge n -> root
+          }
+        }
+    "#;
+    let file = File::from_str(tree_sitter_python::language(), source).expect("Cannot parse file");
+
+    assert_eq!(
+        file.globals,
+        vec![Global {
+            name: "roots".into(),
+            quantifier: ZeroOrMore,
+            location: Location { row: 1, column: 15 },
+        }]
+    );
+
+    let statements = file
+        .stanzas
+        .into_iter()
+        .map(|s| s.statements)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        statements,
+        vec![vec![ForIn {
+            variable: UnscopedVariable {
+                name: "root".into(),
+                location: Location { row: 4, column: 14 },
+            }
+            .into(),
+            value: UnscopedVariable {
+                name: "roots".into(),
+                location: Location { row: 4, column: 22 },
+            }
+            .into(),
+            statements: vec![
+                CreateGraphNode {
+                    node: UnscopedVariable {
+                        name: "n".into(),
+                        location: Location { row: 5, column: 17 },
+                    }
+                    .into(),
+                    location: Location { row: 5, column: 12 },
+                }
+                .into(),
+                CreateEdge {
+                    source: UnscopedVariable {
+                        name: "n".into(),
+                        location: Location { row: 6, column: 17 },
+                    }
+                    .into(),
+                    sink: UnscopedVariable {
+                        name: "root".into(),
+                        location: Location { row: 6, column: 22 },
+                    }
+                    .into(),
+                    location: Location { row: 6, column: 12 },
+                }
+                .into(),
+            ],
+            location: Location { row: 4, column: 10 },
+        }
+        .into(),]]
+    );
+}
+
+#[test]
+fn can_parse_optional_global() {
+    let source = r#"
+        global root?
+
+        (identifier) {
+          if some root {
+            node n
+            edge n -> root
+          }
+        }
+    "#;
+    let file = File::from_str(tree_sitter_python::language(), source).expect("Cannot parse file");
+
+    assert_eq!(
+        file.globals,
+        vec![Global {
+            name: "root".into(),
+            quantifier: ZeroOrOne,
+            location: Location { row: 1, column: 15 },
+        }]
+    );
+
+    let statements = file
+        .stanzas
+        .into_iter()
+        .map(|s| s.statements)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        statements,
+        vec![vec![If {
+            arms: vec![IfArm {
+                conditions: vec![Condition::Some {
+                    value: UnscopedVariable {
+                        name: "root".into(),
+                        location: Location { row: 4, column: 18 },
+                    }
+                    .into(),
+                    location: Location { row: 4, column: 13 },
+                },],
+                statements: vec![
+                    CreateGraphNode {
+                        node: UnscopedVariable {
+                            name: "n".into(),
+                            location: Location { row: 5, column: 17 },
+                        }
+                        .into(),
+                        location: Location { row: 5, column: 12 },
+                    }
+                    .into(),
+                    CreateEdge {
+                        source: UnscopedVariable {
+                            name: "n".into(),
+                            location: Location { row: 6, column: 17 },
+                        }
+                        .into(),
+                        sink: UnscopedVariable {
+                            name: "root".into(),
+                            location: Location { row: 6, column: 22 },
+                        }
+                        .into(),
+                        location: Location { row: 6, column: 12 },
+                    }
+                    .into(),
+                ],
+                location: Location { row: 4, column: 10 },
+            },],
+            location: Location { row: 4, column: 10 },
+        }
+        .into(),]]
+    );
+}
+
+#[test]
+fn cannot_parse_global_with_unknown_quantifier() {
+    let source = r#"
+        global root%
+
+        (module) {
+          node root
+        }
+    "#;
+    if let Ok(_) = File::from_str(tree_sitter_python::language(), source) {
+        panic!("Parse succeeded unexpectedly");
+    }
+}
+
+#[test]
+fn cannot_parse_hiding_global() {
+    let source = r#"
+        global root
+
+        (module) {
+          node root
+        }
+    "#;
+    if let Ok(_) = File::from_str(tree_sitter_python::language(), source) {
+        panic!("Parse succeeded unexpectedly");
+    }
+}
+
+#[test]
+fn cannot_parse_set_global() {
+    let source = r#"
+        global root
+
+        (module) {
+          set root = #null
+        }
+    "#;
+    if let Ok(_) = File::from_str(tree_sitter_python::language(), source) {
+        panic!("Parse succeeded unexpectedly");
+    }
+}

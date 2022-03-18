@@ -252,6 +252,8 @@ fn can_use_global_variable() {
     check_execution(
         "pass",
         indoc! {r#"
+          global filename
+
           (module) @root
           {
             node n
@@ -262,6 +264,31 @@ fn can_use_global_variable() {
           node 0
             filename: "test.py"
     "#},
+    );
+}
+
+#[test]
+fn cannot_omit_global_variable() {
+    fail_execution(
+        "pass",
+        indoc! {r#"
+          global root
+
+          (identifier) {
+            node n
+            edge n -> root
+          }
+        "#},
+    );
+}
+
+#[test]
+fn cannot_pass_string_to_global_list_variable() {
+    fail_execution(
+        "pass",
+        indoc! {r#"
+          global filename*
+        "#},
     );
 }
 

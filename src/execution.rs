@@ -79,6 +79,7 @@ impl File {
         if tree.root_node().has_error() {
             return Err(ExecutionError::ParseTreeHasErrors);
         }
+        self.check_globals(globals)?;
         let mut locals = VariableMap::new();
         let mut scoped = ScopedVariables::new();
         let current_regex_captures = Vec::new();
@@ -97,6 +98,30 @@ impl File {
                 &mut function_parameters,
                 &mut cursor,
             )?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn check_globals(&self, globals: &Globals) -> Result<(), ExecutionError> {
+        for global in &self.globals {
+            match globals.get(&global.name) {
+                None => {
+                    return Err(ExecutionError::MissingGlobalVariable(
+                        global.name.as_str().to_string(),
+                    ));
+                }
+                Some(value) => {
+                    if global.quantifier == CaptureQuantifier::ZeroOrMore
+                        || global.quantifier == CaptureQuantifier::OneOrMore
+                    {
+                        if value.as_list().is_err() {
+                            return Err(ExecutionError::ExpectedList(
+                                global.name.as_str().to_string(),
+                            ));
+                        }
+                    }
+                }
+            }
         }
         Ok(())
     }
@@ -133,6 +158,8 @@ pub enum ExecutionError {
     InvalidParameters(String),
     #[error("Scoped variables can only be attached to syntax nodes {0}")]
     InvalidVariableScope(String),
+    #[error("Missing global variable {0}")]
+    MissingGlobalVariable(String),
     #[error("Recursively defined scoped variable {0}")]
     RecursivelyDefinedScopedVariable(String),
     #[error("Recursively defined variable {0}")]
