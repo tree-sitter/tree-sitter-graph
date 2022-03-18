@@ -22,6 +22,8 @@ use tree_sitter_loader::Loader;
 
 const BUILD_VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
+const MAX_PARSE_ERRORS: usize = 5;
+
 fn main() -> Result<()> {
     init_log();
 
@@ -82,8 +84,14 @@ fn main() -> Result<()> {
     if !allow_parse_errors {
         let parse_errors = ParseError::find_all(&tree);
         if !parse_errors.is_empty() {
-            for parse_error in parse_errors {
+            for parse_error in parse_errors.iter().take(MAX_PARSE_ERRORS) {
                 eprintln!("{}", parse_error.display(&source, true));
+            }
+            if parse_errors.len() > MAX_PARSE_ERRORS {
+                eprintln!(
+                    "{} more parse errors omitted",
+                    parse_errors.len() - MAX_PARSE_ERRORS
+                );
             }
             return Err(anyhow!("Cannot parse {}", source_path.display()));
         }
