@@ -725,19 +725,81 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_list(&mut self) -> Result<ast::Expression, ParseError> {
+        let location = self.location;
         self.consume_token("[")?;
         self.consume_whitespace();
-        let elements = self.parse_sequence(']')?;
-        self.consume_token("]")?;
-        Ok(ast::ListComprehension { elements }.into())
+        if let Ok(_) = self.consume_token("]") {
+            return Ok(ast::ListLiteral { elements: vec![] }.into());
+        }
+        let first_element = self.parse_expression()?;
+        self.consume_whitespace();
+        if let Ok(_) = self.consume_token("]") {
+            let elements = vec![first_element];
+            Ok(ast::ListLiteral { elements }.into())
+        } else if let Ok(_) = self.consume_token(",") {
+            self.consume_whitespace();
+            let mut elements = self.parse_sequence(']')?;
+            self.consume_whitespace();
+            self.consume_token("]")?;
+            elements.insert(0, first_element);
+            Ok(ast::ListLiteral { elements }.into())
+        } else {
+            self.consume_token("for")?;
+            self.consume_whitespace();
+            let variable = self.parse_unscoped_variable()?;
+            self.consume_whitespace();
+            self.consume_token("in")?;
+            self.consume_whitespace();
+            let value = self.parse_expression()?;
+            self.consume_whitespace();
+            self.consume_token("]")?;
+            Ok(ast::ListComprehension {
+                element: first_element.into(),
+                variable,
+                value: value.into(),
+                location,
+            }
+            .into())
+        }
     }
 
     fn parse_set(&mut self) -> Result<ast::Expression, ParseError> {
+        let location = self.location;
         self.consume_token("{")?;
         self.consume_whitespace();
-        let elements = self.parse_sequence('}')?;
-        self.consume_token("}")?;
-        Ok(ast::SetComprehension { elements }.into())
+        if let Ok(_) = self.consume_token("}") {
+            return Ok(ast::SetLiteral { elements: vec![] }.into());
+        }
+        let first_element = self.parse_expression()?;
+        self.consume_whitespace();
+        if let Ok(_) = self.consume_token("}") {
+            let elements = vec![first_element];
+            Ok(ast::SetLiteral { elements }.into())
+        } else if let Ok(_) = self.consume_token(",") {
+            self.consume_whitespace();
+            let mut elements = self.parse_sequence('}')?;
+            self.consume_whitespace();
+            self.consume_token("}")?;
+            elements.insert(0, first_element);
+            Ok(ast::SetLiteral { elements }.into())
+        } else {
+            self.consume_token("for")?;
+            self.consume_whitespace();
+            let variable = self.parse_unscoped_variable()?;
+            self.consume_whitespace();
+            self.consume_token("in")?;
+            self.consume_whitespace();
+            let value = self.parse_expression()?;
+            self.consume_whitespace();
+            self.consume_token("}")?;
+            Ok(ast::SetComprehension {
+                element: first_element.into(),
+                variable,
+                value: value.into(),
+                location,
+            }
+            .into())
+        }
     }
 
     fn parse_capture(&mut self) -> Result<ast::Capture, ParseError> {

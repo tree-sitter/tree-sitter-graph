@@ -337,7 +337,7 @@ fn can_parse_lists() {
                     location: Location { row: 3, column: 14 }
                 }
                 .into(),
-                value: ListComprehension {
+                value: ListLiteral {
                     elements: vec![
                         IntegerConstant { value: 1 }.into(),
                         IntegerConstant { value: 2 }.into(),
@@ -354,7 +354,7 @@ fn can_parse_lists() {
                     location: Location { row: 4, column: 14 }
                 }
                 .into(),
-                value: ListComprehension { elements: vec![] }.into(),
+                value: ListLiteral { elements: vec![] }.into(),
                 location: Location { row: 4, column: 10 },
             }
             .into(),
@@ -364,7 +364,7 @@ fn can_parse_lists() {
                     location: Location { row: 5, column: 14 }
                 }
                 .into(),
-                value: ListComprehension {
+                value: ListLiteral {
                     elements: vec![
                         StringConstant {
                             value: String::from("hello")
@@ -414,7 +414,7 @@ fn can_parse_sets() {
                     location: Location { row: 3, column: 14 }
                 }
                 .into(),
-                value: SetComprehension {
+                value: SetLiteral {
                     elements: vec![
                         IntegerConstant { value: 1 }.into(),
                         IntegerConstant { value: 2 }.into(),
@@ -431,7 +431,7 @@ fn can_parse_sets() {
                     location: Location { row: 4, column: 14 }
                 }
                 .into(),
-                value: SetComprehension { elements: vec![] }.into(),
+                value: SetLiteral { elements: vec![] }.into(),
                 location: Location { row: 4, column: 10 },
             }
             .into(),
@@ -441,7 +441,7 @@ fn can_parse_sets() {
                     location: Location { row: 5, column: 14 }
                 }
                 .into(),
-                value: SetComprehension {
+                value: SetLiteral {
                     elements: vec![
                         StringConstant {
                             value: String::from("hello")
@@ -1073,6 +1073,112 @@ fn cannot_parse_scan_of_nonlocal_variable() {
     if let Ok(_) = File::from_str(tree_sitter_python::language(), source) {
         panic!("Parse succeeded unexpectedly");
     }
+}
+
+#[test]
+fn can_parse_list_comprehension() {
+    let source = r#"
+        (module (_)* @xs)@mod
+        {
+          print [ (named-child-index x) for x in @xs ]
+        }
+    "#;
+    let file = File::from_str(tree_sitter_python::language(), source).expect("Cannot parse file");
+
+    let statements = file
+        .stanzas
+        .into_iter()
+        .map(|s| s.statements)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        statements,
+        vec![vec![Print {
+            values: vec![ListComprehension {
+                element: Box::new(
+                    Call {
+                        function: "named-child-index".into(),
+                        parameters: vec![UnscopedVariable {
+                            name: "x".into(),
+                            location: Location { row: 3, column: 37 }
+                        }
+                        .into()]
+                    }
+                    .into()
+                ),
+                variable: UnscopedVariable {
+                    name: "x".into(),
+                    location: Location { row: 3, column: 44 }
+                },
+                value: Box::new(
+                    Capture {
+                        name: "xs".into(),
+                        quantifier: ZeroOrMore,
+                        file_capture_index: 0,
+                        stanza_capture_index: 0,
+                        location: Location { row: 3, column: 49 }
+                    }
+                    .into()
+                ),
+                location: Location { row: 3, column: 16 }
+            }
+            .into()],
+            location: Location { row: 3, column: 10 }
+        }
+        .into()]]
+    );
+}
+
+#[test]
+fn can_parse_set_comprehension() {
+    let source = r#"
+        (module (_)* @xs)@mod
+        {
+          print { (named-child-index x) for x in @xs }
+        }
+    "#;
+    let file = File::from_str(tree_sitter_python::language(), source).expect("Cannot parse file");
+
+    let statements = file
+        .stanzas
+        .into_iter()
+        .map(|s| s.statements)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        statements,
+        vec![vec![Print {
+            values: vec![SetComprehension {
+                element: Box::new(
+                    Call {
+                        function: "named-child-index".into(),
+                        parameters: vec![UnscopedVariable {
+                            name: "x".into(),
+                            location: Location { row: 3, column: 37 }
+                        }
+                        .into()]
+                    }
+                    .into()
+                ),
+                variable: UnscopedVariable {
+                    name: "x".into(),
+                    location: Location { row: 3, column: 44 }
+                },
+                value: Box::new(
+                    Capture {
+                        name: "xs".into(),
+                        quantifier: ZeroOrMore,
+                        file_capture_index: 0,
+                        stanza_capture_index: 0,
+                        location: Location { row: 3, column: 49 }
+                    }
+                    .into()
+                ),
+                location: Location { row: 3, column: 16 }
+            }
+            .into()],
+            location: Location { row: 3, column: 10 }
+        }
+        .into()]]
+    );
 }
 
 #[test]

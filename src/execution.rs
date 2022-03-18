@@ -6,6 +6,7 @@
 // ------------------------------------------------------------------------------------------------
 
 use anyhow::Context as ErrorContext;
+use std::collections::BTreeSet;
 use std::collections::HashMap;
 use thiserror::Error;
 use tree_sitter::CaptureQuantifier;
@@ -32,11 +33,13 @@ use crate::ast::ForIn;
 use crate::ast::If;
 use crate::ast::IntegerConstant;
 use crate::ast::ListComprehension;
+use crate::ast::ListLiteral;
 use crate::ast::Print;
 use crate::ast::RegexCapture;
 use crate::ast::Scan;
 use crate::ast::ScopedVariable;
 use crate::ast::SetComprehension;
+use crate::ast::SetLiteral;
 use crate::ast::Stanza;
 use crate::ast::Statement;
 use crate::ast::StringConstant;
@@ -596,8 +599,10 @@ impl Expression {
             Expression::TrueLiteral => Ok(Value::Boolean(true)),
             Expression::IntegerConstant(expr) => expr.evaluate(exec),
             Expression::StringConstant(expr) => expr.evaluate(exec),
-            Expression::List(expr) => expr.evaluate(exec),
-            Expression::Set(expr) => expr.evaluate(exec),
+            Expression::ListLiteral(expr) => expr.evaluate(exec),
+            Expression::SetLiteral(expr) => expr.evaluate(exec),
+            Expression::ListComprehension(expr) => expr.evaluate(exec),
+            Expression::SetComprehension(expr) => expr.evaluate(exec),
             Expression::Capture(expr) => expr.evaluate(exec),
             Expression::Variable(expr) => expr.evaluate(exec),
             Expression::Call(expr) => expr.evaluate(exec),
@@ -618,7 +623,7 @@ impl StringConstant {
     }
 }
 
-impl ListComprehension {
+impl ListLiteral {
     fn evaluate(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
         let elements = self
             .elements
@@ -629,13 +634,65 @@ impl ListComprehension {
     }
 }
 
-impl SetComprehension {
+impl ListComprehension {
+    fn evaluate(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+        let values = self.value.evaluate(exec)?.into_list()?;
+        let mut elements = Vec::new();
+        let mut loop_locals = VariableMap::nested(exec.locals);
+        for value in values {
+            loop_locals.clear();
+            let mut loop_exec = ExecutionContext {
+                source: exec.source,
+                graph: exec.graph,
+                config: exec.config,
+                locals: &mut loop_locals,
+                scoped: exec.scoped,
+                current_regex_captures: exec.current_regex_captures,
+                function_parameters: exec.function_parameters,
+                mat: exec.mat,
+                shorthands: exec.shorthands,
+            };
+            self.variable.add(&mut loop_exec, value, false)?;
+            let element = self.element.evaluate(&mut loop_exec)?;
+            elements.push(element);
+        }
+        Ok(Value::List(elements))
+    }
+}
+
+impl SetLiteral {
     fn evaluate(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
         let elements = self
             .elements
             .iter()
             .map(|e| e.evaluate(exec))
             .collect::<Result<_, _>>()?;
+        Ok(Value::Set(elements))
+    }
+}
+
+impl SetComprehension {
+    fn evaluate(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
+        let values = self.value.evaluate(exec)?.into_list()?;
+        let mut elements = BTreeSet::new();
+        let mut loop_locals = VariableMap::nested(exec.locals);
+        for value in values {
+            loop_locals.clear();
+            let mut loop_exec = ExecutionContext {
+                source: exec.source,
+                graph: exec.graph,
+                config: exec.config,
+                locals: &mut loop_locals,
+                scoped: exec.scoped,
+                current_regex_captures: exec.current_regex_captures,
+                function_parameters: exec.function_parameters,
+                mat: exec.mat,
+                shorthands: exec.shorthands,
+            };
+            self.variable.add(&mut loop_exec, value, false)?;
+            let element = self.element.evaluate(&mut loop_exec)?;
+            elements.insert(element);
+        }
         Ok(Value::Set(elements))
     }
 }

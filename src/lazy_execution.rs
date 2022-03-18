@@ -432,8 +432,10 @@ impl ast::Expression {
             Self::TrueLiteral => Ok(true.into()),
             Self::IntegerConstant(expr) => expr.evaluate_lazy(exec),
             Self::StringConstant(expr) => expr.evaluate_lazy(exec),
-            Self::List(expr) => expr.evaluate_lazy(exec),
-            Self::Set(expr) => expr.evaluate_lazy(exec),
+            Self::ListLiteral(expr) => expr.evaluate_lazy(exec),
+            Self::SetLiteral(expr) => expr.evaluate_lazy(exec),
+            Self::ListComprehension(expr) => expr.evaluate_lazy(exec),
+            Self::SetComprehension(expr) => expr.evaluate_lazy(exec),
             Self::Capture(expr) => expr.evaluate_lazy(exec),
             Self::Variable(expr) => expr.evaluate_lazy(exec),
             Self::Call(expr) => expr.evaluate_lazy(exec),
@@ -468,7 +470,7 @@ impl ast::StringConstant {
     }
 }
 
-impl ast::ListComprehension {
+impl ast::ListLiteral {
     fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<LazyValue, ExecutionError> {
         let mut elements = Vec::new();
         for element in &self.elements {
@@ -478,11 +480,71 @@ impl ast::ListComprehension {
     }
 }
 
-impl ast::SetComprehension {
+impl ast::ListComprehension {
+    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<LazyValue, ExecutionError> {
+        let values = self.value.evaluate_eager(exec)?.into_list()?;
+        let mut elements = Vec::new();
+        let mut loop_locals = VariableMap::nested(exec.locals);
+        for value in values {
+            loop_locals.clear();
+            let mut loop_exec = ExecutionContext {
+                source: exec.source,
+                graph: exec.graph,
+                config: exec.config,
+                locals: &mut loop_locals,
+                current_regex_captures: exec.current_regex_captures,
+                mat: exec.mat,
+                store: exec.store,
+                scoped_store: exec.scoped_store,
+                lazy_graph: exec.lazy_graph,
+                function_parameters: exec.function_parameters,
+                prev_element_debug_info: exec.prev_element_debug_info,
+                shorthands: exec.shorthands,
+            };
+            self.variable
+                .add_lazy(&mut loop_exec, value.into(), false)?;
+            let element = self.element.evaluate_lazy(&mut loop_exec)?;
+            elements.push(element);
+        }
+        Ok(elements.into())
+    }
+}
+
+impl ast::SetLiteral {
     fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<LazyValue, ExecutionError> {
         let mut elements = Vec::new();
         for element in &self.elements {
             elements.push(element.evaluate_lazy(exec)?);
+        }
+        Ok(LazySet::new(elements).into())
+    }
+}
+
+impl ast::SetComprehension {
+    fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<LazyValue, ExecutionError> {
+        let values = self.value.evaluate_eager(exec)?.into_list()?;
+        let mut elements = Vec::new();
+        let mut loop_locals = VariableMap::nested(exec.locals);
+        for value in values {
+            loop_locals.clear();
+            let mut loop_exec = ExecutionContext {
+                source: exec.source,
+                graph: exec.graph,
+                config: exec.config,
+                locals: &mut loop_locals,
+                current_regex_captures: exec.current_regex_captures,
+                mat: exec.mat,
+                store: exec.store,
+                scoped_store: exec.scoped_store,
+                lazy_graph: exec.lazy_graph,
+                function_parameters: exec.function_parameters,
+                prev_element_debug_info: exec.prev_element_debug_info,
+                shorthands: exec.shorthands,
+            };
+            self.variable
+                .add_lazy(&mut loop_exec, value.into(), false)?;
+            let element = self.element.evaluate_lazy(&mut loop_exec)?;
+            elements.push(element);
         }
         Ok(LazySet::new(elements).into())
     }

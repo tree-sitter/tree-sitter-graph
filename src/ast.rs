@@ -527,9 +527,12 @@ pub enum Expression {
     // Constants
     IntegerConstant(IntegerConstant),
     StringConstant(StringConstant),
+    // Literals
+    ListLiteral(ListLiteral),
+    SetLiteral(SetLiteral),
     // Comprehensions
-    List(ListComprehension),
-    Set(SetComprehension),
+    ListComprehension(ListComprehension),
+    SetComprehension(SetComprehension),
     // Syntax nodes
     Capture(Capture),
     // Variables
@@ -548,8 +551,10 @@ impl std::fmt::Display for Expression {
             Expression::TrueLiteral => write!(f, "true"),
             Expression::IntegerConstant(expr) => expr.fmt(f),
             Expression::StringConstant(expr) => expr.fmt(f),
-            Expression::List(expr) => expr.fmt(f),
-            Expression::Set(expr) => expr.fmt(f),
+            Expression::ListLiteral(expr) => expr.fmt(f),
+            Expression::SetLiteral(expr) => expr.fmt(f),
+            Expression::ListComprehension(expr) => expr.fmt(f),
+            Expression::SetComprehension(expr) => expr.fmt(f),
             Expression::Capture(expr) => expr.fmt(f),
             Expression::Variable(expr) => expr.fmt(f),
             Expression::Call(expr) => expr.fmt(f),
@@ -627,17 +632,17 @@ impl std::fmt::Display for IntegerConstant {
 
 /// An ordered list of values
 #[derive(Debug, Eq, PartialEq)]
-pub struct ListComprehension {
+pub struct ListLiteral {
     pub elements: Vec<Expression>,
 }
 
-impl From<ListComprehension> for Expression {
-    fn from(expr: ListComprehension) -> Expression {
-        Expression::List(expr)
+impl From<ListLiteral> for Expression {
+    fn from(expr: ListLiteral) -> Expression {
+        Expression::ListLiteral(expr)
     }
 }
 
-impl std::fmt::Display for ListComprehension {
+impl std::fmt::Display for ListLiteral {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "[")?;
         let mut first = true;
@@ -650,6 +655,31 @@ impl std::fmt::Display for ListComprehension {
             }
         }
         write!(f, "]")
+    }
+}
+
+/// An list comprehension
+#[derive(Debug, Eq, PartialEq)]
+pub struct ListComprehension {
+    pub element: Box<Expression>,
+    pub variable: UnscopedVariable,
+    pub value: Box<Expression>,
+    pub location: Location,
+}
+
+impl From<ListComprehension> for Expression {
+    fn from(expr: ListComprehension) -> Expression {
+        Expression::ListComprehension(expr)
+    }
+}
+
+impl std::fmt::Display for ListComprehension {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "[ {} for {} in {} ]",
+            self.element, self.variable, self.value
+        )
     }
 }
 
@@ -673,17 +703,17 @@ impl std::fmt::Display for RegexCapture {
 
 /// An unordered set of values
 #[derive(Debug, Eq, PartialEq)]
-pub struct SetComprehension {
+pub struct SetLiteral {
     pub elements: Vec<Expression>,
 }
 
-impl From<SetComprehension> for Expression {
-    fn from(expr: SetComprehension) -> Expression {
-        Expression::Set(expr)
+impl From<SetLiteral> for Expression {
+    fn from(expr: SetLiteral) -> Expression {
+        Expression::SetLiteral(expr)
     }
 }
 
-impl std::fmt::Display for SetComprehension {
+impl std::fmt::Display for SetLiteral {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{{")?;
         let mut first = true;
@@ -696,6 +726,31 @@ impl std::fmt::Display for SetComprehension {
             }
         }
         write!(f, "}}")
+    }
+}
+
+/// An set comprehension
+#[derive(Debug, Eq, PartialEq)]
+pub struct SetComprehension {
+    pub element: Box<Expression>,
+    pub variable: UnscopedVariable,
+    pub value: Box<Expression>,
+    pub location: Location,
+}
+
+impl From<SetComprehension> for Expression {
+    fn from(expr: SetComprehension) -> Expression {
+        Expression::SetComprehension(expr)
+    }
+}
+
+impl std::fmt::Display for SetComprehension {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "{{ {} for {} in {} }}",
+            self.element, self.variable, self.value
+        )
     }
 }
 
