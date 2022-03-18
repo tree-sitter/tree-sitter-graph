@@ -752,13 +752,11 @@ impl AttributeShorthands {
         self.0.insert(shorthand.name.clone(), shorthand);
     }
 
-    pub fn iter(&self) -> std::collections::hash_map::Values<Identifier, AttributeShorthand> {
+    pub fn iter(&self) -> impl Iterator<Item = &AttributeShorthand> {
         self.0.values()
     }
 
-    pub fn into_iter(
-        self,
-    ) -> std::collections::hash_map::IntoValues<Identifier, AttributeShorthand> {
+    pub fn into_iter(self) -> impl Iterator<Item = AttributeShorthand> {
         self.0.into_values()
     }
 }
