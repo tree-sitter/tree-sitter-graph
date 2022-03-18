@@ -16,7 +16,7 @@ use tree_sitter::Parser;
 use tree_sitter_config::Config;
 use tree_sitter_graph::ast::File;
 use tree_sitter_graph::functions::Functions;
-use tree_sitter_graph::util::ParseError;
+use tree_sitter_graph::parse_error::ParseError;
 use tree_sitter_graph::Variables;
 use tree_sitter_loader::Loader;
 
