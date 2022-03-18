@@ -20,9 +20,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Library
 
+#### Added
+
+- Module `parse_error` for finding and displaying `tree-sitter` parse errors.
+
 #### Changed
 
 - Calls to `execute` will fail with a runtime error if declared global variables are missing in the global environment.
+- Calls to `execute` will not fail early on parse trees with errors. Errors may occur during query execution if matched parts of the tree are missing.
+
+### CLI
+
+#### Added
+
+- Flag `--allow-parse-errors` that allows running against input files with parse errors.
+
+#### Changed
+
+- Improved formatting of parse error messages.
 
 ## 0.3.0 - 2022-02-08
 
