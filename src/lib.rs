@@ -35,6 +35,7 @@ pub mod functions;
 pub mod graph;
 mod lazy_execution;
 mod parser;
+pub mod util;
 mod variables;
 
 pub use execution::ExecutionError;
