@@ -80,9 +80,6 @@ impl File {
         functions: &mut Functions,
         globals: &Globals,
     ) -> Result<(), ExecutionError> {
-        if tree.root_node().has_error() {
-            return Err(ExecutionError::ParseTreeHasErrors);
-        }
         self.check_globals(globals)?;
         let mut locals = VariableMap::new();
         let mut scoped = ScopedVariables::new();
@@ -185,8 +182,6 @@ pub enum ExecutionError {
     UndefinedVariable(String),
     #[error("Cannot add scoped variable after being forced {0}")]
     VariableScopesAlreadyForced(String),
-    #[error("Parse tree has errors")]
-    ParseTreeHasErrors,
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }

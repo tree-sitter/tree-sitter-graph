@@ -16,10 +16,13 @@ use tree_sitter::Parser;
 use tree_sitter_config::Config;
 use tree_sitter_graph::ast::File;
 use tree_sitter_graph::functions::Functions;
+use tree_sitter_graph::parse_error::ParseError;
 use tree_sitter_graph::Variables;
 use tree_sitter_loader::Loader;
 
 const BUILD_VERSION: &'static str = env!("CARGO_PKG_VERSION");
+
+const MAX_PARSE_ERRORS: usize = 5;
 
 fn main() -> Result<()> {
     init_log();
@@ -44,6 +47,11 @@ fn main() -> Result<()> {
         )
         .arg(Arg::with_name("scope").long("scope").takes_value(true))
         .arg(Arg::with_name("json").long("json").takes_value(false))
+        .arg(
+            Arg::with_name("allow-parse-errors")
+                .long("allow-parse-errors")
+                .takes_value(false),
+        )
         .get_matches();
 
     let tsg_path = Path::new(matches.value_of("tsg").unwrap());
@@ -51,24 +59,44 @@ fn main() -> Result<()> {
     let current_dir = std::env::current_dir().unwrap();
     let quiet = matches.is_present("quiet");
     let lazy = matches.is_present("lazy");
+
     let config = Config::load()?;
     let mut loader = Loader::new()?;
     let loader_config = config.get()?;
     loader.find_all_languages(&loader_config)?;
     let language = loader.select_language(source_path, &current_dir, matches.value_of("scope"))?;
+
+    let tsg = std::fs::read(tsg_path)
+        .with_context(|| format!("Cannot read TSG file {}", tsg_path.display()))?;
+    let tsg = String::from_utf8(tsg)?;
+    let file = File::from_str(language, &tsg)
+        .with_context(|| format!("Cannot parsing TSG file {}", tsg_path.display()))?;
+
+    let source = std::fs::read(source_path)
+        .with_context(|| format!("Cannot read source file {}", source_path.display()))?;
+    let source = String::from_utf8(source)?;
     let mut parser = Parser::new();
     parser.set_language(language)?;
-    let tsg = std::fs::read(tsg_path)
-        .with_context(|| format!("Error reading TSG file {}", tsg_path.display()))?;
-    let tsg = String::from_utf8(tsg)?;
-    let source = std::fs::read(source_path)
-        .with_context(|| format!("Error reading source file {}", source_path.display()))?;
-    let source = String::from_utf8(source)?;
     let tree = parser
         .parse(&source, None)
-        .ok_or_else(|| anyhow!("Could not parse {}", source_path.display()))?;
-    let file = File::from_str(language, &tsg)
-        .with_context(|| format!("Error parsing TSG file {}", tsg_path.display()))?;
+        .ok_or_else(|| anyhow!("Cannot parse {}", source_path.display()))?;
+    let allow_parse_errors = matches.is_present("allow-parse-errors");
+    if !allow_parse_errors {
+        let parse_errors = ParseError::find_all(&tree);
+        if !parse_errors.is_empty() {
+            for parse_error in parse_errors.iter().take(MAX_PARSE_ERRORS) {
+                eprintln!("{}", parse_error.display(&source, true));
+            }
+            if parse_errors.len() > MAX_PARSE_ERRORS {
+                eprintln!(
+                    "{} more parse errors omitted",
+                    parse_errors.len() - MAX_PARSE_ERRORS
+                );
+            }
+            return Err(anyhow!("Cannot parse {}", source_path.display()));
+        }
+    }
+
     let mut functions = Functions::stdlib();
     let globals = Variables::new();
     let graph = if lazy {
@@ -76,13 +104,15 @@ fn main() -> Result<()> {
     } else {
         file.execute(&tree, &source, &mut functions, &globals)
     }
-    .with_context(|| format!("Could not execute TSG file {}", tsg_path.display()))?;
+    .with_context(|| format!("Error executing TSG file {}", tsg_path.display()))?;
+
     let json = matches.is_present("json");
     if json {
         graph.display_json();
     } else if !quiet {
         print!("{}", graph.pretty_print());
     }
+
     Ok(())
 }
 
