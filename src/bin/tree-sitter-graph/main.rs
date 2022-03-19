@@ -83,15 +83,17 @@ fn main() -> Result<()> {
         .ok_or_else(|| anyhow!("Cannot parse {}", source_path.display()))?;
     let allow_parse_errors = matches.is_present("allow-parse-errors");
     if !allow_parse_errors {
-        let parse_errors = ParseError::find_all(&tree);
+        let parse_errors = ParseError::all(&tree);
         if !parse_errors.is_empty() {
             for parse_error in parse_errors.iter().take(MAX_PARSE_ERRORS) {
                 eprintln!("{}", parse_error.display(&source, true));
             }
             if parse_errors.len() > MAX_PARSE_ERRORS {
+                let more_errors = parse_errors.len() - MAX_PARSE_ERRORS;
                 eprintln!(
-                    "{} more parse errors omitted",
-                    parse_errors.len() - MAX_PARSE_ERRORS
+                    "{} more parse error{} omitted",
+                    more_errors,
+                    if more_errors > 1 { "s" } else { "" },
                 );
             }
             return Err(anyhow!("Cannot parse {}", source_path.display()));
