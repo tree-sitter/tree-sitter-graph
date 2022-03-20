@@ -86,7 +86,14 @@ fn main() -> Result<()> {
         let parse_errors = ParseError::all(&tree);
         if !parse_errors.is_empty() {
             for parse_error in parse_errors.iter().take(MAX_PARSE_ERRORS) {
-                eprintln!("{}", parse_error.display(&source, true));
+                let line = parse_error.node().start_position().row;
+                let column = parse_error.node().start_position().column;
+                eprintln!(
+                    "On line {} column {}: {}",
+                    line + 1,
+                    column + 1,
+                    parse_error.display(&source, true)
+                );
             }
             if parse_errors.len() > MAX_PARSE_ERRORS {
                 let more_errors = parse_errors.len() - MAX_PARSE_ERRORS;

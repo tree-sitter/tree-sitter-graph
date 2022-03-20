@@ -52,6 +52,13 @@ impl<'tree> ParseError<'tree> {
 }
 
 impl<'tree> ParseError<'tree> {
+    pub fn node(&self) -> &Node<'tree> {
+        match self {
+            Self::Missing(node) => node,
+            Self::Unexpected(node) => node,
+        }
+    }
+
     pub fn display(&self, source: &'tree str, verbose: bool) -> ParseErrorDisplay {
         ParseErrorDisplay {
             error: self,
@@ -81,7 +88,6 @@ impl std::fmt::Display for ParseErrorDisplay<'_> {
         };
         let line = node.start_position().row;
         let start_column = node.start_position().column;
-        write!(f, " on line {} column {}", line + 1, start_column + 1)?;
         if node.byte_range().is_empty() {
             writeln!(f, "")?;
         } else {
