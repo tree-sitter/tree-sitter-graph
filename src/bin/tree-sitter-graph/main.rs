@@ -89,7 +89,8 @@ fn main() -> Result<()> {
                 let line = parse_error.node().start_position().row;
                 let column = parse_error.node().start_position().column;
                 eprintln!(
-                    "On line {} column {}: {}",
+                    "{}:{}:{}: {}",
+                    source_path.display(),
                     line + 1,
                     column + 1,
                     parse_error.display(&source, true)
