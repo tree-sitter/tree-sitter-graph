@@ -5,6 +5,8 @@
 // Please see the LICENSE-APACHE or LICENSE-MIT files in this distribution for license details.
 // ------------------------------------------------------------------------------------------------
 
+//! Data types and functions for finding and displaying tree-sitter parse errors.
+
 use tree_sitter::Node;
 use tree_sitter::Tree;
 
