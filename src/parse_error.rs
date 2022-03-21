@@ -31,9 +31,7 @@ impl<'tree> ParseError<'tree> {
     /// This returns a type, combining the tree and the error, that can be moved safely,
     /// which is not possible with a seperate tree and error.
     pub fn into_first(tree: Tree) -> TreeWithParseErrorOption {
-        let mut errors = Vec::new();
-        find_errors(&tree, &mut errors, true);
-        crate::new_tree_with_parse_error_option!(tree, errors.into_iter().next())
+        TreeWithParseErrorOption::into_first(tree)
     }
 
     /// Return all parse errors in the given tree.
@@ -47,9 +45,7 @@ impl<'tree> ParseError<'tree> {
     /// This returns a type, combining the tree and the errors, that can be moved safely,
     /// which is not possible with a seperate tree and errors.
     pub fn into_all(tree: Tree) -> TreeWithParseErrorVec {
-        let mut errors = Vec::new();
-        find_errors(&tree, &mut errors, false);
-        crate::new_tree_with_parse_error_vec!(tree, errors)
+        TreeWithParseErrorVec::into_all(tree)
     }
 }
 
@@ -188,16 +184,6 @@ pub struct TreeWithParseError {
     error: ParseError<'static>,
 }
 
-#[macro_export]
-macro_rules! new_tree_with_parse_error {
-    ($tree:expr,$error:expr) => {{
-        TreeWithParseError {
-            error: unsafe { std::mem::transmute($error) },
-            tree: $tree,
-        }
-    }};
-}
-
 impl TreeWithParseError {
     pub fn tree(&self) -> &Tree {
         &self.tree
@@ -230,14 +216,15 @@ pub struct TreeWithParseErrorOption {
     error: Option<ParseError<'static>>,
 }
 
-#[macro_export]
-macro_rules! new_tree_with_parse_error_option {
-    ($tree:expr,$error:expr) => {{
-        TreeWithParseErrorOption {
-            error: unsafe { std::mem::transmute($error) },
-            tree: $tree,
+impl TreeWithParseErrorOption {
+    fn into_first(tree: Tree) -> TreeWithParseErrorOption {
+        let mut errors = Vec::new();
+        find_errors(&tree, &mut errors, true);
+        Self {
+            error: unsafe { std::mem::transmute(errors.into_iter().next()) },
+            tree: tree,
         }
-    }};
+    }
 }
 
 impl TreeWithParseErrorOption {
@@ -282,14 +269,15 @@ pub struct TreeWithParseErrorVec {
     errors: Vec<ParseError<'static>>,
 }
 
-#[macro_export]
-macro_rules! new_tree_with_parse_error_vec {
-    ($tree:expr,$errors:expr) => {{
+impl TreeWithParseErrorVec {
+    fn into_all(tree: Tree) -> TreeWithParseErrorVec {
+        let mut errors = Vec::new();
+        find_errors(&tree, &mut errors, false);
         TreeWithParseErrorVec {
-            errors: unsafe { std::mem::transmute($errors) },
-            tree: $tree,
+            errors: unsafe { std::mem::transmute(errors) },
+            tree: tree,
         }
-    }};
+    }
 }
 
 impl TreeWithParseErrorVec {
