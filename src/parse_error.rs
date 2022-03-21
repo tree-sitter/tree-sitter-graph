@@ -5,10 +5,12 @@
 // Please see the LICENSE-APACHE or LICENSE-MIT files in this distribution for license details.
 // ------------------------------------------------------------------------------------------------
 
+//! Data types and functions for finding and displaying tree-sitter parse errors.
+
 use tree_sitter::Node;
 use tree_sitter::Tree;
 
-/// Parse errors for tree-sitter parse tree
+/// Parse error for tree-sitter tree
 #[derive(Debug)]
 pub enum ParseError<'tree> {
     /// Error representing missing syntax
@@ -18,63 +20,44 @@ pub enum ParseError<'tree> {
 }
 
 impl<'tree> ParseError<'tree> {
-    pub fn find_first(tree: &'tree Tree) -> Option<ParseError> {
+    /// Return the first parse error in the given tree, if it exists.
+    pub fn first(tree: &Tree) -> Option<ParseError> {
         let mut errors = Vec::new();
-        Self::find_into(tree, &mut errors, true);
+        find_errors(tree, &mut errors, true);
         errors.into_iter().next()
     }
 
-    pub fn find_all(tree: &'tree Tree) -> Vec<ParseError> {
+    /// Return the tree and the first parse error in the given tree, if it exists.
+    /// This returns a type, combining the tree and the error, that can be moved safely,
+    /// which is not possible with a seperate tree and error.
+    pub fn into_first(tree: Tree) -> TreeWithParseErrorOption {
+        TreeWithParseErrorOption::into_first(tree)
+    }
+
+    /// Return all parse errors in the given tree.
+    pub fn all(tree: &'tree Tree) -> Vec<ParseError> {
         let mut errors = Vec::new();
-        Self::find_into(tree, &mut errors, true);
+        find_errors(tree, &mut errors, false);
         errors
     }
 
-    fn find_into(tree: &'tree Tree, errors: &mut Vec<ParseError<'tree>>, first_only: bool) {
-        // do not walk the tree unless there actually are errors
-        if !tree.root_node().has_error() {
-            return;
-        }
-
-        let mut cursor = tree.walk();
-        let mut did_visit_children = false;
-        loop {
-            let node = cursor.node();
-            if node.is_error() {
-                errors.push(ParseError::Unexpected(node));
-                if first_only {
-                    break;
-                }
-                did_visit_children = true;
-            } else if node.is_missing() {
-                errors.push(ParseError::Missing(node));
-                if first_only {
-                    break;
-                }
-                did_visit_children = true;
-            }
-            if did_visit_children {
-                if cursor.goto_next_sibling() {
-                    did_visit_children = false;
-                } else if cursor.goto_parent() {
-                    did_visit_children = true;
-                } else {
-                    break;
-                }
-            } else {
-                if cursor.goto_first_child() {
-                    did_visit_children = false;
-                } else {
-                    did_visit_children = true;
-                }
-            }
-        }
-        cursor.reset(tree.root_node());
+    /// Return the tree and all parse errors in the given tree.
+    /// This returns a type, combining the tree and the errors, that can be moved safely,
+    /// which is not possible with a seperate tree and errors.
+    pub fn into_all(tree: Tree) -> TreeWithParseErrorVec {
+        TreeWithParseErrorVec::into_all(tree)
     }
 }
 
 impl<'tree> ParseError<'tree> {
-    pub fn display(&'tree self, source: &'tree str, verbose: bool) -> ParseErrorDisplay<'tree> {
+    pub fn node(&self) -> &Node<'tree> {
+        match self {
+            Self::Missing(node) => node,
+            Self::Unexpected(node) => node,
+        }
+    }
+
+    pub fn display(&self, source: &'tree str, verbose: bool) -> ParseErrorDisplay {
         ParseErrorDisplay {
             error: self,
             source,
@@ -103,7 +86,6 @@ impl std::fmt::Display for ParseErrorDisplay<'_> {
         };
         let line = node.start_position().row;
         let start_column = node.start_position().column;
-        write!(f, " on line {} column {}", line + 1, start_column + 1)?;
         if node.byte_range().is_empty() {
             writeln!(f, "")?;
         } else {
@@ -138,3 +120,187 @@ impl std::fmt::Display for ParseErrorDisplay<'_> {
         Ok(())
     }
 }
+
+/// Find errors in the given tree and add those to the given errors vector
+fn find_errors<'tree>(tree: &'tree Tree, errors: &mut Vec<ParseError<'tree>>, first_only: bool) {
+    // do not walk the tree unless there actually are errors
+    if !tree.root_node().has_error() {
+        return;
+    }
+
+    let mut cursor = tree.walk();
+    let mut did_visit_children = false;
+    loop {
+        let node = cursor.node();
+        if node.is_error() {
+            errors.push(ParseError::Unexpected(node));
+            if first_only {
+                break;
+            }
+            did_visit_children = true;
+        } else if node.is_missing() {
+            errors.push(ParseError::Missing(node));
+            if first_only {
+                break;
+            }
+            did_visit_children = true;
+        }
+        if did_visit_children {
+            if cursor.goto_next_sibling() {
+                did_visit_children = false;
+            } else if cursor.goto_parent() {
+                did_visit_children = true;
+            } else {
+                break;
+            }
+        } else {
+            if cursor.goto_first_child() {
+                did_visit_children = false;
+            } else {
+                did_visit_children = true;
+            }
+        }
+    }
+    cursor.reset(tree.root_node());
+}
+
+// ------------------------------------------------------------------------------------------------
+// Types to package a tree and parse errors for that tree
+//
+// Parse errors contain `Node` values, that are parametrized by the lifetime `tree of the tree they
+// are part of. It is normally not possible to combine a value and references to that value in a single
+// data type. However, in the case of tree-sitter trees and nodes, the nodes do not point to memory in the
+// tree value, but both point to heap allocated memory. Therefore, moving the tree does not invalidate the
+// node. We use this fact to implement the TreeWithParseError* types.
+//
+// To be able to use these types in errors, we implement Send and Sync. These traits are implemented for
+// Tree, but not for Node. However, since the TreeWithParseError* types contain the tree as well as the nodes,
+// it is okay to implement Send and Sync.
+
+/// A type containing a tree and a parse error
+pub struct TreeWithParseError {
+    tree: Tree,
+    // the 'static lifetime is okay because we own `tree`
+    error: ParseError<'static>,
+}
+
+impl TreeWithParseError {
+    pub fn tree(&self) -> &Tree {
+        &self.tree
+    }
+
+    pub fn into_tree(self) -> Tree {
+        self.tree
+    }
+
+    pub fn error(&self) -> &ParseError {
+        &self.error
+    }
+}
+
+impl std::fmt::Debug for TreeWithParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", self.error)
+    }
+}
+
+// Send and Sync must be implemented for ParseError -> Node -> ffi::TSTree
+// This is okay because Send and Sync _are_ implemented for Tree, which also holds ffi::TSTree
+unsafe impl Send for TreeWithParseError {}
+unsafe impl Sync for TreeWithParseError {}
+
+/// A type containing a tree and an optional parse error
+pub struct TreeWithParseErrorOption {
+    tree: Tree,
+    // the 'static lifetime is okay because we own `tree`
+    error: Option<ParseError<'static>>,
+}
+
+impl TreeWithParseErrorOption {
+    fn into_first(tree: Tree) -> TreeWithParseErrorOption {
+        let mut errors = Vec::new();
+        find_errors(&tree, &mut errors, true);
+        Self {
+            error: unsafe { std::mem::transmute(errors.into_iter().next()) },
+            tree: tree,
+        }
+    }
+}
+
+impl TreeWithParseErrorOption {
+    pub fn tree(&self) -> &Tree {
+        &self.tree
+    }
+
+    pub fn into_tree(self) -> Tree {
+        self.tree
+    }
+
+    pub fn error(&self) -> &Option<ParseError> {
+        &self.error
+    }
+
+    pub fn into_option(self) -> Option<TreeWithParseError> {
+        match self.error {
+            None => None,
+            Some(error) => Some(TreeWithParseError {
+                tree: self.tree,
+                error,
+            }),
+        }
+    }
+}
+
+impl std::fmt::Debug for TreeWithParseErrorOption {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", self.error)
+    }
+}
+
+// Send and Sync must be implemented for ParseError -> Node -> ffi::TSTree
+// This is okay because Send and Sync _are_ implemented for Tree, which also holds ffi::TSTree
+unsafe impl Send for TreeWithParseErrorOption {}
+unsafe impl Sync for TreeWithParseErrorOption {}
+
+/// A type containing a tree and parse errors
+pub struct TreeWithParseErrorVec {
+    tree: Tree,
+    // the 'static lifetime is okay because we own `tree`
+    errors: Vec<ParseError<'static>>,
+}
+
+impl TreeWithParseErrorVec {
+    fn into_all(tree: Tree) -> TreeWithParseErrorVec {
+        let mut errors = Vec::new();
+        find_errors(&tree, &mut errors, false);
+        TreeWithParseErrorVec {
+            errors: unsafe { std::mem::transmute(errors) },
+            tree: tree,
+        }
+    }
+}
+
+impl TreeWithParseErrorVec {
+    pub fn tree(&self) -> &Tree {
+        &self.tree
+    }
+
+    pub fn into_tree(self) -> Tree {
+        self.tree
+    }
+
+    pub fn errors(&self) -> &Vec<ParseError> {
+        &self.errors
+    }
+}
+
+impl std::fmt::Debug for TreeWithParseErrorVec {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", self.errors)
+    }
+}
+
+// Send and Sync must be implemented for ParseError -> Node -> ffi::TSTree
+// This is okay because Send and Sync _are_ implemented for Tree, which also holds ffi::TSTree
+unsafe impl Send for TreeWithParseErrorVec {}
+unsafe impl Sync for TreeWithParseErrorVec {}
