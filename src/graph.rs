@@ -539,7 +539,12 @@ impl Serialize for Value {
                 map.serialize_entry("value", list)?;
                 map.end()
             }
-            Value::Set(set) => serializer.collect_seq(set),
+            Value::Set(set) => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("type", "set")?;
+                map.serialize_entry("value", set)?;
+                map.end()
+            }
             // FIXME: we don't distinguish between syntax tree node IDs, graph node IDs, and integers
             Value::SyntaxNode(node) => serializer.serialize_u32(node.index),
             Value::GraphNode(node) => serializer.serialize_u32(node.0),
