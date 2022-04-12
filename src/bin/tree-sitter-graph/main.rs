@@ -123,6 +123,7 @@ fn main() -> Result<()> {
         .with_context(|| format!("Cannot execute TSG file {}", tsg_path.display()))?;
 
     let json = matches.is_present("json");
+    let output_path = matches.value_of("output").map(|str| Path::new(str));
     if json {
         graph.display_json();
     } else if !quiet {
