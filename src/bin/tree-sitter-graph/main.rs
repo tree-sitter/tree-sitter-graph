@@ -49,6 +49,13 @@ fn main() -> Result<()> {
         .arg(Arg::with_name("scope").long("scope").takes_value(true))
         .arg(Arg::with_name("json").long("json").takes_value(false))
         .arg(
+            Arg::with_name("output")
+                .short('o')
+                .long("output")
+                .requires("json")
+                .takes_value(true),
+        )
+        .arg(
             Arg::with_name("allow-parse-errors")
                 .long("allow-parse-errors")
                 .takes_value(false),
