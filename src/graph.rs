@@ -206,7 +206,7 @@ impl<'a> Serialize for SerializeGraphNode<'a> {
         let mut map = serializer.serialize_map(None)?;
         map.serialize_entry("id", &node_index)?;
         map.serialize_entry("edges", &SerializeGraphNodeEdges(&node.outgoing_edges))?;
-        map.serialize_entry("attrs", &SerializeGraphNodeAttributes(&node.attributes))?;
+        map.serialize_entry("attrs", &node.attributes)?;
         map.end()
     }
 }
@@ -234,18 +234,6 @@ impl<'a> Serialize for SerializeGraphNodeEdge<'a> {
         let mut map = serializer.serialize_map(None)?;
         map.serialize_entry("sink", sink)?;
         map.serialize_entry("attrs", &edge.attributes)?;
-        map.end()
-    }
-}
-
-struct SerializeGraphNodeAttributes<'a>(&'a Attributes);
-
-impl<'a> Serialize for SerializeGraphNodeAttributes<'a> {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut map = serializer.serialize_map(None)?;
-        for (key, value) in &self.0.values {
-            map.serialize_entry(key, value)?;
-        }
         map.end()
     }
 }
