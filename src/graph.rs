@@ -532,7 +532,6 @@ impl Serialize for Value {
             Value::Boolean(value) => serializer.serialize_bool(*value),
             Value::Integer(value) => serializer.serialize_u32(*value),
             Value::String(value) => serializer.serialize_str(value),
-            // FIXME: there's no way to distinguish sets and lists, so we can't roundtrip accurately
             Value::List(list) => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "list")?;
@@ -545,7 +544,6 @@ impl Serialize for Value {
                 map.serialize_entry("value", set)?;
                 map.end()
             }
-            // FIXME: we don't distinguish between syntax tree node IDs, graph node IDs, and integers
             Value::SyntaxNode(node) => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "syntaxNode")?;
