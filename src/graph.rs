@@ -552,7 +552,12 @@ impl Serialize for Value {
                 map.serialize_entry("value", &node.index)?;
                 map.end()
             }
-            Value::GraphNode(node) => serializer.serialize_u32(node.0),
+            Value::GraphNode(node) => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("type", "graphNode")?;
+                map.serialize_entry("value", &node.0)?;
+                map.end()
+            }
         }
     }
 }
