@@ -125,7 +125,7 @@ fn main() -> Result<()> {
     let json = matches.is_present("json");
     let output_path = matches.value_of("output").map(|str| Path::new(str));
     if json {
-        graph.display_json();
+        graph.display_json(output_path);
     } else if !quiet {
         print!("{}", graph.pretty_print());
     }

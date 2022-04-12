@@ -15,6 +15,7 @@ use std::fmt;
 use std::hash::Hash;
 use std::ops::Index;
 use std::ops::IndexMut;
+use std::path::Path;
 
 use serde::ser::SerializeMap;
 use serde::ser::SerializeSeq;
@@ -87,7 +88,7 @@ impl<'tree> Graph<'tree> {
         DisplayGraph(self)
     }
 
-    pub fn display_json(&self) {
+    pub fn display_json(&self, _: Option<&Path>) {
         let s = serde_json::to_string_pretty(self).unwrap();
         print!("{}", s)
     }
