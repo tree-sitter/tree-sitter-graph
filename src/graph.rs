@@ -528,7 +528,11 @@ impl std::fmt::Display for Value {
 impl Serialize for Value {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
-            Value::Null => serializer.serialize_none(),
+            Value::Null => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("type", "null")?;
+                map.end()
+            }
             Value::Boolean(bool) => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "bool")?;
