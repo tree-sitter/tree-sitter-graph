@@ -547,13 +547,13 @@ impl Serialize for Value {
             Value::SyntaxNode(node) => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "syntaxNode")?;
-                map.serialize_entry("value", &node.index)?;
+                map.serialize_entry("id", &node.index)?;
                 map.end()
             }
             Value::GraphNode(node) => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "graphNode")?;
-                map.serialize_entry("value", &node.0)?;
+                map.serialize_entry("id", &node.0)?;
                 map.end()
             }
         }
