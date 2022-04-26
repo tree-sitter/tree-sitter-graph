@@ -15,6 +15,7 @@ use std::fmt;
 use std::fs::File;
 use std::hash::Hash;
 use std::io::prelude::*;
+use std::io::stdout;
 use std::io::IoSlice;
 use std::ops::Index;
 use std::ops::IndexMut;
@@ -98,10 +99,11 @@ impl<'tree> Graph<'tree> {
         match path {
             Some(output_path) => {
                 let mut output_file = File::create(output_path)?;
-                output_file.write_all(s.as_bytes())
+                output_file.write_all(s.as_bytes())?;
+                Ok(())
             }
             None => {
-                print!("{}", s);
+                stdout().write_all(s.as_bytes())?;
                 Ok(())
             }
         }
