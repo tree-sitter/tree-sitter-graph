@@ -97,8 +97,7 @@ impl<'tree> Graph<'tree> {
     pub fn display_json(&self, path: Option<&Path>) -> Result<()> {
         let s = serde_json::to_string_pretty(self).unwrap();
         path.map_or(stdout().write_all(s.as_bytes()), |path| {
-            let mut output_file = File::create(path)?;
-            output_file.write_all(s.as_bytes())
+            File::create(path)?.write_all(s.as_bytes())
         })
         .with_context(|| {
             format!(
