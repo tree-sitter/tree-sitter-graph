@@ -530,7 +530,12 @@ impl Serialize for Value {
         match self {
             Value::Null => serializer.serialize_none(),
             Value::Boolean(value) => serializer.serialize_bool(*value),
-            Value::Integer(value) => serializer.serialize_u32(*value),
+            Value::Integer(int) => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("type", "int")?;
+                map.serialize_entry("int", int)?;
+                map.end()
+            }
             Value::String(str) => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "string")?;
