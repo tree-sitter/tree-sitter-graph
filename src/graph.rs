@@ -20,6 +20,7 @@ use std::ops::Index;
 use std::ops::IndexMut;
 use std::path::Path;
 
+use anyhow::Context;
 use anyhow::Result;
 
 use serde::ser::SerializeMap;
@@ -98,13 +99,16 @@ impl<'tree> Graph<'tree> {
         match path {
             Some(output_path) => {
                 let mut output_file = File::create(output_path)?;
-                output_file.write_all(s.as_bytes())?;
-                Ok(())
+                output_file.write_all(s.as_bytes()).with_context(|| {
+                    format!(
+                        "Failed to write JSON output to {}",
+                        output_path.to_string_lossy()
+                    )
+                })
             }
-            None => {
-                stdout().write_all(s.as_bytes())?;
-                Ok(())
-            }
+            None => stdout()
+                .write_all(s.as_bytes())
+                .with_context(|| format!("Failed to write JSON output to stdout.")),
         }
     }
 
