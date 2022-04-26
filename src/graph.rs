@@ -16,7 +16,6 @@ use std::fs::File;
 use std::hash::Hash;
 use std::io::prelude::*;
 use std::io::stdout;
-use std::io::IoSlice;
 use std::ops::Index;
 use std::ops::IndexMut;
 use std::path::Path;
