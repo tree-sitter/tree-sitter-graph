@@ -529,7 +529,12 @@ impl Serialize for Value {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
             Value::Null => serializer.serialize_none(),
-            Value::Boolean(value) => serializer.serialize_bool(*value),
+            Value::Boolean(bool) => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("type", "bool")?;
+                map.serialize_entry("bool", bool)?;
+                map.end()
+            }
             Value::Integer(int) => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "int")?;
