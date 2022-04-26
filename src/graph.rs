@@ -12,10 +12,15 @@ use std::collections::hash_map::Entry;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::fmt;
+use std::fs::File;
 use std::hash::Hash;
+use std::io::prelude::*;
+use std::io::IoSlice;
 use std::ops::Index;
 use std::ops::IndexMut;
 use std::path::Path;
+
+use anyhow::Result;
 
 use serde::ser::SerializeMap;
 use serde::ser::SerializeSeq;
@@ -88,9 +93,18 @@ impl<'tree> Graph<'tree> {
         DisplayGraph(self)
     }
 
-    pub fn display_json(&self, _: Option<&Path>) {
+    pub fn display_json(&self, path: Option<&Path>) -> Result<()> {
         let s = serde_json::to_string_pretty(self).unwrap();
-        print!("{}", s)
+        match path {
+            Some(output_path) => {
+                let mut output_file = File::create(output_path)?;
+                output_file.write_all(s.as_bytes())
+            }
+            None => {
+                print!("{}", s);
+                Ok(())
+            }
+        }
     }
 
     // Returns an iterator of references to all of the nodes in the graph.
