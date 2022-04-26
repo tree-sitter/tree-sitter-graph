@@ -96,20 +96,16 @@ impl<'tree> Graph<'tree> {
 
     pub fn display_json(&self, path: Option<&Path>) -> Result<()> {
         let s = serde_json::to_string_pretty(self).unwrap();
-        match path {
-            Some(output_path) => {
-                let mut output_file = File::create(output_path)?;
-                output_file.write_all(s.as_bytes()).with_context(|| {
-                    format!(
-                        "Failed to write JSON output to {}",
-                        output_path.to_string_lossy()
-                    )
-                })
-            }
-            None => stdout()
-                .write_all(s.as_bytes())
-                .with_context(|| format!("Failed to write JSON output to stdout.")),
-        }
+        path.map_or(stdout().write_all(s.as_bytes()), |path| {
+            let mut output_file = File::create(path)?;
+            output_file.write_all(s.as_bytes())
+        })
+        .with_context(|| {
+            format!(
+                "Failed to write JSON to {}",
+                path.map_or("stdout", |path| path.to_str().unwrap_or("output path"))
+            )
+        })
     }
 
     // Returns an iterator of references to all of the nodes in the graph.
