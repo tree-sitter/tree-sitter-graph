@@ -535,13 +535,13 @@ impl Serialize for Value {
             Value::List(list) => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "list")?;
-                map.serialize_entry("value", list)?;
+                map.serialize_entry("values", list)?;
                 map.end()
             }
             Value::Set(set) => {
                 let mut map = serializer.serialize_map(None)?;
                 map.serialize_entry("type", "set")?;
-                map.serialize_entry("value", set)?;
+                map.serialize_entry("values", set)?;
                 map.end()
             }
             Value::SyntaxNode(node) => {
