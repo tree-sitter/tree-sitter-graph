@@ -50,7 +50,7 @@ fn main() -> Result<()> {
         .arg(Arg::with_name("json").long("json").takes_value(false))
         .arg(
             Arg::with_name("output")
-                .short('o')
+                .short("o")
                 .long("output")
                 .requires("json")
                 .takes_value(true),
