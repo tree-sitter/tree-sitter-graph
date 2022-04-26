@@ -528,16 +528,53 @@ impl std::fmt::Display for Value {
 impl Serialize for Value {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
-            Value::Null => serializer.serialize_none(),
-            Value::Boolean(value) => serializer.serialize_bool(*value),
-            Value::Integer(value) => serializer.serialize_u32(*value),
-            Value::String(value) => serializer.serialize_str(value),
-            // FIXME: there's no way to distinguish sets and lists, so we can't roundtrip accurately
-            Value::List(list) => serializer.collect_seq(list),
-            Value::Set(set) => serializer.collect_seq(set),
-            // FIXME: we don't distinguish between syntax tree node IDs, graph node IDs, and integers
-            Value::SyntaxNode(node) => serializer.serialize_u32(node.index),
-            Value::GraphNode(node) => serializer.serialize_u32(node.0),
+            Value::Null => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("type", "null")?;
+                map.end()
+            }
+            Value::Boolean(bool) => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("type", "bool")?;
+                map.serialize_entry("bool", bool)?;
+                map.end()
+            }
+            Value::Integer(int) => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("type", "int")?;
+                map.serialize_entry("int", int)?;
+                map.end()
+            }
+            Value::String(str) => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("type", "string")?;
+                map.serialize_entry("string", str)?;
+                map.end()
+            }
+            Value::List(list) => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("type", "list")?;
+                map.serialize_entry("values", list)?;
+                map.end()
+            }
+            Value::Set(set) => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("type", "set")?;
+                map.serialize_entry("values", set)?;
+                map.end()
+            }
+            Value::SyntaxNode(node) => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("type", "syntaxNode")?;
+                map.serialize_entry("id", &node.index)?;
+                map.end()
+            }
+            Value::GraphNode(node) => {
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("type", "graphNode")?;
+                map.serialize_entry("id", &node.0)?;
+                map.end()
+            }
         }
     }
 }
