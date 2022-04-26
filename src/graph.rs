@@ -12,9 +12,16 @@ use std::collections::hash_map::Entry;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::fmt;
+use std::fs::File;
 use std::hash::Hash;
+use std::io::prelude::*;
+use std::io::stdout;
 use std::ops::Index;
 use std::ops::IndexMut;
+use std::path::Path;
+
+use anyhow::Context;
+use anyhow::Result;
 
 use serde::ser::SerializeMap;
 use serde::ser::SerializeSeq;
@@ -87,9 +94,17 @@ impl<'tree> Graph<'tree> {
         DisplayGraph(self)
     }
 
-    pub fn display_json(&self) {
+    pub fn display_json(&self, path: Option<&Path>) -> Result<()> {
         let s = serde_json::to_string_pretty(self).unwrap();
-        print!("{}", s)
+        path.map_or(stdout().write_all(s.as_bytes()), |path| {
+            File::create(path)?.write_all(s.as_bytes())
+        })
+        .with_context(|| {
+            format!(
+                "Failed to write JSON to {}",
+                path.map_or("stdout", |path| path.to_str().unwrap_or("output path"))
+            )
+        })
     }
 
     // Returns an iterator of references to all of the nodes in the graph.

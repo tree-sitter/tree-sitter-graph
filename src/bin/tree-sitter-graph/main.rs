@@ -49,6 +49,13 @@ fn main() -> Result<()> {
         .arg(Arg::with_name("scope").long("scope").takes_value(true))
         .arg(Arg::with_name("json").long("json").takes_value(false))
         .arg(
+            Arg::with_name("output")
+                .short("o")
+                .long("output")
+                .requires("json")
+                .takes_value(true),
+        )
+        .arg(
             Arg::with_name("allow-parse-errors")
                 .long("allow-parse-errors")
                 .takes_value(false),
@@ -116,8 +123,9 @@ fn main() -> Result<()> {
         .with_context(|| format!("Cannot execute TSG file {}", tsg_path.display()))?;
 
     let json = matches.is_present("json");
+    let output_path = matches.value_of("output").map(|str| Path::new(str));
     if json {
-        graph.display_json();
+        graph.display_json(output_path).unwrap_or(());
     } else if !quiet {
         print!("{}", graph.pretty_print());
     }
