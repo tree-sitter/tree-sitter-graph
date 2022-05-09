@@ -13,6 +13,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Report query errors with correct source locations.
 
+### Library
+
+#### Changed
+
+- In JSON output, all values are represented as objects with a `type` field
+  indicating the value type, and additional value fields that vary per type.
+
+### CLI
+
+#### Added
+
+- Flag `--output`/`-o` to set JSON output path.
+
 ## 0.4.0 -- 2022-03-21
 
 ### DSL
