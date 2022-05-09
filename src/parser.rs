@@ -227,7 +227,8 @@ impl<'a> Parser<'a> {
             }
             self.consume_whitespace();
         }
-        file.query = Some(Query::new(file.language, &self.query_source)?);
+        // we can unwrap here because all queries have already been parsed before
+        file.query = Some(Query::new(file.language, &self.query_source).unwrap());
         Ok(())
     }
 
@@ -292,16 +293,21 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_query(&mut self, language: Language) -> Result<Query, ParseError> {
+        let location = self.location;
         let query_start = self.offset;
         self.skip_query()?;
         let query_end = self.offset;
         let query_source = self.source[query_start..query_end].to_owned() + "@" + FULL_MATCH;
         // If tree-sitter allowed us to incrementally add patterns to a query, we wouldn't need
-        // the global query_source and could compute the cpature indices in the AST instead of
-        // having to resolve the capture names at execution time.
+        // the global query_source.
         self.query_source += &query_source;
         self.query_source += "\n";
-        Ok(Query::new(language, &query_source)?)
+        let query = Query::new(language, &query_source).map_err(|mut e| {
+            e.row += location.row;
+            e.offset += query_start;
+            e
+        })?;
+        Ok(query)
     }
 
     fn skip_query(&mut self) -> Result<(), ParseError> {
