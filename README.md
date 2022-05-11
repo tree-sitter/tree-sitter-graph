@@ -8,6 +8,7 @@ structures from source code that has been parsed using [tree-sitter][].
 - [Language Reference](https://docs.rs/tree-sitter-graph/*/tree_sitter_graph/reference/)
 - [API documentation](https://docs.rs/tree-sitter-graph/)
 - [Release notes](https://github.com/tree-sitter/tree-sitter-graph/blob/main/CHANGELOG.md)
+- [VS Code Extension](https://marketplace.visualstudio.com/items?itemName=tree-sitter.tree-sitter-graph)
 
 ## Usage
 
