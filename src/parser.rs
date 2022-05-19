@@ -70,6 +70,8 @@ pub enum ParseError {
     UnexpectedKeyword(String, Location),
     #[error("Unexpected literal '#{0}' at {1}")]
     UnexpectedLiteral(String, Location),
+    #[error("Query contains multiple patterns {0}")]
+    UnexpectedQueryPatterns(Location),
     #[error(transparent)]
     Check(#[from] crate::checker::CheckError),
     #[error(transparent)]
@@ -305,6 +307,9 @@ impl<'a> Parser<'a> {
             e.offset += query_start;
             e
         })?;
+        if query.pattern_count() > 1 {
+            return Err(ParseError::UnexpectedQueryPatterns(location));
+        }
         Ok(query)
     }
 
