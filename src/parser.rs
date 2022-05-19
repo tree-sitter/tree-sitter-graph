@@ -70,7 +70,7 @@ pub enum ParseError {
     UnexpectedKeyword(String, Location),
     #[error("Unexpected literal '#{0}' at {1}")]
     UnexpectedLiteral(String, Location),
-    #[error("Query contains multiple patterns {0}")]
+    #[error("Query contains multiple patterns at {0}")]
     UnexpectedQueryPatterns(Location),
     #[error(transparent)]
     Check(#[from] crate::checker::CheckError),
