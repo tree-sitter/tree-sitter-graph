@@ -60,8 +60,6 @@ pub enum ParseError {
     InvalidRegex(String, Location),
     #[error("Expected integer constant in regex capture at {0}")]
     InvalidRegexCapture(Location),
-    // TODO: The positions in the wrapped QueryError will be incorrect, since they will count the
-    // row/column from the start of the query, not from the start of the file.
     #[error("Invalid query pattern: {}", _0.message)]
     QueryError(#[from] QueryError),
     #[error("Unexpected character '{0}' in {1} at {2}")]
