@@ -60,8 +60,6 @@ pub enum ParseError {
     InvalidRegex(String, Location),
     #[error("Expected integer constant in regex capture at {0}")]
     InvalidRegexCapture(Location),
-    // TODO: The positions in the wrapped QueryError will be incorrect, since they will count the
-    // row/column from the start of the query, not from the start of the file.
     #[error("Invalid query pattern: {}", _0.message)]
     QueryError(#[from] QueryError),
     #[error("Unexpected character '{0}' in {1} at {2}")]
@@ -72,6 +70,8 @@ pub enum ParseError {
     UnexpectedKeyword(String, Location),
     #[error("Unexpected literal '#{0}' at {1}")]
     UnexpectedLiteral(String, Location),
+    #[error("Query contains multiple patterns at {0}")]
+    UnexpectedQueryPatterns(Location),
     #[error(transparent)]
     Check(#[from] crate::checker::CheckError),
     #[error(transparent)]
@@ -307,6 +307,9 @@ impl<'a> Parser<'a> {
             e.offset += query_start;
             e
         })?;
+        if query.pattern_count() > 1 {
+            return Err(ParseError::UnexpectedQueryPatterns(location));
+        }
         Ok(query)
     }
 

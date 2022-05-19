@@ -1519,3 +1519,16 @@ fn can_parse_shorthand() {
         }]
     );
 }
+
+#[test]
+fn cannot_parse_multiple_patterns() {
+    let source = r#"
+        (function_definition)
+        (pass_statement)
+        {
+        }
+    "#;
+    if let Ok(_) = File::from_str(tree_sitter_python::language(), source) {
+        panic!("Parse succeeded unexpectedly");
+    }
+}
