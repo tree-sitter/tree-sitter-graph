@@ -148,7 +148,12 @@ impl LazyScopedVariables {
                 let mut map = HashMap::new();
                 let mut debug_infos = HashMap::new();
                 for (scope, value, debug_info) in pairs.into_iter() {
-                    let node = scope.evaluate_as_syntax_node(exec)?;
+                    let node = scope.evaluate_as_syntax_node(exec).with_context(|| {
+                        format!(
+                            "Evaluating scope of variable _.{} set at {}",
+                            name, debug_info
+                        )
+                    })?;
                     let prev_debug_info = debug_infos.insert(node, debug_info.clone());
                     match map.insert(node, value.clone()) {
                         Some(_) => {
