@@ -777,7 +777,7 @@ impl ScopedVariable {
             Value::SyntaxNode(scope) => scope,
             _ => {
                 return Err(ExecutionError::InvalidVariableScope(format!(
-                    " got {}",
+                    "got {}",
                     scope
                 )))
             }
@@ -804,7 +804,7 @@ impl ScopedVariable {
             Value::SyntaxNode(scope) => scope,
             _ => {
                 return Err(ExecutionError::InvalidVariableScope(format!(
-                    " got {}",
+                    "got {}",
                     scope
                 )))
             }
@@ -821,7 +821,7 @@ impl ScopedVariable {
             Value::SyntaxNode(scope) => scope,
             _ => {
                 return Err(ExecutionError::InvalidVariableScope(format!(
-                    " got {}",
+                    "got {}",
                     scope,
                 )))
             }
