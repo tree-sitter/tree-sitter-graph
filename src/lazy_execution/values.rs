@@ -138,7 +138,7 @@ impl LazyValue {
         let node = self.evaluate(exec)?;
         match node {
             Value::GraphNode(node) => Ok(node),
-            _ => Err(ExecutionError::ExpectedGraphNode(format!(" got {}", node))),
+            _ => Err(ExecutionError::ExpectedGraphNode(format!("got {}", node))),
         }
     }
 
@@ -149,7 +149,7 @@ impl LazyValue {
         let node = self.evaluate(exec)?;
         match node {
             Value::SyntaxNode(node) => Ok(node),
-            _ => Err(ExecutionError::ExpectedSyntaxNode(format!(" got {}", node))),
+            _ => Err(ExecutionError::ExpectedSyntaxNode(format!("got {}", node))),
         }
     }
 }
