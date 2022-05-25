@@ -29,6 +29,8 @@ pub struct File {
     pub stanzas: Vec<Stanza>,
     /// Attribute shorthands defined in the file
     pub shorthands: AttributeShorthands,
+    /// Procedures defined in the file
+    pub procedures: Procedures,
 }
 
 impl File {
@@ -39,6 +41,7 @@ impl File {
             query: None,
             stanzas: Vec::new(),
             shorthands: AttributeShorthands::new(),
+            procedures: Procedures::new(),
         }
     }
 }
@@ -86,6 +89,8 @@ pub enum Statement {
     If(If),
     // ForIn
     ForIn(ForIn),
+    // ForIn
+    Call(ProcedureCall),
 }
 
 impl std::fmt::Display for Statement {
@@ -102,6 +107,7 @@ impl std::fmt::Display for Statement {
             Self::Print(stmt) => stmt.fmt(f),
             Self::If(stmt) => stmt.fmt(f),
             Self::ForIn(stmt) => stmt.fmt(f),
+            Self::Call(stmt) => stmt.fmt(f),
         }
     }
 }
@@ -459,6 +465,26 @@ impl std::fmt::Display for ForIn {
             "for {} in {} {{ ... }} at {}",
             self.variable, self.value, self.location,
         )
+    }
+}
+
+/// Procedure call
+#[derive(Debug, Eq, PartialEq)]
+pub struct ProcedureCall {
+    pub name: Identifier,
+    pub arguments: Vec<Expression>,
+    pub location: Location,
+}
+
+impl From<ProcedureCall> for Statement {
+    fn from(statement: ProcedureCall) -> Statement {
+        Statement::Call(statement)
+    }
+}
+
+impl std::fmt::Display for ProcedureCall {
+    fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
+        write!(f, "call {}(...) at {}", self.name, self.location,)
     }
 }
 
@@ -827,10 +853,79 @@ pub struct AttributeShorthand {
 
 impl std::fmt::Display for AttributeShorthand {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "attribute {} = {} =>", self.name, self.variable,)?;
+        write!(f, "attr {} = {} =>", self.name, self.variable,)?;
         for attr in &self.attributes {
             write!(f, " {}", attr)?;
         }
         write!(f, " at {}", self.location)
+    }
+}
+
+/// Procedures
+#[derive(Debug, Eq, PartialEq)]
+pub struct Procedures(HashMap<Identifier, Procedure>);
+
+impl Procedures {
+    pub fn new() -> Self {
+        Self(HashMap::new())
+    }
+
+    pub fn get(&self, name: &Identifier) -> Option<&Procedure> {
+        self.0.get(name)
+    }
+
+    pub fn add(&mut self, procedure: Procedure) {
+        self.0.insert(procedure.name.clone(), procedure);
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &Procedure> {
+        self.0.values()
+    }
+
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Procedure> {
+        self.0.values_mut()
+    }
+
+    pub fn into_iter(self) -> impl Iterator<Item = Procedure> {
+        self.0.into_values()
+    }
+}
+
+/// A procedure
+#[derive(Debug, Eq, PartialEq)]
+pub struct Procedure {
+    pub name: Identifier,
+    pub parameters: Vec<Parameter>,
+    pub statements: Vec<Statement>,
+    pub location: Location,
+}
+
+impl std::fmt::Display for Procedure {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "proc {} {{ ... }}", self.name)?;
+        write!(f, " at {}", self.location)
+    }
+}
+
+/// A parameter
+#[derive(Debug, Eq, PartialEq)]
+pub struct Parameter {
+    pub name: Identifier,
+    pub quantifier: CaptureQuantifier,
+}
+
+impl std::fmt::Display for Parameter {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}{}", self.name, display_quantifier(self.quantifier))
+    }
+}
+
+fn display_quantifier(quantifier: CaptureQuantifier) -> &'static str {
+    match quantifier {
+        CaptureQuantifier::OneOrMore => "+",
+        CaptureQuantifier::One => "",
+        CaptureQuantifier::ZeroOrMore => "*",
+        CaptureQuantifier::ZeroOrOne => "?",
+        CaptureQuantifier::Zero => "!",
     }
 }

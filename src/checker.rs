@@ -5,10 +5,12 @@
 // Please see the LICENSE-APACHE or LICENSE-MIT files in this distribution for license details.
 // ------------------------------------------------------------------------------------------------
 
+use std::collections::HashMap;
 use thiserror::Error;
 use tree_sitter::CaptureQuantifier;
 use tree_sitter::CaptureQuantifier::One;
 use tree_sitter::CaptureQuantifier::OneOrMore;
+use tree_sitter::CaptureQuantifier::Zero;
 use tree_sitter::CaptureQuantifier::ZeroOrMore;
 use tree_sitter::CaptureQuantifier::ZeroOrOne;
 use tree_sitter::Query;
@@ -18,6 +20,7 @@ use crate::parser::FULL_MATCH;
 use crate::variables::VariableError;
 use crate::variables::VariableMap;
 use crate::variables::Variables;
+use crate::Identifier;
 use crate::Location;
 
 #[derive(Debug, Error)]
@@ -34,24 +37,49 @@ pub enum CheckError {
     ExpectedLocalValue(Location),
     #[error("Expected optional value at {0}")]
     ExpectedOptionalValue(Location),
+    #[error("Not in query context")]
+    NotInQueryContext,
     #[error("Nullable regular expression /{0}/ at {1}")]
     NullableRegex(String, Location),
     #[error("Undefined syntax capture @{0} at {1}")]
     UndefinedSyntaxCapture(String, Location),
     #[error("Undefined variable {0} at {1}")]
     UndefinedVariable(String, Location),
+    #[error("Undefined procedure {0} at {1}")]
+    UndefinedProcedure(String, Location),
     #[error("{0}: {1}")]
     Variable(VariableError, String),
+    #[error("Wrong number of arguments, got {0}, expected {1}")]
+    WrongNumberOfArguments(usize, usize),
 }
 
 /// Checker context
 struct CheckContext<'a> {
     globals: &'a dyn Variables<ExpressionResult>,
-    file_query: &'a Query,
-    stanza_index: usize,
-    stanza_query: &'a Query,
+    procedures: &'a Procedures,
+    file_query: Option<&'a Query>,
+    stanza_index: Option<usize>,
+    stanza_query: Option<&'a Query>,
     locals: &'a mut dyn Variables<ExpressionResult>,
 }
+
+impl<'a> CheckContext<'a> {
+    fn file_query(&self) -> Result<&'a Query, CheckError> {
+        self.file_query.ok_or_else(|| CheckError::NotInQueryContext)
+    }
+
+    fn stanza_index(&self) -> Result<usize, CheckError> {
+        self.stanza_index
+            .ok_or_else(|| CheckError::NotInQueryContext)
+    }
+
+    fn stanza_query(&self) -> Result<&'a Query, CheckError> {
+        self.stanza_query
+            .ok_or_else(|| CheckError::NotInQueryContext)
+    }
+}
+
+type Procedures = HashMap<Identifier, Vec<CaptureQuantifier>>;
 
 //-----------------------------------------------------------------------------
 // File
@@ -76,9 +104,23 @@ impl ast::File {
                     )
                 })?;
         }
+        let mut procedures = HashMap::new();
+        for procedure in self.procedures.iter() {
+            procedures.insert(
+                procedure.name.clone(),
+                procedure
+                    .parameters
+                    .iter()
+                    .map(|p| p.quantifier)
+                    .collect::<Vec<_>>(),
+            );
+        }
+        for procedure in self.procedures.iter_mut() {
+            procedure.check(&globals, &procedures)?;
+        }
         let file_query = self.query.as_ref().unwrap();
         for (index, stanza) in self.stanzas.iter_mut().enumerate() {
-            stanza.check(&globals, file_query, index)?;
+            stanza.check(&globals, &procedures, file_query, index)?;
         }
         Ok(())
     }
@@ -91,19 +133,23 @@ impl ast::Stanza {
     fn check(
         &mut self,
         globals: &dyn Variables<ExpressionResult>,
+        procedures: &Procedures,
         file_query: &Query,
         stanza_index: usize,
     ) -> Result<(), CheckError> {
         let mut locals = VariableMap::new();
         let mut ctx = CheckContext {
             globals,
-            file_query,
-            stanza_index,
-            stanza_query: &self.query,
+            procedures,
+            file_query: Some(file_query),
+            stanza_index: Some(stanza_index),
+            stanza_query: Some(&self.query),
             locals: &mut locals,
         };
-        self.full_match_file_capture_index =
-            ctx.file_query.capture_index_for_name(FULL_MATCH).unwrap() as usize;
+        self.full_match_file_capture_index = ctx
+            .file_query()?
+            .capture_index_for_name(FULL_MATCH)
+            .unwrap() as usize;
         for statement in &mut self.statements {
             statement.check(&mut ctx)?;
         }
@@ -128,6 +174,7 @@ impl ast::Statement {
             Self::Print(stmt) => stmt.check(ctx),
             Self::If(stmt) => stmt.check(ctx),
             Self::ForIn(stmt) => stmt.check(ctx),
+            Self::Call(stmt) => stmt.check(ctx),
         }
     }
 }
@@ -222,6 +269,7 @@ impl ast::Scan {
             let mut arm_locals = VariableMap::nested(ctx.locals);
             let mut arm_ctx = CheckContext {
                 globals: ctx.globals,
+                procedures: ctx.procedures,
                 file_query: ctx.file_query,
                 stanza_index: ctx.stanza_index,
                 stanza_query: ctx.stanza_query,
@@ -255,6 +303,7 @@ impl ast::If {
             let mut arm_locals = VariableMap::nested(ctx.locals);
             let mut arm_ctx = CheckContext {
                 globals: ctx.globals,
+                procedures: ctx.procedures,
                 file_query: ctx.file_query,
                 stanza_index: ctx.stanza_index,
                 stanza_query: ctx.stanza_query,
@@ -305,6 +354,7 @@ impl ast::ForIn {
         let mut loop_locals = VariableMap::nested(ctx.locals);
         let mut loop_ctx = CheckContext {
             globals: ctx.globals,
+            procedures: ctx.procedures,
             file_query: ctx.file_query,
             stanza_index: ctx.stanza_index,
             stanza_query: ctx.stanza_query,
@@ -317,6 +367,57 @@ impl ast::ForIn {
         }
         Ok(())
     }
+}
+
+impl ast::ProcedureCall {
+    fn check(&mut self, ctx: &mut CheckContext) -> Result<(), CheckError> {
+        let parameters = match ctx.procedures.get(&self.name) {
+            Some(procedure) => procedure,
+            None => {
+                return Err(CheckError::UndefinedProcedure(
+                    self.name.to_string(),
+                    self.location,
+                ))
+            }
+        };
+        let mut argument_results = Vec::new();
+        for argument in &mut self.arguments {
+            let argument_result = argument.check(ctx)?;
+            argument_results.push(argument_result);
+        }
+        if argument_results.len() != parameters.len() {
+            return Err(CheckError::WrongNumberOfArguments(
+                argument_results.len(),
+                parameters.len(),
+            ));
+        }
+        for (argument_result, parameter) in argument_results.iter().zip(parameters.iter()) {
+            check_quantifier(*parameter, argument_result.quantifier, self.location)?;
+        }
+        Ok(())
+    }
+}
+
+fn check_quantifier(
+    expected: CaptureQuantifier,
+    actual: CaptureQuantifier,
+    location: Location,
+) -> Result<(), CheckError> {
+    match expected {
+        One => {}
+        ZeroOrOne => {
+            if actual != ZeroOrOne {
+                return Err(CheckError::ExpectedOptionalValue(location));
+            }
+        }
+        ZeroOrMore | OneOrMore => {
+            if ![ZeroOrMore, OneOrMore].contains(&actual) {
+                return Err(CheckError::ExpectedListValue(location));
+            }
+        }
+        Zero => unreachable!(),
+    }
+    Ok(())
 }
 
 //-----------------------------------------------------------------------------
@@ -417,6 +518,7 @@ impl ast::ListComprehension {
         let mut loop_locals = VariableMap::nested(ctx.locals);
         let mut loop_ctx = CheckContext {
             globals: ctx.globals,
+            procedures: ctx.procedures,
             file_query: ctx.file_query,
             stanza_index: ctx.stanza_index,
             stanza_query: ctx.stanza_query,
@@ -446,6 +548,7 @@ impl ast::SetComprehension {
         let mut loop_locals = VariableMap::nested(ctx.locals);
         let mut loop_ctx = CheckContext {
             globals: ctx.globals,
+            procedures: ctx.procedures,
             file_query: ctx.file_query,
             stanza_index: ctx.stanza_index,
             stanza_query: ctx.stanza_query,
@@ -466,13 +569,13 @@ impl ast::Capture {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
         let name = self.name.to_string();
         self.stanza_capture_index = ctx
-            .stanza_query
+            .stanza_query()?
             .capture_index_for_name(&name)
             .ok_or_else(|| CheckError::UndefinedSyntaxCapture(name.clone(), self.location))?
             as usize;
-        self.file_capture_index = ctx.file_query.capture_index_for_name(&name).unwrap() as usize;
+        self.file_capture_index = ctx.file_query()?.capture_index_for_name(&name).unwrap() as usize;
         self.quantifier =
-            ctx.file_query.capture_quantifiers(ctx.stanza_index)[self.file_capture_index];
+            ctx.file_query()?.capture_quantifiers(ctx.stanza_index()?)[self.file_capture_index];
         Ok(ExpressionResult {
             is_local: true,
             quantifier: self.quantifier,
@@ -595,7 +698,7 @@ impl ast::UnscopedVariable {
         .cloned()
         // TODO deprecated support for undeclared globals
         .or_else(|| {
-            eprintln!("Use of undeclared global variable {} is deprecated. Fix by adding an explicit declaration `global {}`", self.name, self.name);
+            eprintln!("Use of undeclared global variable {} at {} is deprecated. Fix by adding an explicit declaration `global {}`", self.name, self.location, self.name);
             Some(ExpressionResult {
                 quantifier: One,
                 is_local: true,
@@ -640,6 +743,43 @@ impl ast::ScopedVariable {
 impl ast::Attribute {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<(), CheckError> {
         self.value.check(ctx)?;
+        Ok(())
+    }
+}
+
+//-----------------------------------------------------------------------------
+// Procedures
+
+impl ast::Procedure {
+    fn check(
+        &mut self,
+        globals: &dyn Variables<ExpressionResult>,
+        procedures: &Procedures,
+    ) -> Result<(), CheckError> {
+        let mut locals = VariableMap::new();
+        for parameter in &self.parameters {
+            locals
+                .add(
+                    parameter.name.clone(),
+                    ExpressionResult {
+                        is_local: false,
+                        quantifier: parameter.quantifier,
+                    },
+                    false,
+                )
+                .map_err(|e| CheckError::Variable(e, format!("{}", parameter.name)))?;
+        }
+        let mut ctx = CheckContext {
+            globals,
+            procedures,
+            file_query: None,
+            stanza_index: None,
+            stanza_query: None,
+            locals: &mut locals,
+        };
+        for statement in &mut self.statements {
+            statement.check(&mut ctx)?;
+        }
         Ok(())
     }
 }

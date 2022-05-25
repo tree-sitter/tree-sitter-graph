@@ -1532,3 +1532,87 @@ fn cannot_parse_multiple_patterns() {
         panic!("Parse succeeded unexpectedly");
     }
 }
+
+#[test]
+fn can_parse_procedure() {
+    let source = r#"
+        (pass_statement) {
+          node n
+          call add_attr(n)
+        }
+
+        proc add_attr(n) {
+            attr (n) sh = "name"
+        }
+    "#;
+    let file = File::from_str(tree_sitter_python::language(), source).expect("Cannot parse file");
+
+    assert_eq!(
+        file.stanzas[0].statements[1],
+        ProcedureCall {
+            name: "add_attr".into(),
+            arguments: vec![UnscopedVariable {
+                name: "n".into(),
+                location: Location { row: 3, column: 24 }
+            }
+            .into()],
+            location: Location { row: 3, column: 10 },
+        }
+        .into()
+    );
+
+    let procedures = file.procedures.into_iter().collect::<Vec<_>>();
+    assert_eq!(
+        procedures,
+        vec![Procedure {
+            name: "add_attr".into(),
+            parameters: vec![Parameter {
+                name: "n".into(),
+                quantifier: One
+            }],
+            statements: vec![AddGraphNodeAttribute {
+                node: UnscopedVariable {
+                    name: "n".into(),
+                    location: Location { row: 7, column: 18 }
+                }
+                .into(),
+                attributes: vec![Attribute {
+                    name: "sh".into(),
+                    value: StringConstant {
+                        value: "name".into()
+                    }
+                    .into()
+                }],
+                location: Location { row: 7, column: 12 },
+            }
+            .into()],
+            location: Location { row: 6, column: 13 }
+        }]
+    );
+}
+
+#[test]
+fn cannot_parse_multiple_procedures_with_same_name() {
+    let source = r#"
+        proc add_name(n) {}
+        proc add_name(n) {}
+    "#;
+    if let Ok(_) = File::from_str(tree_sitter_python::language(), source) {
+        panic!("Parse succeeded unexpectedly");
+    }
+}
+
+#[test]
+fn cannot_parse_procedure_call_with_incorrect_number_of_arguments() {
+    let source = r#"
+        (pass_statement)
+        {
+            node n
+            call add_name(n)
+        }
+        proc add_name(n) {}
+    "#;
+    if let Ok(_) = File::from_str(tree_sitter_python::language(), source) {
+        panic!("Parse succeeded unexpectedly");
+    }
+}

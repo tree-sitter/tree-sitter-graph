@@ -213,14 +213,18 @@ impl<'a> Parser<'a> {
     fn parse_into_file(&mut self, file: &mut ast::File) -> Result<(), ParseError> {
         self.consume_whitespace();
         while self.try_peek().is_some() {
-            if let Ok(_) = self.consume_token("global") {
+            if self.consume_token("global").is_ok() {
                 self.consume_whitespace();
                 let global = self.parse_global()?;
                 file.globals.push(global);
-            } else if let Ok(_) = self.consume_token("attribute") {
+            } else if self.consume_token("attribute").is_ok() {
                 self.consume_whitespace();
                 let shorthand = self.parse_shorthand()?;
                 file.shorthands.add(shorthand);
+            } else if self.consume_token("proc").is_ok() {
+                self.consume_whitespace();
+                let procedure = self.parse_procedure()?;
+                file.procedures.add(procedure);
             } else {
                 let stanza = self.parse_stanza(file.language)?;
                 file.stanzas.push(stanza);
@@ -235,7 +239,14 @@ impl<'a> Parser<'a> {
     fn parse_global(&mut self) -> Result<ast::Global, ParseError> {
         let location = self.location;
         let name = self.parse_identifier("global variable")?;
-        let quantifier = self.parse_quantifier()?;
+        let quantifier_location = self.location;
+        let quantifier = if let Some(quantifier) = self.try_parse_quantifier() {
+            quantifier
+        } else if self.try_peek().map(|c| c.is_whitespace()).unwrap_or(true) {
+            One
+        } else {
+            return Err(ParseError::ExpectedQuantifier(quantifier_location));
+        };
         Ok(ast::Global {
             name,
             quantifier,
@@ -262,21 +273,21 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_quantifier(&mut self) -> Result<CaptureQuantifier, ParseError> {
+    fn try_parse_quantifier(&mut self) -> Option<CaptureQuantifier> {
         let mut quantifier = One;
         if let Some(c) = self.try_peek() {
-            self.skip().unwrap();
             if c == '?' {
                 quantifier = ZeroOrOne;
             } else if c == '*' {
                 quantifier = ZeroOrMore;
             } else if c == '+' {
                 quantifier = OneOrMore;
-            } else if !c.is_whitespace() {
-                return Err(ParseError::ExpectedQuantifier(self.location));
+            } else {
+                return None;
             }
         }
-        Ok(quantifier)
+        self.skip().unwrap();
+        Some(quantifier)
     }
 
     fn parse_stanza(&mut self, language: Language) -> Result<ast::Stanza, ParseError> {
@@ -583,6 +594,20 @@ impl<'a> Parser<'a> {
                 location: keyword_location,
             }
             .into())
+        } else if keyword == "call" {
+            self.consume_whitespace();
+            let name = self.parse_identifier("procedure")?;
+            self.consume_whitespace();
+            self.consume_token("(")?;
+            self.consume_whitespace();
+            let arguments = self.parse_sequence(')')?;
+            self.consume_token(")")?;
+            Ok(ast::ProcedureCall {
+                name,
+                arguments,
+                location: keyword_location,
+            }
+            .into())
         } else {
             Err(ParseError::UnexpectedKeyword(
                 keyword.into(),
@@ -629,6 +654,44 @@ impl<'a> Parser<'a> {
         };
         self.consume_whitespace();
         Ok(condition)
+    }
+
+    fn parse_procedure(&mut self) -> Result<ast::Procedure, ParseError> {
+        let location = self.location;
+        let name = self.parse_identifier("procedure")?;
+        self.consume_whitespace();
+        self.consume_token("(")?;
+        self.consume_whitespace();
+        let parameters = self.parse_parameters(')')?;
+        self.consume_token(")")?;
+        self.consume_whitespace();
+        let statements = self.parse_statements()?;
+        Ok(ast::Procedure {
+            name,
+            parameters,
+            statements,
+            location,
+        })
+    }
+
+    fn parse_parameters(&mut self, end_marker: char) -> Result<Vec<ast::Parameter>, ParseError> {
+        let mut elements = Vec::new();
+        while self.peek()? != end_marker {
+            elements.push(self.parse_parameter()?);
+            self.consume_whitespace();
+            if self.peek()? != end_marker {
+                self.consume_token(",")?;
+                self.consume_whitespace();
+            }
+        }
+        Ok(elements)
+    }
+
+    fn parse_parameter(&mut self) -> Result<ast::Parameter, ParseError> {
+        let name = self.parse_identifier("parameter")?;
+        self.consume_whitespace();
+        let quantifier = self.try_parse_quantifier().unwrap_or(One);
+        Ok(ast::Parameter { name, quantifier })
     }
 
     fn parse_identifier(&mut self, within: &'static str) -> Result<Identifier, ParseError> {

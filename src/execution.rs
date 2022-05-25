@@ -343,6 +343,7 @@ impl Statement {
             Statement::Print(statement) => statement.execute(exec),
             Statement::If(statement) => statement.execute(exec),
             Statement::ForIn(statement) => statement.execute(exec),
+            Statement::Call(statement) => todo!(),
         }
     }
 }

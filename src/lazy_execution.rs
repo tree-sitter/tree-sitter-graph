@@ -185,6 +185,7 @@ impl ast::Statement {
             Self::Print(statement) => statement.execute_lazy(exec),
             Self::If(statement) => statement.execute_lazy(exec),
             Self::ForIn(statement) => statement.execute_lazy(exec),
+            Self::Call(statement) => todo!(),
         }
     }
 }
