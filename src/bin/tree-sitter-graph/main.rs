@@ -10,14 +10,17 @@ use std::path::Path;
 use anyhow::anyhow;
 use anyhow::Context as _;
 use anyhow::Result;
+use clap::builder::ArgAction;
 use clap::App;
 use clap::Arg;
 use tree_sitter::Parser;
 use tree_sitter_config::Config;
 use tree_sitter_graph::ast::File;
 use tree_sitter_graph::functions::Functions;
+use tree_sitter_graph::graph;
 use tree_sitter_graph::parse_error::ParseError;
 use tree_sitter_graph::ExecutionConfig;
+use tree_sitter_graph::Identifier;
 use tree_sitter_graph::Variables;
 use tree_sitter_loader::Loader;
 
@@ -36,13 +39,13 @@ fn main() -> Result<()> {
         .arg(Arg::with_name("source").index(2).required(true))
         .arg(
             Arg::with_name("quiet")
-                .short("q")
+                .short('q')
                 .long("quiet")
                 .help("Suppress console output"),
         )
         .arg(
             Arg::with_name("lazy")
-                .short("z")
+                .short('z')
                 .long("lazy")
                 .help("Use lazy evaluation (experimental)"),
         )
@@ -50,7 +53,7 @@ fn main() -> Result<()> {
         .arg(Arg::with_name("json").long("json").takes_value(false))
         .arg(
             Arg::with_name("output")
-                .short("o")
+                .short('o')
                 .long("output")
                 .requires("json")
                 .takes_value(true),
@@ -60,6 +63,12 @@ fn main() -> Result<()> {
                 .long("allow-parse-errors")
                 .takes_value(false),
         )
+        .arg(
+            Arg::with_name("global")
+                .long("global")
+                .takes_value(true)
+                .action(ArgAction::Append),
+        )
         .get_matches();
 
     let tsg_path = Path::new(matches.value_of("tsg").unwrap());
@@ -67,6 +76,17 @@ fn main() -> Result<()> {
     let current_dir = std::env::current_dir().unwrap();
     let quiet = matches.is_present("quiet");
     let lazy = matches.is_present("lazy");
+    let globals = matches.get_many::<String>("global").unwrap_or_default();
+    let mut globals_ = Variables::new();
+    for kv in globals {
+        let kv_ = kv
+            .split_once('=')
+            .with_context(|| format!("Expected key-value pair separated by '=', got {}.", kv))?;
+        globals_.add(
+            Identifier::from(kv_.0),
+            graph::Value::String(kv_.1.to_string()),
+        )?;
+    }
 
     let config = Config::load()?;
     let mut loader = Loader::new()?;
@@ -116,8 +136,7 @@ fn main() -> Result<()> {
     }
 
     let mut functions = Functions::stdlib();
-    let globals = Variables::new();
-    let mut config = ExecutionConfig::new(&mut functions, &globals).lazy(lazy);
+    let mut config = ExecutionConfig::new(&mut functions, &globals_).lazy(lazy);
     let graph = file
         .execute(&tree, &source, &mut config)
         .with_context(|| format!("Cannot execute TSG file {}", tsg_path.display()))?;
