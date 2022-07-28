@@ -75,6 +75,11 @@ fn main() -> Result<()> {
     let quiet = matches.is_present("quiet");
     let lazy = matches.is_present("lazy");
     let globals = matches.get_many::<String>("global").unwrap_or_default();
+    for kv in globals {
+        let (k, v) = kv
+            .split_once('=')
+            .with_context(|| format!("Expected key-value pair separated by '=', got {}.", kv))?;
+    }
 
     let config = Config::load()?;
     let mut loader = Loader::new()?;
