@@ -10,6 +10,7 @@ use std::path::Path;
 use anyhow::anyhow;
 use anyhow::Context as _;
 use anyhow::Result;
+use clap::builder::ArgAction;
 use clap::App;
 use clap::Arg;
 use tree_sitter::Parser;
@@ -60,6 +61,12 @@ fn main() -> Result<()> {
                 .long("allow-parse-errors")
                 .takes_value(false),
         )
+        .arg(
+            Arg::with_name("global")
+                .long("global")
+                .takes_value(true)
+                .action(ArgAction::Append),
+        )
         .get_matches();
 
     let tsg_path = Path::new(matches.value_of("tsg").unwrap());
@@ -67,6 +74,7 @@ fn main() -> Result<()> {
     let current_dir = std::env::current_dir().unwrap();
     let quiet = matches.is_present("quiet");
     let lazy = matches.is_present("lazy");
+    let globals = matches.get_many::<String>("global").unwrap_or_default();
 
     let config = Config::load()?;
     let mut loader = Loader::new()?;
