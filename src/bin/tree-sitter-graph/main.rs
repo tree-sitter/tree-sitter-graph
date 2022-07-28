@@ -17,8 +17,10 @@ use tree_sitter::Parser;
 use tree_sitter_config::Config;
 use tree_sitter_graph::ast::File;
 use tree_sitter_graph::functions::Functions;
+use tree_sitter_graph::graph;
 use tree_sitter_graph::parse_error::ParseError;
 use tree_sitter_graph::ExecutionConfig;
+use tree_sitter_graph::Identifier;
 use tree_sitter_graph::Variables;
 use tree_sitter_loader::Loader;
 
@@ -75,12 +77,15 @@ fn main() -> Result<()> {
     let quiet = matches.is_present("quiet");
     let lazy = matches.is_present("lazy");
     let globals = matches.get_many::<String>("global").unwrap_or_default();
-    let mut globals_: Vec<(&str, &str)> = Vec::new();
+    let mut globals_ = Variables::new();
     for kv in globals {
         let kv_ = kv
             .split_once('=')
             .with_context(|| format!("Expected key-value pair separated by '=', got {}.", kv))?;
-        globals_.push(kv_);
+        globals_.add(
+            Identifier::from(kv_.0),
+            graph::Value::String(kv_.1.to_string()),
+        )?;
     }
 
     let config = Config::load()?;
