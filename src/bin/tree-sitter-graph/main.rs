@@ -75,10 +75,12 @@ fn main() -> Result<()> {
     let quiet = matches.is_present("quiet");
     let lazy = matches.is_present("lazy");
     let globals = matches.get_many::<String>("global").unwrap_or_default();
+    let mut globals_: Vec<(&str, &str)> = Vec::new();
     for kv in globals {
-        let (k, v) = kv
+        let kv_ = kv
             .split_once('=')
             .with_context(|| format!("Expected key-value pair separated by '=', got {}.", kv))?;
+        globals_.push(kv_);
     }
 
     let config = Config::load()?;
