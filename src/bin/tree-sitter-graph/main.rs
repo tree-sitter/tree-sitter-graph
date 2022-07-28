@@ -36,13 +36,13 @@ fn main() -> Result<()> {
         .arg(Arg::with_name("source").index(2).required(true))
         .arg(
             Arg::with_name("quiet")
-                .short("q")
+                .short('q')
                 .long("quiet")
                 .help("Suppress console output"),
         )
         .arg(
             Arg::with_name("lazy")
-                .short("z")
+                .short('z')
                 .long("lazy")
                 .help("Use lazy evaluation (experimental)"),
         )
@@ -50,7 +50,7 @@ fn main() -> Result<()> {
         .arg(Arg::with_name("json").long("json").takes_value(false))
         .arg(
             Arg::with_name("output")
-                .short("o")
+                .short('o')
                 .long("output")
                 .requires("json")
                 .takes_value(true),

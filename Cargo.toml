@@ -46,7 +46,7 @@ cli = ["clap", "env_logger", "tree-sitter-config", "tree-sitter-loader"]
 
 [dependencies.clap]
 optional = true
-version = "2.32"
+version = "3.2"
 
 [dependencies.env_logger]
 optional = true
