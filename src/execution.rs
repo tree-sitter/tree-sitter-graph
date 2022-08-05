@@ -350,7 +350,7 @@ impl Stanza {
             for statement in &self.statements {
                 statement
                     .execute(&mut exec)
-                    .with_context(|| format!("Executing {}", statement))?;
+                    .or_else(|e| Err(e).with_context(|| format!("Executing {}", statement)))?;
             }
         }
         Ok(())
