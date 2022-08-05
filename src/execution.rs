@@ -349,16 +349,42 @@ impl Stanza {
                 cancellation_flag,
             };
             for statement in &self.statements {
-                statement
-                    .execute(&mut exec)
-                    .or_else(|e| Err(e).with_context(|| format!("Executing {}", statement)))?;
+                statement.execute(&mut exec).or_else(|e| {
+                    Err(e).with_context(|| {
+                        format!(
+                            "Executing {} {}",
+                            statement,
+                            excerpt(source, statement.location()).unwrap_or_default()
+                        )
+                    })
+                })?;
             }
         }
         Ok(())
     }
 }
 
+fn excerpt(source: &str, loc: Location) -> Option<&str> {
+    source.lines().nth(loc.row)
+}
+
 impl Statement {
+    fn location(&self) -> Location {
+        match self {
+            Statement::DeclareImmutable(s) => s.location,
+            Statement::DeclareMutable(s) => s.location,
+            Statement::Assign(s) => s.location,
+            Statement::CreateGraphNode(s) => s.location,
+            Statement::AddGraphNodeAttribute(s) => s.location,
+            Statement::CreateEdge(s) => s.location,
+            Statement::AddEdgeAttribute(s) => s.location,
+            Statement::Scan(s) => s.location,
+            Statement::Print(s) => s.location,
+            Statement::If(s) => s.location,
+            Statement::ForIn(s) => s.location,
+        }
+    }
+
     fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
         exec.cancellation_flag.check("executing statement")?;
         match self {
