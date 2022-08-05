@@ -54,6 +54,7 @@ use crate::variables::Globals;
 use crate::variables::VariableMap;
 use crate::variables::Variables;
 use crate::Identifier;
+use crate::Location;
 
 impl File {
     /// Executes this graph DSL file against a source file.  You must provide the parsed syntax
@@ -252,8 +253,8 @@ pub enum ExecutionError {
     EmptyRegexCapture(String),
     #[error("Undefined edge {0}")]
     UndefinedEdge(String),
-    #[error("Undefined variable {0}")]
-    UndefinedVariable(String),
+    #[error("Undefined variable {0} at {1}")]
+    UndefinedVariable(String, Location),
     #[error("Cannot add scoped variable after being forced {0}")]
     VariableScopesAlreadyForced(String),
     #[error(transparent)]
@@ -821,10 +822,10 @@ impl ScopedVariable {
         if let Some(value) = variables.get(&self.name) {
             Ok(value)
         } else {
-            Err(ExecutionError::UndefinedVariable(format!(
-                "{} on node {}",
-                self, scope,
-            )))
+            Err(ExecutionError::UndefinedVariable(
+                format!("{} on node {}", self, scope,),
+                scope.location(),
+            ))
         }
     }
 
@@ -875,7 +876,7 @@ impl UnscopedVariable {
         } else {
             exec.locals.get(&self.name)
         }
-        .ok_or_else(|| ExecutionError::UndefinedVariable(format!("{}", self)))
+        .ok_or_else(|| ExecutionError::UndefinedVariable(format!("{}", self), self.location))
     }
 
     fn add(
@@ -906,7 +907,7 @@ impl UnscopedVariable {
             if exec.locals.get(&self.name).is_some() {
                 ExecutionError::CannotAssignImmutableVariable(format!("{}", self))
             } else {
-                ExecutionError::UndefinedVariable(format!("{}", self))
+                ExecutionError::UndefinedVariable(format!("{}", self), self.location)
             }
         })
     }

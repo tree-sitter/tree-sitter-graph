@@ -695,7 +695,7 @@ impl ast::UnscopedVariable {
         } else {
             exec.locals.get(&self.name).map(|value| value.clone())
         }
-        .ok_or_else(|| ExecutionError::UndefinedVariable(format!("{}", self)))
+        .ok_or_else(|| ExecutionError::UndefinedVariable(format!("{}", self), self.location))
     }
 }
 
@@ -736,7 +736,7 @@ impl ast::UnscopedVariable {
                 if exec.locals.get(&self.name).is_some() {
                     ExecutionError::CannotAssignImmutableVariable(format!("{}", self))
                 } else {
-                    ExecutionError::UndefinedVariable(format!("{}", self))
+                    ExecutionError::UndefinedVariable(format!("{}", self), self.location)
                 }
             })
     }
