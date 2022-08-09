@@ -228,7 +228,7 @@ pub enum ExecutionError {
     DuplicateAttribute(String),
     #[error("Duplicate edge {0}")]
     DuplicateEdge(String),
-    #[error("Duplicate variable {0}")]
+    #[error("Duplicate variable {0} at {1}")]
     DuplicateVariable(String, Location),
     #[error("Expected a graph node reference {0}")]
     ExpectedGraphNode(String),
