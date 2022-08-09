@@ -139,7 +139,7 @@ fn main() -> Result<()> {
     let functions = Functions::stdlib();
     let mut config = ExecutionConfig::new(&functions, &globals_).lazy(lazy);
     let graph = file
-        .execute(&tree, &source, &mut config, &NoCancellation)
+        .execute(&tree, &source, &tsg, &mut config, &NoCancellation)
         .with_context(|| format!("Cannot execute TSG file {}", tsg_path.display()))?;
 
     let json = matches.is_present("json");

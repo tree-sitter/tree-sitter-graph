@@ -60,15 +60,23 @@ impl File {
     /// Executes this graph DSL file against a source file.  You must provide the parsed syntax
     /// tree (`tree`) as well as the source text that it was parsed from (`source`).  You also
     /// provide the set of functions and global variables that are available during execution.
-    pub fn execute<'tree>(
+    pub fn execute<'a, 'tree>(
         &self,
         tree: &'tree Tree,
         source: &'tree str,
+        tsg_source: &'a str,
         config: &mut ExecutionConfig,
         cancellation_flag: &dyn CancellationFlag,
     ) -> Result<Graph<'tree>, ExecutionError> {
         let mut graph = Graph::new();
-        self.execute_into(&mut graph, tree, source, config, cancellation_flag)?;
+        self.execute_into(
+            &mut graph,
+            tree,
+            source,
+            tsg_source,
+            config,
+            cancellation_flag,
+        )?;
         Ok(graph)
     }
 
@@ -77,18 +85,19 @@ impl File {
     /// text that it was parsed from (`source`).  You also provide the set of functions and global
     /// variables that are available during execution. This variant is useful when you need to
     /// “pre-seed” the graph with some predefined nodes and/or edges before executing the DSL file.
-    pub fn execute_into<'tree>(
+    pub fn execute_into<'a, 'tree>(
         &self,
         graph: &mut Graph<'tree>,
         tree: &'tree Tree,
         source: &'tree str,
+        tsg_source: &'a str,
         config: &mut ExecutionConfig,
         cancellation_flag: &dyn CancellationFlag,
     ) -> Result<(), ExecutionError> {
         if config.lazy {
             self.execute_lazy_into(graph, tree, source, config, cancellation_flag)
         } else {
-            self.execute_strict_into(graph, tree, source, config, cancellation_flag)
+            self.execute_strict_into(graph, tree, source, tsg_source, config, cancellation_flag)
         }
     }
 }
@@ -99,11 +108,12 @@ impl File {
     /// text that it was parsed from (`source`).  You also provide the set of functions and global
     /// variables that are available during execution. This variant is useful when you need to
     /// “pre-seed” the graph with some predefined nodes and/or edges before executing the DSL file.
-    fn execute_strict_into<'tree>(
+    fn execute_strict_into<'a, 'tree>(
         &self,
         graph: &mut Graph<'tree>,
         tree: &'tree Tree,
         source: &'tree str,
+        tsg_source: &'a str,
         config: &mut ExecutionConfig,
         cancellation_flag: &dyn CancellationFlag,
     ) -> Result<(), ExecutionError> {
@@ -118,6 +128,7 @@ impl File {
             stanza.execute(
                 tree,
                 source,
+                tsg_source,
                 graph,
                 config,
                 &mut locals,
@@ -290,6 +301,7 @@ pub struct CancellationError(pub &'static str);
 /// State that is threaded through the execution
 struct ExecutionContext<'a, 'c, 'g, 's, 'tree> {
     source: &'tree str,
+    tsg_source: &'a str,
     graph: &'a mut Graph<'tree>,
     config: &'a mut ExecutionConfig<'c, 'g>,
     locals: &'a mut dyn Variables<Value>,
@@ -318,10 +330,11 @@ impl<'a> ScopedVariables<'a> {
 }
 
 impl Stanza {
-    fn execute<'g, 'l, 's, 'tree>(
+    fn execute<'a, 'g, 'l, 's, 'tree>(
         &self,
         tree: &'tree Tree,
         source: &'tree str,
+        tsg_source: &'a str,
         graph: &mut Graph<'tree>,
         config: &mut ExecutionConfig<'_, 'g>,
         locals: &mut VariableMap<'l, Value>,
@@ -338,6 +351,7 @@ impl Stanza {
             locals.clear();
             let mut exec = ExecutionContext {
                 source,
+                tsg_source,
                 graph,
                 config,
                 locals,
@@ -538,6 +552,7 @@ impl Scan {
             let mut arm_locals = VariableMap::nested(exec.locals);
             let mut arm_exec = ExecutionContext {
                 source: exec.source,
+                tsg_source: exec.tsg_source,
                 graph: exec.graph,
                 config: exec.config,
                 locals: &mut arm_locals,
@@ -594,6 +609,7 @@ impl If {
                 let mut arm_locals = VariableMap::nested(exec.locals);
                 let mut arm_exec = ExecutionContext {
                     source: exec.source,
+                    tsg_source: exec.tsg_source,
                     graph: exec.graph,
                     config: exec.config,
                     locals: &mut arm_locals,
@@ -632,6 +648,7 @@ impl ForIn {
             loop_locals.clear();
             let mut loop_exec = ExecutionContext {
                 source: exec.source,
+                tsg_source: exec.tsg_source,
                 graph: exec.graph,
                 config: exec.config,
                 locals: &mut loop_locals,
@@ -703,6 +720,7 @@ impl ListComprehension {
             loop_locals.clear();
             let mut loop_exec = ExecutionContext {
                 source: exec.source,
+                tsg_source: exec.tsg_source,
                 graph: exec.graph,
                 config: exec.config,
                 locals: &mut loop_locals,
@@ -741,6 +759,7 @@ impl SetComprehension {
             loop_locals.clear();
             let mut loop_exec = ExecutionContext {
                 source: exec.source,
+                tsg_source: exec.tsg_source,
                 graph: exec.graph,
                 config: exec.config,
                 locals: &mut loop_locals,
@@ -997,6 +1016,7 @@ impl AttributeShorthand {
         let mut shorthand_locals = VariableMap::new();
         let mut shorthand_exec = ExecutionContext {
             source: exec.source,
+            tsg_source: exec.tsg_source,
             graph: exec.graph,
             config: exec.config,
             locals: &mut shorthand_locals,
