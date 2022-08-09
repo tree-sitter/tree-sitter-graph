@@ -41,11 +41,12 @@ impl ast::File {
     /// text that it was parsed from (`source`).  You also provide the set of functions and global
     /// variables that are available during execution. This variant is useful when you need to
     /// “pre-seed” the graph with some predefined nodes and/or edges before executing the DSL file.
-    pub(crate) fn execute_lazy_into<'tree>(
+    pub(crate) fn execute_lazy_into<'a, 'tree>(
         &self,
         graph: &mut Graph<'tree>,
         tree: &'tree Tree,
         source: &'tree str,
+        tsg_source: &'a str,
         config: &mut ExecutionConfig,
         cancellation_flag: &dyn CancellationFlag,
     ) -> Result<(), ExecutionError> {
@@ -65,6 +66,7 @@ impl ast::File {
             let stanza = &self.stanzas[mat.pattern_index];
             stanza.execute_lazy(
                 source,
+                tsg_source,
                 &mat,
                 graph,
                 config,
@@ -101,6 +103,7 @@ impl ast::File {
 /// Context for execution, which executes stanzas to build the lazy graph
 struct ExecutionContext<'a, 'c, 'g, 'tree> {
     source: &'tree str,
+    tsg_source: &'a str,
     graph: &'a mut Graph<'tree>,
     config: &'a mut ExecutionConfig<'c, 'g>,
     locals: &'a mut dyn Variables<LazyValue>,
@@ -138,6 +141,7 @@ impl ast::Stanza {
     fn execute_lazy<'a, 'l, 'g, 'q, 'tree>(
         &self,
         source: &'tree str,
+        tsg_source: &'a str,
         mat: &QueryMatch<'_, 'tree>,
         graph: &mut Graph<'tree>,
         config: &mut ExecutionConfig,
@@ -154,6 +158,7 @@ impl ast::Stanza {
         locals.clear();
         let mut exec = ExecutionContext {
             source,
+            tsg_source,
             graph,
             config,
             locals,
@@ -315,6 +320,7 @@ impl ast::Scan {
             let mut arm_locals = VariableMap::nested(exec.locals);
             let mut arm_exec = ExecutionContext {
                 source: exec.source,
+                tsg_source: exec.tsg_source,
                 graph: exec.graph,
                 config: exec.config,
                 locals: &mut arm_locals,
@@ -379,6 +385,7 @@ impl ast::If {
                 let mut arm_locals = VariableMap::nested(exec.locals);
                 let mut arm_exec = ExecutionContext {
                     source: exec.source,
+                    tsg_source: exec.tsg_source,
                     graph: exec.graph,
                     config: exec.config,
                     locals: &mut arm_locals,
@@ -425,6 +432,7 @@ impl ast::ForIn {
             loop_locals.clear();
             let mut loop_exec = ExecutionContext {
                 source: exec.source,
+                tsg_source: exec.tsg_source,
                 graph: exec.graph,
                 config: exec.config,
                 locals: &mut loop_locals,
@@ -519,6 +527,7 @@ impl ast::ListComprehension {
             loop_locals.clear();
             let mut loop_exec = ExecutionContext {
                 source: exec.source,
+                tsg_source: exec.tsg_source,
                 graph: exec.graph,
                 config: exec.config,
                 locals: &mut loop_locals,
@@ -562,6 +571,7 @@ impl ast::SetComprehension {
             loop_locals.clear();
             let mut loop_exec = ExecutionContext {
                 source: exec.source,
+                tsg_source: exec.tsg_source,
                 graph: exec.graph,
                 config: exec.config,
                 locals: &mut loop_locals,
@@ -776,6 +786,7 @@ impl ast::AttributeShorthand {
         let mut shorthand_locals = VariableMap::new();
         let mut shorthand_exec = ExecutionContext {
             source: exec.source,
+            tsg_source: exec.tsg_source,
             graph: exec.graph,
             config: exec.config,
             locals: &mut shorthand_locals,

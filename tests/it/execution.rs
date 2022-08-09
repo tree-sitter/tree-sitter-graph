@@ -40,7 +40,7 @@ fn execute(python_source: &str, dsl_source: &str) -> Result<String, ExecutionErr
     let graph = file.execute(
         &tree,
         python_source,
-        &dsl_source,
+        dsl_source,
         &mut config,
         &NoCancellation,
     )?;

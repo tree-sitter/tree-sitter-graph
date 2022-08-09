@@ -95,7 +95,7 @@ impl File {
         cancellation_flag: &dyn CancellationFlag,
     ) -> Result<(), ExecutionError> {
         if config.lazy {
-            self.execute_lazy_into(graph, tree, source, config, cancellation_flag)
+            self.execute_lazy_into(graph, tree, source, tsg_source, config, cancellation_flag)
         } else {
             self.execute_strict_into(graph, tree, source, tsg_source, config, cancellation_flag)
         }
