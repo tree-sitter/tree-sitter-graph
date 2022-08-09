@@ -717,15 +717,17 @@ impl ast::UnscopedVariable {
         mutable: bool,
     ) -> Result<(), ExecutionError> {
         if exec.config.globals.get(&self.name).is_some() {
-            return Err(ExecutionError::DuplicateVariable(format!(
-                " global {}",
-                self
-            )));
+            return Err(ExecutionError::DuplicateVariable(
+                format!(" global {}", self),
+                self.location,
+            ));
         }
         let value = exec.store.add(value, self.location.into());
         exec.locals
             .add(self.name.clone(), value.into(), mutable)
-            .map_err(|_| ExecutionError::DuplicateVariable(format!(" local {}", self)))
+            .map_err(|_| {
+                ExecutionError::DuplicateVariable(format!(" local {}", self), self.location)
+            })
     }
 
     fn set_lazy(

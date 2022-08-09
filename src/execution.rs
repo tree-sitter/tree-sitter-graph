@@ -229,7 +229,7 @@ pub enum ExecutionError {
     #[error("Duplicate edge {0}")]
     DuplicateEdge(String),
     #[error("Duplicate variable {0}")]
-    DuplicateVariable(String),
+    DuplicateVariable(String, Location),
     #[error("Expected a graph node reference {0}")]
     ExpectedGraphNode(String),
     #[error("Expected a list {0}")]
@@ -893,7 +893,7 @@ impl ScopedVariable {
         let variables = exec.scoped.get(scope);
         variables
             .add(self.name.clone(), value, mutable)
-            .map_err(|_| ExecutionError::DuplicateVariable(format!(" {}", self)))
+            .map_err(|_| ExecutionError::DuplicateVariable(format!(" {}", self), self.location))
     }
 
     fn set(&self, exec: &mut ExecutionContext, value: Value) -> Result<(), ExecutionError> {
@@ -910,7 +910,7 @@ impl ScopedVariable {
         let variables = exec.scoped.get(scope);
         variables
             .set(self.name.clone(), value)
-            .map_err(|_| ExecutionError::DuplicateVariable(format!(" {}", self)))
+            .map_err(|_| ExecutionError::DuplicateVariable(format!(" {}", self), self.location))
     }
 }
 
@@ -931,14 +931,16 @@ impl UnscopedVariable {
         mutable: bool,
     ) -> Result<(), ExecutionError> {
         if exec.config.globals.get(&self.name).is_some() {
-            return Err(ExecutionError::DuplicateVariable(format!(
-                " global {}",
-                self,
-            )));
+            return Err(ExecutionError::DuplicateVariable(
+                format!(" global {}", self,),
+                self.location,
+            ));
         }
         exec.locals
             .add(self.name.clone(), value, mutable)
-            .map_err(|_| ExecutionError::DuplicateVariable(format!(" local {}", self)))
+            .map_err(|_| {
+                ExecutionError::DuplicateVariable(format!(" local {}", self), self.location)
+            })
     }
 
     fn set(&self, exec: &mut ExecutionContext, value: Value) -> Result<(), ExecutionError> {
