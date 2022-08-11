@@ -929,9 +929,10 @@ impl ScopedVariable {
             .add(self.name.clone(), value, mutable)
             .map_err(|_| {
                 ExecutionError::DuplicateVariable(format!(
-                    "{}\n{}",
+                    "{}\n{}\n{}",
                     self,
-                    Excerpt::from_source(exec.tsg_source, self.location)
+                    Excerpt::from_source(exec.tsg_source, self.location),
+                    Excerpt::from_source(exec.source, scope.location())
                 ))
             })
     }
@@ -950,9 +951,10 @@ impl ScopedVariable {
         let variables = exec.scoped.get(scope);
         variables.set(self.name.clone(), value).map_err(|_| {
             ExecutionError::DuplicateVariable(format!(
-                "{}\n{}",
+                "{}\n{}\n{}",
                 self,
-                Excerpt::from_source(exec.tsg_source, self.location)
+                Excerpt::from_source(exec.tsg_source, self.location),
+                Excerpt::from_source(exec.source, scope.location())
             ))
         })
     }
