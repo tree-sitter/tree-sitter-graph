@@ -329,6 +329,7 @@ impl<'a> ScopedVariables<'a> {
     }
 }
 
+/// Excerpts of source from either the target language file or the tsg rules file.
 struct Excerpt<'a> {
     source: Option<&'a str>,
     location: Location,
