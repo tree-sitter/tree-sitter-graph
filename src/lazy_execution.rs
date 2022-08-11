@@ -705,7 +705,7 @@ impl ast::UnscopedVariable {
         } else {
             exec.locals.get(&self.name).map(|value| value.clone())
         }
-        .ok_or_else(|| ExecutionError::UndefinedVariable(format!("{}", self), self.location))
+        .ok_or_else(|| ExecutionError::UndefinedVariable(format!("{}", self)))
     }
 }
 
@@ -717,17 +717,15 @@ impl ast::UnscopedVariable {
         mutable: bool,
     ) -> Result<(), ExecutionError> {
         if exec.config.globals.get(&self.name).is_some() {
-            return Err(ExecutionError::DuplicateVariable(
-                format!(" global {}", self),
-                self.location,
-            ));
+            return Err(ExecutionError::DuplicateVariable(format!(
+                " global {}",
+                self
+            )));
         }
         let value = exec.store.add(value, self.location.into());
         exec.locals
             .add(self.name.clone(), value.into(), mutable)
-            .map_err(|_| {
-                ExecutionError::DuplicateVariable(format!(" local {}", self), self.location)
-            })
+            .map_err(|_| ExecutionError::DuplicateVariable(format!(" local {}", self)))
     }
 
     fn set_lazy(
@@ -748,7 +746,7 @@ impl ast::UnscopedVariable {
                 if exec.locals.get(&self.name).is_some() {
                     ExecutionError::CannotAssignImmutableVariable(format!("{}", self))
                 } else {
-                    ExecutionError::UndefinedVariable(format!("{}", self), self.location)
+                    ExecutionError::UndefinedVariable(format!("{}", self))
                 }
             })
     }

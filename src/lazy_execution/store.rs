@@ -157,16 +157,13 @@ impl LazyScopedVariables {
                     let prev_debug_info = debug_infos.insert(node, debug_info.clone());
                     match map.insert(node, value.clone()) {
                         Some(_) => {
-                            return Err(ExecutionError::DuplicateVariable(
-                                format!(
-                                    "{}.{} set at {} and {}",
-                                    node,
-                                    name,
-                                    prev_debug_info.unwrap(),
-                                    debug_info,
-                                ),
-                                node.location(),
-                            ));
+                            return Err(ExecutionError::DuplicateVariable(format!(
+                                "{}.{} set at {} and {}",
+                                node,
+                                name,
+                                prev_debug_info.unwrap(),
+                                debug_info,
+                            )));
                         }
                         _ => {}
                     };

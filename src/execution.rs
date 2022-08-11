@@ -228,8 +228,8 @@ pub enum ExecutionError {
     DuplicateAttribute(String),
     #[error("Duplicate edge {0}")]
     DuplicateEdge(String),
-    #[error("Duplicate variable {0} at {1}")]
-    DuplicateVariable(String, Location),
+    #[error("Duplicate variable {0}")]
+    DuplicateVariable(String),
     #[error("Expected a graph node reference {0}")]
     ExpectedGraphNode(String),
     #[error("Expected a list {0}")]
@@ -264,8 +264,8 @@ pub enum ExecutionError {
     EmptyRegexCapture(String),
     #[error("Undefined edge {0}")]
     UndefinedEdge(String),
-    #[error("Undefined variable {0} at {1}")]
-    UndefinedVariable(String, Location),
+    #[error("Undefined variable {0}")]
+    UndefinedVariable(String),
     #[error("Cannot add scoped variable after being forced {0}")]
     VariableScopesAlreadyForced(String),
     #[error(transparent)]
@@ -897,10 +897,10 @@ impl ScopedVariable {
         if let Some(value) = variables.get(&self.name) {
             Ok(value)
         } else {
-            Err(ExecutionError::UndefinedVariable(
-                format!("{} on node {}", self, scope,),
-                scope.location(),
-            ))
+            Err(ExecutionError::UndefinedVariable(format!(
+                "{} on node {}",
+                self, scope
+            )))
         }
     }
 
@@ -924,14 +924,11 @@ impl ScopedVariable {
         variables
             .add(self.name.clone(), value, mutable)
             .map_err(|_| {
-                ExecutionError::DuplicateVariable(
-                    format!(
-                        "{}\n{}",
-                        self,
-                        Excerpt::from_source(exec.tsg_source, self.location)
-                    ),
-                    self.location,
-                )
+                ExecutionError::DuplicateVariable(format!(
+                    "{}\n{}",
+                    self,
+                    Excerpt::from_source(exec.tsg_source, self.location)
+                ))
             })
     }
 
@@ -948,14 +945,11 @@ impl ScopedVariable {
         };
         let variables = exec.scoped.get(scope);
         variables.set(self.name.clone(), value).map_err(|_| {
-            ExecutionError::DuplicateVariable(
-                format!(
-                    "{}\n{}",
-                    self,
-                    Excerpt::from_source(exec.tsg_source, self.location)
-                ),
-                self.location,
-            )
+            ExecutionError::DuplicateVariable(format!(
+                "{}\n{}",
+                self,
+                Excerpt::from_source(exec.tsg_source, self.location)
+            ))
         })
     }
 }
@@ -967,7 +961,7 @@ impl UnscopedVariable {
         } else {
             exec.locals.get(&self.name)
         }
-        .ok_or_else(|| ExecutionError::UndefinedVariable(format!("{}", self), self.location))
+        .ok_or_else(|| ExecutionError::UndefinedVariable(format!("{}", self)))
     }
 
     fn add(
@@ -977,16 +971,14 @@ impl UnscopedVariable {
         mutable: bool,
     ) -> Result<(), ExecutionError> {
         if exec.config.globals.get(&self.name).is_some() {
-            return Err(ExecutionError::DuplicateVariable(
-                format!(" global {}", self,),
-                self.location,
-            ));
+            return Err(ExecutionError::DuplicateVariable(format!(
+                " global {}",
+                self,
+            )));
         }
         exec.locals
             .add(self.name.clone(), value, mutable)
-            .map_err(|_| {
-                ExecutionError::DuplicateVariable(format!(" local {}", self), self.location)
-            })
+            .map_err(|_| ExecutionError::DuplicateVariable(format!(" local {}", self)))
     }
 
     fn set(&self, exec: &mut ExecutionContext, value: Value) -> Result<(), ExecutionError> {
@@ -1000,7 +992,7 @@ impl UnscopedVariable {
             if exec.locals.get(&self.name).is_some() {
                 ExecutionError::CannotAssignImmutableVariable(format!("{}", self))
             } else {
-                ExecutionError::UndefinedVariable(format!("{}", self), self.location)
+                ExecutionError::UndefinedVariable(format!("{}", self))
             }
         })
     }
