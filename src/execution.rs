@@ -346,7 +346,7 @@ struct ExecutionContext<'a, 'c, 'g, 's, 'tree> {
 }
 
 impl<'a, 'c, 'g, 's, 'tree> ExecutionContext<'a, 'c, 'g, 's, 'tree> {
-    fn match_location(&self, tree: Tree) -> Option<Location> {
+    fn match_location(&self) -> Option<Location> {
         self.mat
             .captures
             .iter()
