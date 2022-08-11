@@ -394,7 +394,7 @@ impl Stanza {
                         format!(
                             "Executing {}\n{}",
                             statement,
-                            Excerpt::from_source(tsg_source, statement.location())
+                            Excerpt::from_source(tsg_source, statement.location()) // FIXME: add the statement excerpt to the leaf error instead
                         )
                     })
                 })?;
