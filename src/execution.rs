@@ -330,14 +330,14 @@ impl<'a> ScopedVariables<'a> {
 }
 
 struct Excerpt<'a> {
-    source: &'a str,
+    source: Option<&'a str>,
     location: Location,
 }
 
 impl<'a> Excerpt<'a> {
     fn from_source(source: &'a str, location: Location) -> Excerpt {
         Excerpt {
-            source: source.lines().nth(location.row).unwrap(),
+            source: source.lines().nth(location.row),
             location: location,
         }
     }
@@ -345,7 +345,12 @@ impl<'a> Excerpt<'a> {
 
 impl<'a> std::fmt::Display for Excerpt<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{} | {}", self.location, self.source)
+        write!(
+            f,
+            "{} | {}",
+            self.location,
+            self.source.unwrap_or("<no source found>")
+        )
     }
 }
 
