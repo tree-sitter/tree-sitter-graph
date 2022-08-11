@@ -388,7 +388,7 @@ impl Stanza {
                         format!(
                             "Executing {} {}",
                             statement,
-                            excerpt(source, statement.location()).unwrap_or_default()
+                            Excerpt::from_source(source, statement.location())
                         )
                     })
                 })?;
