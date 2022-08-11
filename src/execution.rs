@@ -354,9 +354,11 @@ impl<'a> std::fmt::Display for Excerpt<'a> {
         write!(
             f,
             "{}{}{}\n{}{}{}{}",
+            // first line: line number & source
             Colour::Blue.paint(format!("{}", self.location.row + 1)),
             Colour::Blue.paint(" | "),
             self.source.unwrap_or("<no source found>"),
+            // second line: caret
             " ".repeat(self.gutter_width()),
             Colour::Blue.paint(" | "),
             " ".repeat(self.location.column),
