@@ -392,7 +392,7 @@ impl Stanza {
                 statement.execute(&mut exec).or_else(|e| {
                     Err(e).with_context(|| {
                         format!(
-                            "Executing {} {}",
+                            "Executing {}\n{}",
                             statement,
                             Excerpt::from_source(tsg_source, statement.location())
                         )
