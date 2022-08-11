@@ -353,15 +353,14 @@ impl<'a> std::fmt::Display for Excerpt<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let gutter_width = self.gutter_width();
         let column_padding = self.location.column;
+        let empty = "";
         write!(
             f,
-            "{}{}{}\n{:gutter_width$}{}{:column_padding$}{}",
+            "{}{}{}\n{empty:gutter_width$}{}{empty:column_padding$}{}",
             Colour::Blue.paint(format!("{}", self.location.row + 1)),
             Colour::Blue.paint(" | "),
             self.source.unwrap_or("<no source found>"),
-            "",
             Colour::Blue.paint(" | "),
-            "",
             Colour::Green.bold().paint("^")
         )
     }
