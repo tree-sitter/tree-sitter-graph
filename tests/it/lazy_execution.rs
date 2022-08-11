@@ -6,6 +6,7 @@
 // ------------------------------------------------------------------------------------------------
 
 use indoc::indoc;
+use std::path::Path;
 use tree_sitter::Parser;
 use tree_sitter_graph::ast::File;
 use tree_sitter_graph::functions::Functions;
@@ -38,7 +39,9 @@ fn execute(python_source: &str, dsl_source: &str) -> Result<String, ExecutionErr
     let mut config = ExecutionConfig::new(&functions, &globals).lazy(true);
     let graph = file.execute(
         &tree,
+        &Path::new("test.py"),
         python_source,
+        &Path::new("test.tsg"),
         &dsl_source,
         &mut config,
         &NoCancellation,

@@ -9,6 +9,7 @@ use ansi_term::Colour;
 use anyhow::Context as ErrorContext;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
+use std::path::Path;
 use thiserror::Error;
 use tree_sitter::CaptureQuantifier;
 use tree_sitter::QueryCursor;
@@ -64,7 +65,9 @@ impl File {
     pub fn execute<'a, 'tree>(
         &self,
         tree: &'tree Tree,
+        source_path: &'tree Path,
         source: &'tree str,
+        tsg_path: &'a Path,
         tsg_source: &'a str,
         config: &mut ExecutionConfig,
         cancellation_flag: &dyn CancellationFlag,
@@ -73,7 +76,9 @@ impl File {
         self.execute_into(
             &mut graph,
             tree,
+            source_path,
             source,
+            tsg_path,
             tsg_source,
             config,
             cancellation_flag,
@@ -90,15 +95,35 @@ impl File {
         &self,
         graph: &mut Graph<'tree>,
         tree: &'tree Tree,
+        source_path: &'tree Path,
         source: &'tree str,
+        tsg_path: &'a Path,
         tsg_source: &'a str,
         config: &mut ExecutionConfig,
         cancellation_flag: &dyn CancellationFlag,
     ) -> Result<(), ExecutionError> {
         if config.lazy {
-            self.execute_lazy_into(graph, tree, source, tsg_source, config, cancellation_flag)
+            self.execute_lazy_into(
+                graph,
+                tree,
+                source_path,
+                source,
+                tsg_path,
+                tsg_source,
+                config,
+                cancellation_flag,
+            )
         } else {
-            self.execute_strict_into(graph, tree, source, tsg_source, config, cancellation_flag)
+            self.execute_strict_into(
+                graph,
+                tree,
+                source_path,
+                source,
+                tsg_path,
+                tsg_source,
+                config,
+                cancellation_flag,
+            )
         }
     }
 }
@@ -113,7 +138,9 @@ impl File {
         &self,
         graph: &mut Graph<'tree>,
         tree: &'tree Tree,
+        source_path: &'tree Path,
         source: &'tree str,
+        tsg_path: &'a Path,
         tsg_source: &'a str,
         config: &mut ExecutionConfig,
         cancellation_flag: &dyn CancellationFlag,
@@ -128,7 +155,9 @@ impl File {
             cancellation_flag.check("executing stanza")?;
             stanza.execute(
                 tree,
+                source_path,
                 source,
+                tsg_path,
                 tsg_source,
                 graph,
                 config,
@@ -301,7 +330,9 @@ pub struct CancellationError(pub &'static str);
 
 /// State that is threaded through the execution
 struct ExecutionContext<'a, 'c, 'g, 's, 'tree> {
+    source_path: &'tree Path,
     source: &'tree str,
+    tsg_path: &'a Path,
     tsg_source: &'a str,
     graph: &'a mut Graph<'tree>,
     config: &'a mut ExecutionConfig<'c, 'g>,
@@ -371,7 +402,9 @@ impl Stanza {
     fn execute<'a, 'g, 'l, 's, 'tree>(
         &self,
         tree: &'tree Tree,
+        source_path: &'tree Path,
         source: &'tree str,
+        tsg_path: &'a Path,
         tsg_source: &'a str,
         graph: &mut Graph<'tree>,
         config: &mut ExecutionConfig<'_, 'g>,
@@ -388,7 +421,9 @@ impl Stanza {
             cancellation_flag.check("processing matches")?;
             locals.clear();
             let mut exec = ExecutionContext {
+                source_path,
                 source,
+                tsg_path,
                 tsg_source,
                 graph,
                 config,
@@ -585,7 +620,9 @@ impl Scan {
 
             let mut arm_locals = VariableMap::nested(exec.locals);
             let mut arm_exec = ExecutionContext {
+                source_path: exec.source_path,
                 source: exec.source,
+                tsg_path: exec.tsg_path,
                 tsg_source: exec.tsg_source,
                 graph: exec.graph,
                 config: exec.config,
@@ -642,7 +679,9 @@ impl If {
             if result {
                 let mut arm_locals = VariableMap::nested(exec.locals);
                 let mut arm_exec = ExecutionContext {
+                    source_path: exec.source_path,
                     source: exec.source,
+                    tsg_path: exec.tsg_path,
                     tsg_source: exec.tsg_source,
                     graph: exec.graph,
                     config: exec.config,
@@ -681,7 +720,9 @@ impl ForIn {
         for value in values {
             loop_locals.clear();
             let mut loop_exec = ExecutionContext {
+                source_path: exec.source_path,
                 source: exec.source,
+                tsg_path: exec.tsg_path,
                 tsg_source: exec.tsg_source,
                 graph: exec.graph,
                 config: exec.config,
@@ -753,7 +794,9 @@ impl ListComprehension {
         for value in values {
             loop_locals.clear();
             let mut loop_exec = ExecutionContext {
+                source_path: exec.source_path,
                 source: exec.source,
+                tsg_path: exec.tsg_path,
                 tsg_source: exec.tsg_source,
                 graph: exec.graph,
                 config: exec.config,
@@ -792,7 +835,9 @@ impl SetComprehension {
         for value in values {
             loop_locals.clear();
             let mut loop_exec = ExecutionContext {
+                source_path: exec.source_path,
                 source: exec.source,
+                tsg_path: exec.tsg_path,
                 tsg_source: exec.tsg_source,
                 graph: exec.graph,
                 config: exec.config,
@@ -1061,7 +1106,9 @@ impl AttributeShorthand {
     {
         let mut shorthand_locals = VariableMap::new();
         let mut shorthand_exec = ExecutionContext {
+            source_path: exec.source_path,
             source: exec.source,
+            tsg_path: exec.tsg_path,
             tsg_source: exec.tsg_source,
             graph: exec.graph,
             config: exec.config,
