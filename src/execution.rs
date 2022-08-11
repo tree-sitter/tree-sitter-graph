@@ -329,6 +329,11 @@ impl<'a> ScopedVariables<'a> {
     }
 }
 
+struct Excerpt<'a> {
+    source: &'a str,
+    location: Location,
+}
+
 impl Stanza {
     fn execute<'a, 'g, 'l, 's, 'tree>(
         &self,
