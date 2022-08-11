@@ -403,10 +403,6 @@ impl Stanza {
     }
 }
 
-fn excerpt(source: &str, loc: Location) -> Option<&str> {
-    source.lines().nth(loc.row)
-}
-
 impl Statement {
     fn location(&self) -> Location {
         match self {
