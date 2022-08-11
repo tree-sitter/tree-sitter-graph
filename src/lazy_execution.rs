@@ -113,7 +113,7 @@ struct ExecutionContext<'a, 'c, 'g, 'tree> {
 pub(self) struct EvaluationContext<'a, 'tree> {
     pub source: &'tree str,
     pub graph: &'a mut Graph<'tree>,
-    pub functions: &'a mut Functions,
+    pub functions: &'a Functions,
     pub store: &'a LazyStore,
     pub scoped_store: &'a LazyScopedVariables,
     pub function_parameters: &'a mut Vec<graph::Value>, // re-usable buffer to reduce memory allocations

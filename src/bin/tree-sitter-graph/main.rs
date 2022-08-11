@@ -135,8 +135,8 @@ fn main() -> Result<()> {
         }
     }
 
-    let mut functions = Functions::stdlib();
-    let mut config = ExecutionConfig::new(&mut functions, &globals_).lazy(lazy);
+    let functions = Functions::stdlib();
+    let mut config = ExecutionConfig::new(&functions, &globals_).lazy(lazy);
     let graph = file
         .execute(&tree, &source, &mut config)
         .with_context(|| format!("Cannot execute TSG file {}", tsg_path.display()))?;

@@ -24,7 +24,7 @@ use crate::Identifier;
 /// number and type of them.
 pub trait Function {
     fn call(
-        &mut self,
+        &self,
         graph: &mut Graph,
         source: &str,
         parameters: &mut dyn Parameters,
@@ -144,7 +144,7 @@ impl Functions {
 
     /// Calls a named function, returning an error if there is no function with that name.
     pub fn call(
-        &mut self,
+        &self,
         name: &Identifier,
         graph: &mut Graph,
         source: &str,
@@ -152,7 +152,7 @@ impl Functions {
     ) -> Result<Value, ExecutionError> {
         let function = self
             .functions
-            .get_mut(name)
+            .get(name)
             .ok_or(ExecutionError::UndefinedFunction(format!("{}", name)))?;
         function.call(graph, source, parameters)
     }
@@ -175,7 +175,7 @@ pub mod stdlib {
 
     impl Function for IsNull {
         fn call(
-            &mut self,
+            &self,
             _graph: &mut Graph,
             _source: &str,
             parameters: &mut dyn Parameters,
@@ -200,7 +200,7 @@ pub mod stdlib {
 
         impl Function for NamedChildIndex {
             fn call(
-                &mut self,
+                &self,
                 graph: &mut Graph,
                 _source: &str,
                 parameters: &mut dyn Parameters,
@@ -228,7 +228,7 @@ pub mod stdlib {
 
         impl Function for SourceText {
             fn call(
-                &mut self,
+                &self,
                 graph: &mut Graph,
                 source: &str,
                 parameters: &mut dyn Parameters,
@@ -245,7 +245,7 @@ pub mod stdlib {
 
         impl Function for StartRow {
             fn call(
-                &mut self,
+                &self,
                 graph: &mut Graph,
                 _source: &str,
                 parameters: &mut dyn Parameters,
@@ -263,7 +263,7 @@ pub mod stdlib {
 
         impl Function for StartColumn {
             fn call(
-                &mut self,
+                &self,
                 graph: &mut Graph,
                 _source: &str,
                 parameters: &mut dyn Parameters,
@@ -280,7 +280,7 @@ pub mod stdlib {
 
         impl Function for EndRow {
             fn call(
-                &mut self,
+                &self,
                 graph: &mut Graph,
                 _source: &str,
                 parameters: &mut dyn Parameters,
@@ -297,7 +297,7 @@ pub mod stdlib {
 
         impl Function for EndColumn {
             fn call(
-                &mut self,
+                &self,
                 graph: &mut Graph,
                 _source: &str,
                 parameters: &mut dyn Parameters,
@@ -314,7 +314,7 @@ pub mod stdlib {
 
         impl Function for NodeType {
             fn call(
-                &mut self,
+                &self,
                 graph: &mut Graph,
                 _source: &str,
                 parameters: &mut dyn Parameters,
@@ -332,7 +332,7 @@ pub mod stdlib {
 
         impl Function for NamedChildCount {
             fn call(
-                &mut self,
+                &self,
                 graph: &mut Graph,
                 _source: &str,
                 parameters: &mut dyn Parameters,
@@ -352,7 +352,7 @@ pub mod stdlib {
 
         impl Function for Node {
             fn call(
-                &mut self,
+                &self,
                 graph: &mut Graph,
                 _source: &str,
                 parameters: &mut dyn Parameters,
@@ -372,7 +372,7 @@ pub mod stdlib {
 
         impl Function for Not {
             fn call(
-                &mut self,
+                &self,
                 _graph: &mut Graph,
                 _source: &str,
                 parameters: &mut dyn Parameters,
@@ -388,7 +388,7 @@ pub mod stdlib {
 
         impl Function for And {
             fn call(
-                &mut self,
+                &self,
                 _graph: &mut Graph,
                 _source: &str,
                 parameters: &mut dyn Parameters,
@@ -406,7 +406,7 @@ pub mod stdlib {
 
         impl Function for Or {
             fn call(
-                &mut self,
+                &self,
                 _graph: &mut Graph,
                 _source: &str,
                 parameters: &mut dyn Parameters,
@@ -428,7 +428,7 @@ pub mod stdlib {
 
         impl Function for Plus {
             fn call(
-                &mut self,
+                &self,
                 _graph: &mut Graph,
                 _source: &str,
                 parameters: &mut dyn Parameters,
@@ -450,7 +450,7 @@ pub mod stdlib {
 
         impl Function for Replace {
             fn call(
-                &mut self,
+                &self,
                 _graph: &mut Graph,
                 _source: &str,
                 parameters: &mut dyn Parameters,
@@ -475,7 +475,7 @@ pub mod stdlib {
 
         impl Function for IsEmpty {
             fn call(
-                &mut self,
+                &self,
                 _graph: &mut Graph,
                 _source: &str,
                 parameters: &mut dyn Parameters,
@@ -490,7 +490,7 @@ pub mod stdlib {
 
         impl Function for Length {
             fn call(
-                &mut self,
+                &self,
                 _graph: &mut Graph,
                 _source: &str,
                 parameters: &mut dyn Parameters,
