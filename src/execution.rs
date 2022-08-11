@@ -343,6 +343,12 @@ impl<'a> Excerpt<'a> {
     }
 }
 
+impl<'a> std::fmt::Display for Excerpt<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{} | {}", self.location, self.source)
+    }
+}
+
 impl Stanza {
     fn execute<'a, 'g, 'l, 's, 'tree>(
         &self,
