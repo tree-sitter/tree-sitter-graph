@@ -603,12 +603,18 @@ pub struct SyntaxNodeRef {
     position: tree_sitter::Point,
 }
 
+impl From<tree_sitter::Point> for Location {
+    fn from(point: tree_sitter::Point) -> Location {
+        Location {
+            row: point.row,
+            column: point.column,
+        }
+    }
+}
+
 impl SyntaxNodeRef {
     pub fn location(&self) -> Location {
-        Location {
-            row: self.position.row,
-            column: self.position.column,
-        }
+        Location::from(self.position)
     }
 }
 
