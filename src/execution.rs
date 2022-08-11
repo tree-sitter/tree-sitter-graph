@@ -334,6 +334,15 @@ struct Excerpt<'a> {
     location: Location,
 }
 
+impl<'a> Excerpt<'a> {
+    fn from_source(source: &'a str, location: Location) -> Excerpt {
+        Excerpt {
+            source: source.lines().nth(location.row).unwrap(),
+            location: location,
+        }
+    }
+}
+
 impl Stanza {
     fn execute<'a, 'g, 'l, 's, 'tree>(
         &self,
