@@ -350,11 +350,15 @@ impl<'a> Excerpt<'a> {
 
 impl<'a> std::fmt::Display for Excerpt<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let gutter_width = self.gutter_width();
+        let column_padding = self.location.column;
         write!(
             f,
-            "{} | {}",
+            "{} | {}\n{:gutter_width$} | {:column_padding$}^",
             self.location.row + 1,
-            self.source.unwrap_or("<no source found>")
+            self.source.unwrap_or("<no source found>"),
+            "",
+            ""
         )
     }
 }
