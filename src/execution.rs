@@ -363,13 +363,15 @@ impl<'a> ScopedVariables<'a> {
 
 /// Excerpts of source from either the target language file or the tsg rules file.
 struct Excerpt<'a> {
+    path: &'a Path,
     source: Option<&'a str>,
     location: Location,
 }
 
 impl<'a> Excerpt<'a> {
-    fn from_source(source: &'a str, location: Location) -> Excerpt {
+    fn from_source(path: &'a Path, source: &'a str, location: Location) -> Excerpt<'a> {
         Excerpt {
+            path,
             source: source.lines().nth(location.row),
             location: location,
         }
@@ -441,7 +443,7 @@ impl Stanza {
                         format!(
                             "Executing {}\n{}",
                             statement,
-                            Excerpt::from_source(tsg_source, statement.location()) // FIXME: add the statement excerpt to the leaf error instead
+                            Excerpt::from_source(tsg_path, tsg_source, statement.location()) // FIXME: add the statement excerpt to the leaf error instead
                         )
                     })
                 })?;
@@ -976,8 +978,8 @@ impl ScopedVariable {
                 ExecutionError::DuplicateVariable(format!(
                     "{}\n{}\n{}",
                     self,
-                    Excerpt::from_source(exec.tsg_source, self.location),
-                    Excerpt::from_source(exec.source, scope.location())
+                    Excerpt::from_source(exec.tsg_path, exec.tsg_source, self.location),
+                    Excerpt::from_source(exec.source_path, exec.source, scope.location())
                 ))
             })
     }
@@ -998,8 +1000,8 @@ impl ScopedVariable {
             ExecutionError::DuplicateVariable(format!(
                 "{}\n{}\n{}",
                 self,
-                Excerpt::from_source(exec.tsg_source, self.location),
-                Excerpt::from_source(exec.source, scope.location())
+                Excerpt::from_source(exec.tsg_path, exec.tsg_source, self.location),
+                Excerpt::from_source(exec.source_path, exec.source, scope.location())
             ))
         })
     }
