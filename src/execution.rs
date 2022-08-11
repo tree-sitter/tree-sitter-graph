@@ -923,7 +923,16 @@ impl ScopedVariable {
         let variables = exec.scoped.get(scope);
         variables
             .add(self.name.clone(), value, mutable)
-            .map_err(|_| ExecutionError::DuplicateVariable(format!("{}", self), self.location))
+            .map_err(|_| {
+                ExecutionError::DuplicateVariable(
+                    format!(
+                        "{}\n{}",
+                        self,
+                        Excerpt::from_source(exec.tsg_source, self.location)
+                    ),
+                    self.location,
+                )
+            })
     }
 
     fn set(&self, exec: &mut ExecutionContext, value: Value) -> Result<(), ExecutionError> {
@@ -938,9 +947,16 @@ impl ScopedVariable {
             }
         };
         let variables = exec.scoped.get(scope);
-        variables
-            .set(self.name.clone(), value)
-            .map_err(|_| ExecutionError::DuplicateVariable(format!("{}", self), self.location))
+        variables.set(self.name.clone(), value).map_err(|_| {
+            ExecutionError::DuplicateVariable(
+                format!(
+                    "{}\n{}",
+                    self,
+                    Excerpt::from_source(exec.tsg_source, self.location)
+                ),
+                self.location,
+            )
+        })
     }
 }
 
