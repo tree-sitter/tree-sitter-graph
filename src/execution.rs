@@ -355,10 +355,12 @@ impl<'a> std::fmt::Display for Excerpt<'a> {
         let column_padding = self.location.column;
         write!(
             f,
-            "{} | {}\n{:gutter_width$} | {:column_padding$}{}",
-            self.location.row + 1,
+            "{}{}{}\n{:gutter_width$}{}{:column_padding$}{}",
+            Colour::Blue.paint(format!("{}", self.location.row + 1)),
+            Colour::Blue.paint(" | "),
             self.source.unwrap_or("<no source found>"),
             "",
+            Colour::Blue.paint(" | "),
             "",
             Colour::Green.bold().paint("^")
         )
