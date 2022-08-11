@@ -5,6 +5,7 @@
 // Please see the LICENSE-APACHE or LICENSE-MIT files in this distribution for license details.
 // ------------------------------------------------------------------------------------------------
 
+use ansi_term::Colour;
 use anyhow::Context as ErrorContext;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
@@ -354,11 +355,12 @@ impl<'a> std::fmt::Display for Excerpt<'a> {
         let column_padding = self.location.column;
         write!(
             f,
-            "{} | {}\n{:gutter_width$} | {:column_padding$}^",
+            "{} | {}\n{:gutter_width$} | {:column_padding$}{}",
             self.location.row + 1,
             self.source.unwrap_or("<no source found>"),
             "",
-            ""
+            "",
+            Colour::Green.bold().paint("^")
         )
     }
 }
