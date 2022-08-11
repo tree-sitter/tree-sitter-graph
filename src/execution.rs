@@ -342,6 +342,10 @@ impl<'a> Excerpt<'a> {
             location: location,
         }
     }
+
+    fn gutter_width(&self) -> usize {
+        ((self.location.row + 1) as f64).log10() as usize + 1
+    }
 }
 
 impl<'a> std::fmt::Display for Excerpt<'a> {
