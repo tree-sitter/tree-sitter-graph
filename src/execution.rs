@@ -348,7 +348,7 @@ impl<'a> std::fmt::Display for Excerpt<'a> {
         write!(
             f,
             "{} | {}",
-            self.location.row,
+            self.location.row + 1,
             self.source.unwrap_or("<no source found>")
         )
     }
