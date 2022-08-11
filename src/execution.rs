@@ -345,6 +345,17 @@ struct ExecutionContext<'a, 'c, 'g, 's, 'tree> {
     cancellation_flag: &'a dyn CancellationFlag,
 }
 
+impl<'a, 'c, 'g, 's, 'tree> ExecutionContext<'a, 'c, 'g, 's, 'tree> {
+    fn match_location(&self, tree: Tree) -> Option<Location> {
+        self.mat
+            .captures
+            .iter()
+            .take(1)
+            .map(|c| Location::from(c.node.range().start_point))
+            .next()
+    }
+}
+
 struct ScopedVariables<'a> {
     scopes: HashMap<SyntaxNodeRef, VariableMap<'a, Value>>,
 }
