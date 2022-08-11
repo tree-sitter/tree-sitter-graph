@@ -386,7 +386,17 @@ impl<'a> std::fmt::Display for Excerpt<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "{}{}{}\n{}{}{}{}",
+            "{}:{}:{}:\n{}{}{}\n{}{}{}{}",
+            // path and line/col
+            Colour::White
+                .bold()
+                .paint(self.path.to_str().unwrap_or("<unknown file>")),
+            Colour::White
+                .bold()
+                .paint(format!("{}", self.location.row + 1)),
+            Colour::White
+                .bold()
+                .paint(format!("{}", self.location.column + 1)),
             // first line: line number & source
             Colour::Blue.paint(format!("{}", self.location.row + 1)),
             Colour::Blue.paint(" | "),
