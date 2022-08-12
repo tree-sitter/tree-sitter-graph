@@ -345,17 +345,6 @@ struct ExecutionContext<'a, 'c, 'g, 's, 'tree> {
     cancellation_flag: &'a dyn CancellationFlag,
 }
 
-impl<'a, 'c, 'g, 's, 'tree> ExecutionContext<'a, 'c, 'g, 's, 'tree> {
-    fn match_location(&self) -> Option<Location> {
-        self.mat
-            .captures
-            .iter()
-            .take(1)
-            .map(|c| Location::from(c.node.range().start_point))
-            .next()
-    }
-}
-
 struct ScopedVariables<'a> {
     scopes: HashMap<SyntaxNodeRef, VariableMap<'a, Value>>,
 }
@@ -984,11 +973,10 @@ impl ScopedVariable {
             Ok(value)
         } else {
             Err(ExecutionError::UndefinedVariable(format!(
-                "{} on node {}\n{}\n{}",
+                "{} on node {}\n{}",
                 self,
                 scope,
-                Excerpt::from_source(exec.tsg_path, exec.tsg_source, self.location),
-                Excerpt::from_source(exec.source_path, exec.source, scope.location())
+                Excerpt::from_source(exec.tsg_path, exec.tsg_source, self.location)
             )))
         }
     }
@@ -1014,10 +1002,9 @@ impl ScopedVariable {
             .add(self.name.clone(), value, mutable)
             .map_err(|_| {
                 ExecutionError::DuplicateVariable(format!(
-                    "{}\n{}\n{}",
+                    "{}\n{}",
                     self,
-                    Excerpt::from_source(exec.tsg_path, exec.tsg_source, self.location),
-                    Excerpt::from_source(exec.source_path, exec.source, scope.location())
+                    Excerpt::from_source(exec.tsg_path, exec.tsg_source, self.location)
                 ))
             })
     }
@@ -1036,10 +1023,9 @@ impl ScopedVariable {
         let variables = exec.scoped.get(scope);
         variables.set(self.name.clone(), value).map_err(|_| {
             ExecutionError::DuplicateVariable(format!(
-                "{}\n{}\n{}",
+                "{}\n{}",
                 self,
-                Excerpt::from_source(exec.tsg_path, exec.tsg_source, self.location),
-                Excerpt::from_source(exec.source_path, exec.source, scope.location())
+                Excerpt::from_source(exec.tsg_path, exec.tsg_source, self.location)
             ))
         })
     }
@@ -1084,15 +1070,9 @@ impl UnscopedVariable {
                 ExecutionError::CannotAssignImmutableVariable(format!("{}", self))
             } else {
                 ExecutionError::UndefinedVariable(format!(
-                    "{}\n{}\n{}",
+                    "{}\n{}",
                     self,
-                    Excerpt::from_source(exec.tsg_path, exec.tsg_source, self.location),
-                    Excerpt::from_source(
-                        exec.source_path,
-                        exec.source,
-                        exec.match_location()
-                            .unwrap_or(Location { row: 0, column: 0 })
-                    )
+                    Excerpt::from_source(exec.tsg_path, exec.tsg_source, self.location)
                 ))
             }
         })
