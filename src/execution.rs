@@ -457,8 +457,9 @@ impl Stanza {
                             .unwrap()
                             .node;
                         format!(
-                            "Executing statement {}\n{}\nfor ({}) node at source position\n{}",
+                            "While executing statement {}\nin stanza\n{}\n{}\nmatching ({}) node\n{}",
                             statement,
+                            Excerpt::from_source(tsg_path, tsg_source, self.location),
                             Excerpt::from_source(tsg_path, tsg_source, statement.location()),
                             node.kind(),
                             Excerpt::from_source(
