@@ -457,10 +457,10 @@ impl Stanza {
                             .unwrap()
                             .node;
                         format!(
-                            "While executing statement {}\nin stanza\n{}\n{}\nmatching ({}) node\n{}",
+                            "While executing statement {}\n{}\nin stanza\n{}\nmatching ({}) node\n{}",
                             statement,
-                            Excerpt::from_source(tsg_path, tsg_source, self.location),
                             Excerpt::from_source(tsg_path, tsg_source, statement.location()),
+                            Excerpt::from_source(tsg_path, tsg_source, self.location),
                             node.kind(),
                             Excerpt::from_source(
                                 source_path,
