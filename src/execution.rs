@@ -462,9 +462,23 @@ impl Stanza {
                 statement.execute(&mut exec).or_else(|e| {
                     Err(e).with_context(|| {
                         format!(
-                            "Executing {}\n{}",
+                            "Executing {}\n{}\n{}",
                             statement,
-                            Excerpt::from_source(tsg_path, tsg_source, statement.location()) // FIXME: add the statement excerpt to the leaf error instead
+                            Excerpt::from_source(tsg_path, tsg_source, statement.location()), // FIXME: add the statement excerpt to the leaf error instead
+                            Excerpt::from_source(
+                                source_path,
+                                source,
+                                Location::from(
+                                    mat.captures
+                                        .iter()
+                                        .find(|c| c.index as usize
+                                            == self.full_match_file_capture_index)
+                                        .unwrap()
+                                        .node
+                                        .range()
+                                        .start_point
+                                )
+                            )
                         )
                     })
                 })?;
