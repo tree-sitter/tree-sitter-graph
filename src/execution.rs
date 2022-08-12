@@ -970,8 +970,11 @@ impl ScopedVariable {
             Ok(value)
         } else {
             Err(ExecutionError::UndefinedVariable(format!(
-                "{} on node {}",
-                self, scope
+                "{} on node {}\n{}\n{}",
+                self,
+                scope,
+                Excerpt::from_source(exec.tsg_path, exec.tsg_source, self.location),
+                Excerpt::from_source(exec.source_path, exec.source, scope.location())
             )))
         }
     }
@@ -1066,7 +1069,17 @@ impl UnscopedVariable {
             if exec.locals.get(&self.name).is_some() {
                 ExecutionError::CannotAssignImmutableVariable(format!("{}", self))
             } else {
-                ExecutionError::UndefinedVariable(format!("{}", self))
+                ExecutionError::UndefinedVariable(format!(
+                    "{}\n{}\n{}",
+                    self,
+                    Excerpt::from_source(exec.tsg_path, exec.tsg_source, self.location),
+                    Excerpt::from_source(
+                        exec.source_path,
+                        exec.source,
+                        exec.match_location()
+                            .unwrap_or(Location { row: 0, column: 0 })
+                    )
+                ))
             }
         })
     }
