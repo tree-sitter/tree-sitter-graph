@@ -973,10 +973,8 @@ impl ScopedVariable {
             Ok(value)
         } else {
             Err(ExecutionError::UndefinedVariable(format!(
-                "{} on node {}\n{}",
-                self,
-                scope,
-                Excerpt::from_source(exec.tsg_path, exec.tsg_source, self.location)
+                "{} on node {}",
+                self, scope
             )))
         }
     }
@@ -1000,13 +998,7 @@ impl ScopedVariable {
         let variables = exec.scoped.get(scope);
         variables
             .add(self.name.clone(), value, mutable)
-            .map_err(|_| {
-                ExecutionError::DuplicateVariable(format!(
-                    "{}\n{}",
-                    self,
-                    Excerpt::from_source(exec.tsg_path, exec.tsg_source, self.location)
-                ))
-            })
+            .map_err(|_| ExecutionError::DuplicateVariable(format!("{}", self)))
     }
 
     fn set(&self, exec: &mut ExecutionContext, value: Value) -> Result<(), ExecutionError> {
@@ -1021,13 +1013,9 @@ impl ScopedVariable {
             }
         };
         let variables = exec.scoped.get(scope);
-        variables.set(self.name.clone(), value).map_err(|_| {
-            ExecutionError::DuplicateVariable(format!(
-                "{}\n{}",
-                self,
-                Excerpt::from_source(exec.tsg_path, exec.tsg_source, self.location)
-            ))
-        })
+        variables
+            .set(self.name.clone(), value)
+            .map_err(|_| ExecutionError::DuplicateVariable(format!("{}", self)))
     }
 }
 
@@ -1069,11 +1057,7 @@ impl UnscopedVariable {
             if exec.locals.get(&self.name).is_some() {
                 ExecutionError::CannotAssignImmutableVariable(format!("{}", self))
             } else {
-                ExecutionError::UndefinedVariable(format!(
-                    "{}\n{}",
-                    self,
-                    Excerpt::from_source(exec.tsg_path, exec.tsg_source, self.location)
-                ))
+                ExecutionError::UndefinedVariable(format!("{}", self))
             }
         })
     }
