@@ -477,7 +477,7 @@ impl Stanza {
 }
 
 impl Statement {
-    fn location(&self) -> Location {
+    pub fn location(&self) -> Location {
         match self {
             Statement::DeclareImmutable(s) => s.location,
             Statement::DeclareMutable(s) => s.location,
