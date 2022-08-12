@@ -457,9 +457,10 @@ impl Stanza {
                             .unwrap()
                             .node;
                         format!(
-                            "Executing statement {}\n{}\nfor source position\n{}",
+                            "Executing statement {}\n{}\nfor ({}) node at source position\n{}",
                             statement,
                             Excerpt::from_source(tsg_path, tsg_source, statement.location()),
+                            node.kind(),
                             Excerpt::from_source(
                                 source_path,
                                 source,
