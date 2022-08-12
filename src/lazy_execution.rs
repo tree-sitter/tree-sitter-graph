@@ -22,6 +22,7 @@ use tree_sitter::Tree;
 
 use crate::ast;
 use crate::execution::query_capture_value;
+use crate::execution::Excerpt;
 use crate::execution::ExecutionConfig;
 use crate::execution::ExecutionError;
 use crate::functions::Functions;
@@ -31,6 +32,7 @@ use crate::variables::VariableMap;
 use crate::variables::Variables;
 use crate::CancellationFlag;
 use crate::Identifier;
+use crate::Location;
 
 use statements::*;
 use store::*;
@@ -189,9 +191,28 @@ impl ast::Stanza {
         for statement in &self.statements {
             exec.cancellation_flag
                 .check("executing stanza statements")?;
-            statement
-                .execute_lazy(&mut exec)
-                .with_context(|| format!("Executing {}", statement))?;
+            statement.execute_lazy(&mut exec).or_else(|e| {
+                Err(e).with_context(|| {
+                    let node = mat
+                        .captures
+                        .iter()
+                        .find(|c| c.index as usize == self.full_match_file_capture_index)
+                        .unwrap()
+                        .node;
+                    format!(
+                        "While executing statement {}\n{}\nin stanza\n{}\nmatching ({}) node\n{}",
+                        statement,
+                        Excerpt::from_source(tsg_path, tsg_source, statement.location()),
+                        Excerpt::from_source(tsg_path, tsg_source, self.location),
+                        node.kind(),
+                        Excerpt::from_source(
+                            source_path,
+                            source,
+                            Location::from(node.range().start_point)
+                        )
+                    )
+                })
+            })?;
         }
         trace!("}}");
         Ok(())
