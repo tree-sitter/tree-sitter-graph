@@ -109,10 +109,7 @@ impl ast::File {
 
 /// Context for execution, which executes stanzas to build the lazy graph
 struct ExecutionContext<'a, 'c, 'g, 'tree> {
-    source_path: &'tree Path,
     source: &'tree str,
-    tsg_path: &'a Path,
-    tsg_source: &'a str,
     graph: &'a mut Graph<'tree>,
     config: &'a mut ExecutionConfig<'c, 'g>,
     locals: &'a mut dyn Variables<LazyValue>,
@@ -168,10 +165,7 @@ impl ast::Stanza {
         let current_regex_captures = vec![];
         locals.clear();
         let mut exec = ExecutionContext {
-            source_path,
             source,
-            tsg_path,
-            tsg_source,
             graph,
             config,
             locals,
@@ -351,10 +345,7 @@ impl ast::Scan {
 
             let mut arm_locals = VariableMap::nested(exec.locals);
             let mut arm_exec = ExecutionContext {
-                source_path: exec.source_path,
                 source: exec.source,
-                tsg_path: exec.tsg_path,
-                tsg_source: exec.tsg_source,
                 graph: exec.graph,
                 config: exec.config,
                 locals: &mut arm_locals,
@@ -418,10 +409,7 @@ impl ast::If {
             if result {
                 let mut arm_locals = VariableMap::nested(exec.locals);
                 let mut arm_exec = ExecutionContext {
-                    source_path: exec.source_path,
                     source: exec.source,
-                    tsg_path: exec.tsg_path,
-                    tsg_source: exec.tsg_source,
                     graph: exec.graph,
                     config: exec.config,
                     locals: &mut arm_locals,
@@ -467,10 +455,7 @@ impl ast::ForIn {
         for value in values {
             loop_locals.clear();
             let mut loop_exec = ExecutionContext {
-                source_path: exec.source_path,
                 source: exec.source,
-                tsg_path: exec.tsg_path,
-                tsg_source: exec.tsg_source,
                 graph: exec.graph,
                 config: exec.config,
                 locals: &mut loop_locals,
@@ -564,10 +549,7 @@ impl ast::ListComprehension {
                 .check("executing list comprehension values")?;
             loop_locals.clear();
             let mut loop_exec = ExecutionContext {
-                source_path: exec.source_path,
                 source: exec.source,
-                tsg_path: exec.tsg_path,
-                tsg_source: exec.tsg_source,
                 graph: exec.graph,
                 config: exec.config,
                 locals: &mut loop_locals,
@@ -610,10 +592,7 @@ impl ast::SetComprehension {
                 .check("executing set comprehension values")?;
             loop_locals.clear();
             let mut loop_exec = ExecutionContext {
-                source_path: exec.source_path,
                 source: exec.source,
-                tsg_path: exec.tsg_path,
-                tsg_source: exec.tsg_source,
                 graph: exec.graph,
                 config: exec.config,
                 locals: &mut loop_locals,
@@ -827,10 +806,7 @@ impl ast::AttributeShorthand {
     {
         let mut shorthand_locals = VariableMap::new();
         let mut shorthand_exec = ExecutionContext {
-            source_path: exec.source_path,
             source: exec.source,
-            tsg_path: exec.tsg_path,
-            tsg_source: exec.tsg_source,
             graph: exec.graph,
             config: exec.config,
             locals: &mut shorthand_locals,

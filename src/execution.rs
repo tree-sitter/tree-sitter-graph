@@ -330,10 +330,7 @@ pub struct CancellationError(pub &'static str);
 
 /// State that is threaded through the execution
 struct ExecutionContext<'a, 'c, 'g, 's, 'tree> {
-    source_path: &'tree Path,
     source: &'tree str,
-    tsg_path: &'a Path,
-    tsg_source: &'a str,
     graph: &'a mut Graph<'tree>,
     config: &'a mut ExecutionConfig<'c, 'g>,
     locals: &'a mut dyn Variables<Value>,
@@ -433,10 +430,7 @@ impl Stanza {
             cancellation_flag.check("processing matches")?;
             locals.clear();
             let mut exec = ExecutionContext {
-                source_path,
                 source,
-                tsg_path,
-                tsg_source,
                 graph,
                 config,
                 locals,
@@ -645,10 +639,7 @@ impl Scan {
 
             let mut arm_locals = VariableMap::nested(exec.locals);
             let mut arm_exec = ExecutionContext {
-                source_path: exec.source_path,
                 source: exec.source,
-                tsg_path: exec.tsg_path,
-                tsg_source: exec.tsg_source,
                 graph: exec.graph,
                 config: exec.config,
                 locals: &mut arm_locals,
@@ -704,10 +695,7 @@ impl If {
             if result {
                 let mut arm_locals = VariableMap::nested(exec.locals);
                 let mut arm_exec = ExecutionContext {
-                    source_path: exec.source_path,
                     source: exec.source,
-                    tsg_path: exec.tsg_path,
-                    tsg_source: exec.tsg_source,
                     graph: exec.graph,
                     config: exec.config,
                     locals: &mut arm_locals,
@@ -745,10 +733,7 @@ impl ForIn {
         for value in values {
             loop_locals.clear();
             let mut loop_exec = ExecutionContext {
-                source_path: exec.source_path,
                 source: exec.source,
-                tsg_path: exec.tsg_path,
-                tsg_source: exec.tsg_source,
                 graph: exec.graph,
                 config: exec.config,
                 locals: &mut loop_locals,
@@ -819,10 +804,7 @@ impl ListComprehension {
         for value in values {
             loop_locals.clear();
             let mut loop_exec = ExecutionContext {
-                source_path: exec.source_path,
                 source: exec.source,
-                tsg_path: exec.tsg_path,
-                tsg_source: exec.tsg_source,
                 graph: exec.graph,
                 config: exec.config,
                 locals: &mut loop_locals,
@@ -860,10 +842,7 @@ impl SetComprehension {
         for value in values {
             loop_locals.clear();
             let mut loop_exec = ExecutionContext {
-                source_path: exec.source_path,
                 source: exec.source,
-                tsg_path: exec.tsg_path,
-                tsg_source: exec.tsg_source,
                 graph: exec.graph,
                 config: exec.config,
                 locals: &mut loop_locals,
@@ -1119,10 +1098,7 @@ impl AttributeShorthand {
     {
         let mut shorthand_locals = VariableMap::new();
         let mut shorthand_exec = ExecutionContext {
-            source_path: exec.source_path,
             source: exec.source,
-            tsg_path: exec.tsg_path,
-            tsg_source: exec.tsg_source,
             graph: exec.graph,
             config: exec.config,
             locals: &mut shorthand_locals,
