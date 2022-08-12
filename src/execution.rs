@@ -450,6 +450,12 @@ impl Stanza {
             for statement in &self.statements {
                 statement.execute(&mut exec).or_else(|e| {
                     Err(e).with_context(|| {
+                        let node = mat
+                            .captures
+                            .iter()
+                            .find(|c| c.index as usize == self.full_match_file_capture_index)
+                            .unwrap()
+                            .node;
                         format!(
                             "Executing statement {}\n{}\nfor source position\n{}",
                             statement,
@@ -457,16 +463,7 @@ impl Stanza {
                             Excerpt::from_source(
                                 source_path,
                                 source,
-                                Location::from(
-                                    mat.captures
-                                        .iter()
-                                        .find(|c| c.index as usize
-                                            == self.full_match_file_capture_index)
-                                        .unwrap()
-                                        .node
-                                        .range()
-                                        .start_point
-                                )
+                                Location::from(node.range().start_point)
                             )
                         )
                     })
