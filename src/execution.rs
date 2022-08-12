@@ -362,14 +362,14 @@ impl<'a> ScopedVariables<'a> {
 }
 
 /// Excerpts of source from either the target language file or the tsg rules file.
-struct Excerpt<'a> {
+pub struct Excerpt<'a> {
     path: &'a Path,
     source: Option<&'a str>,
     location: Location,
 }
 
 impl<'a> Excerpt<'a> {
-    fn from_source(path: &'a Path, source: &'a str, location: Location) -> Excerpt<'a> {
+    pub fn from_source(path: &'a Path, source: &'a str, location: Location) -> Excerpt<'a> {
         Excerpt {
             path,
             source: source.lines().nth(location.row),
