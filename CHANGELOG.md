@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Library
 
+#### Fixed
+
+- Fixed bug in `Identifier` so `ast::File` instances can be safely shared between threads.
+
 #### Changed
 
 - Functions are not passed as mutable anymore, so that they can safely used concurrently and reused between executions.
