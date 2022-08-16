@@ -64,9 +64,10 @@ impl File {
         tree: &'tree Tree,
         source: &'tree str,
         config: &mut ExecutionConfig,
+        cancellation_flag: &dyn CancellationFlag,
     ) -> Result<Graph<'tree>, ExecutionError> {
         let mut graph = Graph::new();
-        self.execute_into(&mut graph, tree, source, config)?;
+        self.execute_into(&mut graph, tree, source, config, cancellation_flag)?;
         Ok(graph)
     }
 
@@ -81,11 +82,12 @@ impl File {
         tree: &'tree Tree,
         source: &'tree str,
         config: &mut ExecutionConfig,
+        cancellation_flag: &dyn CancellationFlag,
     ) -> Result<(), ExecutionError> {
         if config.lazy {
-            self.execute_lazy_into(graph, tree, source, config)
+            self.execute_lazy_into(graph, tree, source, config, cancellation_flag)
         } else {
-            self.execute_strict_into(graph, tree, source, config)
+            self.execute_strict_into(graph, tree, source, config, cancellation_flag)
         }
     }
 }
@@ -102,6 +104,7 @@ impl File {
         tree: &'tree Tree,
         source: &'tree str,
         config: &mut ExecutionConfig,
+        cancellation_flag: &dyn CancellationFlag,
     ) -> Result<(), ExecutionError> {
         self.check_globals(config.globals)?;
         let mut locals = VariableMap::new();
@@ -110,6 +113,7 @@ impl File {
         let mut function_parameters = Vec::new();
         let mut cursor = QueryCursor::new();
         for stanza in &self.stanzas {
+            cancellation_flag.check("executing stanza")?;
             stanza.execute(
                 tree,
                 source,
@@ -121,6 +125,7 @@ impl File {
                 &mut function_parameters,
                 &mut cursor,
                 &self.shorthands,
+                cancellation_flag,
             )?;
         }
         Ok(())
@@ -199,6 +204,8 @@ impl<'a, 'g> ExecutionConfig<'a, 'g> {
 /// An error that can occur while executing a graph DSL file
 #[derive(Debug, Error)]
 pub enum ExecutionError {
+    #[error(transparent)]
+    Cancelled(#[from] CancellationError),
     #[error("Cannot assign immutable variable {0}")]
     CannotAssignImmutableVariable(String),
     #[error("Cannot assign scoped variable {0}")]
@@ -263,6 +270,28 @@ impl ExecutionError {
     }
 }
 
+/// Trait to signal that the execution is cancelled
+pub trait CancellationFlag {
+    fn check(&self, at: &'static str) -> Result<(), CancellationError>;
+}
+
+pub struct NoCancellation;
+impl CancellationFlag for NoCancellation {
+    fn check(&self, _at: &'static str) -> Result<(), CancellationError> {
+        Ok(())
+    }
+}
+impl Default for NoCancellation {
+    fn default() -> Self {
+        Self
+    }
+}
+
+#[derive(Debug, Error)]
+#[error("Cancelled at \"{0}\"")]
+pub struct CancellationError(pub &'static str);
+
+/// State that is threaded through the execution
 struct ExecutionContext<'a, 'c, 'g, 's, 'tree> {
     source: &'tree str,
     graph: &'a mut Graph<'tree>,
@@ -273,6 +302,7 @@ struct ExecutionContext<'a, 'c, 'g, 's, 'tree> {
     function_parameters: &'a mut Vec<Value>,
     mat: &'a QueryMatch<'a, 'tree>,
     shorthands: &'a AttributeShorthands,
+    cancellation_flag: &'a dyn CancellationFlag,
 }
 
 struct ScopedVariables<'a> {
@@ -304,9 +334,11 @@ impl Stanza {
         function_parameters: &mut Vec<Value>,
         cursor: &mut QueryCursor,
         shorthands: &AttributeShorthands,
+        cancellation_flag: &dyn CancellationFlag,
     ) -> Result<(), ExecutionError> {
         let matches = cursor.matches(&self.query, tree.root_node(), source.as_bytes());
         for mat in matches {
+            cancellation_flag.check("processing matches")?;
             locals.clear();
             let mut exec = ExecutionContext {
                 source,
@@ -318,6 +350,7 @@ impl Stanza {
                 function_parameters,
                 mat: &mat,
                 shorthands: shorthands,
+                cancellation_flag,
             };
             for statement in &self.statements {
                 statement
@@ -331,6 +364,7 @@ impl Stanza {
 
 impl Statement {
     fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        exec.cancellation_flag.check("executing statement")?;
         match self {
             Statement::DeclareImmutable(statement) => statement.execute(exec),
             Statement::DeclareMutable(statement) => statement.execute(exec),
@@ -446,6 +480,7 @@ impl Scan {
         let mut i = 0;
         let mut matches = Vec::new();
         while i < match_string.len() {
+            exec.cancellation_flag.check("processing scan matches")?;
             matches.clear();
             for (index, arm) in self.arms.iter().enumerate() {
                 let captures = arm.regex.captures(&match_string[i..]);
@@ -489,6 +524,7 @@ impl Scan {
                 function_parameters: exec.function_parameters,
                 mat: exec.mat,
                 shorthands: exec.shorthands,
+                cancellation_flag: exec.cancellation_flag,
             };
 
             for statement in &arm.statements {
@@ -544,6 +580,7 @@ impl If {
                     function_parameters: exec.function_parameters,
                     mat: exec.mat,
                     shorthands: exec.shorthands,
+                    cancellation_flag: exec.cancellation_flag,
                 };
                 for stmt in &arm.statements {
                     stmt.execute(&mut arm_exec)?;
@@ -581,6 +618,7 @@ impl ForIn {
                 function_parameters: exec.function_parameters,
                 mat: exec.mat,
                 shorthands: exec.shorthands,
+                cancellation_flag: exec.cancellation_flag,
             };
             self.variable.add(&mut loop_exec, value, false)?;
             for stmt in &self.statements {
@@ -651,6 +689,7 @@ impl ListComprehension {
                 function_parameters: exec.function_parameters,
                 mat: exec.mat,
                 shorthands: exec.shorthands,
+                cancellation_flag: exec.cancellation_flag,
             };
             self.variable.add(&mut loop_exec, value, false)?;
             let element = self.element.evaluate(&mut loop_exec)?;
@@ -688,6 +727,7 @@ impl SetComprehension {
                 function_parameters: exec.function_parameters,
                 mat: exec.mat,
                 shorthands: exec.shorthands,
+                cancellation_flag: exec.cancellation_flag,
             };
             self.variable.add(&mut loop_exec, value, false)?;
             let element = self.element.evaluate(&mut loop_exec)?;
@@ -912,6 +952,7 @@ impl Attribute {
     where
         F: Fn(&mut ExecutionContext, Identifier, Value) -> Result<(), ExecutionError>,
     {
+        exec.cancellation_flag.check("executing attribute")?;
         let value = self.value.evaluate(exec)?;
         if let Some(shorthand) = exec.shorthands.get(&self.name) {
             shorthand.execute(exec, add_attribute, value)
@@ -942,6 +983,7 @@ impl AttributeShorthand {
             function_parameters: exec.function_parameters,
             mat: exec.mat,
             shorthands: exec.shorthands,
+            cancellation_flag: exec.cancellation_flag,
         };
         self.variable.add(&mut shorthand_exec, value, false)?;
         for attr in &self.attributes {

@@ -28,6 +28,7 @@ use crate::graph;
 use crate::graph::Graph;
 use crate::variables::VariableMap;
 use crate::variables::Variables;
+use crate::CancellationFlag;
 use crate::Identifier;
 
 use statements::*;
@@ -46,6 +47,7 @@ impl ast::File {
         tree: &'tree Tree,
         source: &'tree str,
         config: &mut ExecutionConfig,
+        cancellation_flag: &dyn CancellationFlag,
     ) -> Result<(), ExecutionError> {
         self.check_globals(config.globals)?;
         let mut locals = VariableMap::new();
@@ -59,6 +61,7 @@ impl ast::File {
         let query = &self.query.as_ref().unwrap();
         let matches = cursor.matches(query, tree.root_node(), source.as_bytes());
         for mat in matches {
+            cancellation_flag.check("processing matches")?;
             let stanza = &self.stanzas[mat.pattern_index];
             stanza.execute_lazy(
                 source,
@@ -72,6 +75,7 @@ impl ast::File {
                 &mut function_parameters,
                 &mut prev_element_debug_info,
                 &self.shorthands,
+                cancellation_flag,
             )?;
         }
 
@@ -85,6 +89,7 @@ impl ast::File {
                     scoped_store: &mut scoped_store,
                     function_parameters: &mut function_parameters,
                     prev_element_debug_info: &mut prev_element_debug_info,
+                    cancellation_flag,
                 })
                 .with_context(|| format!("Executing {}", graph_stmt))?;
         }
@@ -107,6 +112,7 @@ struct ExecutionContext<'a, 'c, 'g, 'tree> {
     function_parameters: &'a mut Vec<graph::Value>, // re-usable buffer to reduce memory allocations
     prev_element_debug_info: &'a mut HashMap<GraphElementKey, DebugInfo>,
     shorthands: &'a ast::AttributeShorthands,
+    cancellation_flag: &'a dyn CancellationFlag,
 }
 
 /// Context for evaluation, which evalautes the lazy graph to build the actual graph
@@ -118,6 +124,7 @@ pub(self) struct EvaluationContext<'a, 'tree> {
     pub scoped_store: &'a LazyScopedVariables,
     pub function_parameters: &'a mut Vec<graph::Value>, // re-usable buffer to reduce memory allocations
     pub prev_element_debug_info: &'a mut HashMap<GraphElementKey, DebugInfo>,
+    pub cancellation_flag: &'a dyn CancellationFlag,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -141,6 +148,7 @@ impl ast::Stanza {
         function_parameters: &mut Vec<graph::Value>,
         prev_element_debug_info: &mut HashMap<GraphElementKey, DebugInfo>,
         shorthands: &ast::AttributeShorthands,
+        cancellation_flag: &dyn CancellationFlag,
     ) -> Result<(), ExecutionError> {
         let current_regex_captures = vec![];
         locals.clear();
@@ -157,11 +165,14 @@ impl ast::Stanza {
             function_parameters,
             prev_element_debug_info,
             shorthands,
+            cancellation_flag,
         };
         let node = query_capture_value(self.full_match_file_capture_index, One, &mat, exec.graph);
         debug!("match {} at {}", node, self.location);
         trace!("{{");
         for statement in &self.statements {
+            exec.cancellation_flag
+                .check("executing stanza statements")?;
             statement
                 .execute_lazy(&mut exec)
                 .with_context(|| format!("Executing {}", statement))?;
@@ -173,6 +184,7 @@ impl ast::Stanza {
 
 impl ast::Statement {
     fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
+        exec.cancellation_flag.check("executing statement")?;
         match self {
             Self::DeclareImmutable(statement) => statement.execute_lazy(exec),
             Self::DeclareMutable(statement) => statement.execute_lazy(exec),
@@ -225,6 +237,8 @@ impl ast::AddGraphNodeAttribute {
         let mut attributes = Vec::new();
         let mut add_attribute = |a| attributes.push(a);
         for attribute in &self.attributes {
+            exec.cancellation_flag
+                .check("executing graph node attributes")?;
             attribute.execute_lazy(exec, &mut add_attribute)?;
         }
         let stmt = LazyAddGraphNodeAttribute::new(node, attributes, self.location.into());
@@ -267,6 +281,7 @@ impl ast::Scan {
         while i < match_string.len() {
             matches.clear();
             for (index, arm) in self.arms.iter().enumerate() {
+                exec.cancellation_flag.check("processing scan matches")?;
                 let captures = arm.regex.captures(&match_string[i..]);
                 if let Some(captures) = captures {
                     if captures.get(0).unwrap().range().is_empty() {
@@ -311,9 +326,13 @@ impl ast::Scan {
                 function_parameters: exec.function_parameters,
                 prev_element_debug_info: exec.prev_element_debug_info,
                 shorthands: exec.shorthands,
+                cancellation_flag: exec.cancellation_flag,
             };
 
             for statement in &arm.statements {
+                arm_exec
+                    .cancellation_flag
+                    .check("executing scan statements")?;
                 statement
                     .execute_lazy(&mut arm_exec)
                     .with_context(|| format!("Executing {}", statement))
@@ -371,8 +390,12 @@ impl ast::If {
                     function_parameters: exec.function_parameters,
                     prev_element_debug_info: exec.prev_element_debug_info,
                     shorthands: exec.shorthands,
+                    cancellation_flag: exec.cancellation_flag,
                 };
                 for stmt in &arm.statements {
+                    arm_exec
+                        .cancellation_flag
+                        .check("executing if statements")?;
                     stmt.execute_lazy(&mut arm_exec)?;
                 }
                 break;
@@ -413,10 +436,14 @@ impl ast::ForIn {
                 function_parameters: exec.function_parameters,
                 prev_element_debug_info: exec.prev_element_debug_info,
                 shorthands: exec.shorthands,
+                cancellation_flag: exec.cancellation_flag,
             };
             self.variable
                 .add_lazy(&mut loop_exec, value.into(), false)?;
             for stmt in &self.statements {
+                loop_exec
+                    .cancellation_flag
+                    .check("executing for statements")?;
                 stmt.execute_lazy(&mut loop_exec)?;
             }
         }
@@ -454,6 +481,7 @@ impl ast::Expression {
             scoped_store: exec.scoped_store,
             function_parameters: exec.function_parameters,
             prev_element_debug_info: exec.prev_element_debug_info,
+            cancellation_flag: exec.cancellation_flag,
         })
     }
 }
@@ -486,6 +514,8 @@ impl ast::ListComprehension {
         let mut elements = Vec::new();
         let mut loop_locals = VariableMap::nested(exec.locals);
         for value in values {
+            exec.cancellation_flag
+                .check("executing list comprehension values")?;
             loop_locals.clear();
             let mut loop_exec = ExecutionContext {
                 source: exec.source,
@@ -500,6 +530,7 @@ impl ast::ListComprehension {
                 function_parameters: exec.function_parameters,
                 prev_element_debug_info: exec.prev_element_debug_info,
                 shorthands: exec.shorthands,
+                cancellation_flag: exec.cancellation_flag,
             };
             self.variable
                 .add_lazy(&mut loop_exec, value.into(), false)?;
@@ -526,6 +557,8 @@ impl ast::SetComprehension {
         let mut elements = Vec::new();
         let mut loop_locals = VariableMap::nested(exec.locals);
         for value in values {
+            exec.cancellation_flag
+                .check("executing set comprehension values")?;
             loop_locals.clear();
             let mut loop_exec = ExecutionContext {
                 source: exec.source,
@@ -540,6 +573,7 @@ impl ast::SetComprehension {
                 function_parameters: exec.function_parameters,
                 prev_element_debug_info: exec.prev_element_debug_info,
                 shorthands: exec.shorthands,
+                cancellation_flag: exec.cancellation_flag,
             };
             self.variable
                 .add_lazy(&mut loop_exec, value.into(), false)?;
@@ -717,6 +751,8 @@ impl ast::Attribute {
     where
         F: FnMut(LazyAttribute) -> (),
     {
+        exec.cancellation_flag
+            .check("executing shorthand attributes")?;
         let value = self.value.evaluate_lazy(exec)?;
         if let Some(shorthand) = exec.shorthands.get(&self.name) {
             shorthand.execute_lazy(exec, add_attribute, value)
@@ -751,6 +787,7 @@ impl ast::AttributeShorthand {
             function_parameters: exec.function_parameters,
             prev_element_debug_info: exec.prev_element_debug_info,
             shorthands: exec.shorthands,
+            cancellation_flag: exec.cancellation_flag,
         };
         self.variable.add_lazy(&mut shorthand_exec, value, false)?;
         for attr in &self.attributes {

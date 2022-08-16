@@ -11,6 +11,7 @@ use tree_sitter_graph::ast::File;
 use tree_sitter_graph::functions::Functions;
 use tree_sitter_graph::ExecutionConfig;
 use tree_sitter_graph::ExecutionError;
+use tree_sitter_graph::NoCancellation;
 use tree_sitter_graph::Variables;
 
 fn init_log() {
@@ -35,7 +36,12 @@ fn execute(python_source: &str, dsl_source: &str) -> Result<String, ExecutionErr
         .add("filename".into(), "test.py".into())
         .map_err(|_| ExecutionError::DuplicateVariable("filename".into()))?;
     let mut config = ExecutionConfig::new(&functions, &globals).lazy(true);
-    let graph = file.execute(&tree, python_source, &mut config)?;
+    let graph = file.execute(
+        &tree,
+        python_source,
+        &mut config,
+        &NoCancellation::default(),
+    )?;
     let result = graph.pretty_print().to_string();
     Ok(result)
 }
