@@ -153,7 +153,7 @@ impl File {
 
 /// Configuration for the execution of a File
 pub struct ExecutionConfig<'a, 'g> {
-    pub(crate) functions: &'a mut Functions,
+    pub(crate) functions: &'a Functions,
     pub(crate) globals: &'a Globals<'g>,
     pub(crate) lazy: bool,
     pub(crate) location_attr: Option<Identifier>,
@@ -161,7 +161,7 @@ pub struct ExecutionConfig<'a, 'g> {
 }
 
 impl<'a, 'g> ExecutionConfig<'a, 'g> {
-    pub fn new(functions: &'a mut Functions, globals: &'a Globals<'g>) -> Self {
+    pub fn new(functions: &'a Functions, globals: &'a Globals<'g>) -> Self {
         Self {
             functions,
             globals,

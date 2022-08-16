@@ -30,12 +30,12 @@ fn execute(python_source: &str, dsl_source: &str) -> Result<String, ExecutionErr
     let tree = parser.parse(python_source, None).unwrap();
     let file =
         File::from_str(tree_sitter_python::language(), dsl_source).expect("Cannot parse file");
-    let mut functions = Functions::stdlib();
+    let functions = Functions::stdlib();
     let mut globals = Variables::new();
     globals
         .add(Identifier::from("filename"), "test.py".into())
         .map_err(|_| ExecutionError::DuplicateVariable("filename".into()))?;
-    let mut config = ExecutionConfig::new(&mut functions, &globals);
+    let mut config = ExecutionConfig::new(&functions, &globals);
     let graph = file.execute(&tree, python_source, &mut config)?;
     let result = graph.pretty_print().to_string();
     Ok(result)
