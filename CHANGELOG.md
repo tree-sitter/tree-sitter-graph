@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Library
 
+#### Added
+
+- Cancellation of `ast::File` execution is now supported by passing an implementation of the
+  `CancellationFlag` trait. Convenience implementations are provided as associated methods on
+  `CancellationFlags`.
+
 #### Fixed
 
 - Fixed bug in `Identifier` so `ast::File` instances can be safely shared between threads.
@@ -16,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Changed
 
 - Functions are not passed as mutable anymore, so that they can safely used concurrently and reused between executions.
+- `ast::File::execute` requires an extra `CancellationFlag` parameter. Use
+  `&CancellationFlags::none()` if no cancellation is required.
 
 ## 0.5.1 -- 2022-05-11
 
