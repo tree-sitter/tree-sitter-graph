@@ -9,10 +9,10 @@ use indoc::indoc;
 use tree_sitter::Parser;
 use tree_sitter_graph::ast::File;
 use tree_sitter_graph::functions::Functions;
+use tree_sitter_graph::CancellationFlags;
 use tree_sitter_graph::ExecutionConfig;
 use tree_sitter_graph::ExecutionError;
 use tree_sitter_graph::Identifier;
-use tree_sitter_graph::NoCancellation;
 use tree_sitter_graph::Variables;
 
 fn init_log() {
@@ -41,7 +41,7 @@ fn execute(python_source: &str, dsl_source: &str) -> Result<String, ExecutionErr
         &tree,
         python_source,
         &mut config,
-        &NoCancellation::default(),
+        &CancellationFlags::none(),
     )?;
     let result = graph.pretty_print().to_string();
     Ok(result)

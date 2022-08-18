@@ -275,15 +275,16 @@ pub trait CancellationFlag {
     fn check(&self, at: &'static str) -> Result<(), CancellationError>;
 }
 
-pub struct NoCancellation;
-impl CancellationFlag for NoCancellation {
-    fn check(&self, _at: &'static str) -> Result<(), CancellationError> {
-        Ok(())
-    }
-}
-impl Default for NoCancellation {
-    fn default() -> Self {
-        Self
+pub struct CancellationFlags;
+impl CancellationFlags {
+    pub fn none() -> impl CancellationFlag {
+        struct NoCancellation;
+        impl CancellationFlag for NoCancellation {
+            fn check(&self, _at: &'static str) -> Result<(), CancellationError> {
+                Ok(())
+            }
+        }
+        NoCancellation
     }
 }
 
