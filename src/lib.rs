@@ -40,9 +40,9 @@ mod variables;
 
 pub use execution::CancellationError;
 pub use execution::CancellationFlag;
-pub use execution::CancellationFlags;
 pub use execution::ExecutionConfig;
 pub use execution::ExecutionError;
+pub use execution::NoCancellation;
 pub use parser::Location;
 pub use parser::ParseError;
 pub use variables::Globals as Variables;

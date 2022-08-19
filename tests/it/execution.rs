@@ -9,10 +9,10 @@ use indoc::indoc;
 use tree_sitter::Parser;
 use tree_sitter_graph::ast::File;
 use tree_sitter_graph::functions::Functions;
-use tree_sitter_graph::CancellationFlags;
 use tree_sitter_graph::ExecutionConfig;
 use tree_sitter_graph::ExecutionError;
 use tree_sitter_graph::Identifier;
+use tree_sitter_graph::NoCancellation;
 use tree_sitter_graph::Variables;
 
 fn init_log() {
@@ -37,12 +37,7 @@ fn execute(python_source: &str, dsl_source: &str) -> Result<String, ExecutionErr
         .add(Identifier::from("filename"), "test.py".into())
         .map_err(|_| ExecutionError::DuplicateVariable("filename".into()))?;
     let mut config = ExecutionConfig::new(&functions, &globals);
-    let graph = file.execute(
-        &tree,
-        python_source,
-        &mut config,
-        &CancellationFlags::none(),
-    )?;
+    let graph = file.execute(&tree, python_source, &mut config, &NoCancellation)?;
     let result = graph.pretty_print().to_string();
     Ok(result)
 }
