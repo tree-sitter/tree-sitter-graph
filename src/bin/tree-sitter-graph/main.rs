@@ -21,6 +21,7 @@ use tree_sitter_graph::graph;
 use tree_sitter_graph::parse_error::ParseError;
 use tree_sitter_graph::ExecutionConfig;
 use tree_sitter_graph::Identifier;
+use tree_sitter_graph::NoCancellation;
 use tree_sitter_graph::Variables;
 use tree_sitter_loader::Loader;
 
@@ -138,7 +139,7 @@ fn main() -> Result<()> {
     let functions = Functions::stdlib();
     let mut config = ExecutionConfig::new(&functions, &globals_).lazy(lazy);
     let graph = file
-        .execute(&tree, &source, &mut config)
+        .execute(&tree, &source, &mut config, &NoCancellation)
         .with_context(|| format!("Cannot execute TSG file {}", tsg_path.display()))?;
 
     let json = matches.is_present("json");

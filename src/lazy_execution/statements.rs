@@ -31,6 +31,7 @@ pub(super) enum LazyStatement {
 
 impl LazyStatement {
     pub(super) fn evaluate(&self, exec: &mut EvaluationContext) -> Result<(), ExecutionError> {
+        exec.cancellation_flag.check("evaluating statement")?;
         debug!("eval {}", self);
         trace!("{{");
         let result = match self {

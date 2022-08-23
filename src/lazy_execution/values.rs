@@ -118,6 +118,7 @@ impl From<LazyCall> for LazyValue {
 
 impl LazyValue {
     pub(super) fn evaluate(&self, exec: &mut EvaluationContext) -> Result<Value, ExecutionError> {
+        exec.cancellation_flag.check("evaluating value")?;
         trace!("eval {} {{", self);
         let ret = match self {
             Self::Value(value) => Ok(value.clone()),
