@@ -23,6 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Functions are not passed as mutable anymore, so that they can safely used concurrently and reused between executions.
 - `ast::File::execute` requires an extra `CancellationFlag` parameter. Use `&NoCancellation` if no cancellation is required.
 
+### CLI
+
+#### Added
+
+- Global variables can be provided by passing `--global VAR=VAL` flags. Only string values are supported.
+
 ## 0.5.1 -- 2022-05-11
 
 ### DSL
