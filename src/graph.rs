@@ -33,6 +33,7 @@ use tree_sitter::Node;
 
 use crate::execution::ExecutionError;
 use crate::Identifier;
+use crate::Location;
 
 /// A graph produced by executing a graph DSL file.  Graphs include a lifetime parameter to ensure
 /// that they don't outlive the tree-sitter syntax tree that they are generated from.
@@ -600,6 +601,21 @@ pub struct SyntaxNodeRef {
     index: SyntaxNodeID,
     kind: &'static str,
     position: tree_sitter::Point,
+}
+
+impl From<tree_sitter::Point> for Location {
+    fn from(point: tree_sitter::Point) -> Location {
+        Location {
+            row: point.row,
+            column: point.column,
+        }
+    }
+}
+
+impl SyntaxNodeRef {
+    pub fn location(&self) -> Location {
+        Location::from(self.position)
+    }
 }
 
 impl From<SyntaxNodeRef> for Value {

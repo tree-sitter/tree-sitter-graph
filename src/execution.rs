@@ -5,9 +5,11 @@
 // Please see the LICENSE-APACHE or LICENSE-MIT files in this distribution for license details.
 // ------------------------------------------------------------------------------------------------
 
+use ansi_term::Colour;
 use anyhow::Context as ErrorContext;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
+use std::path::Path;
 use thiserror::Error;
 use tree_sitter::CaptureQuantifier;
 use tree_sitter::QueryCursor;
@@ -54,20 +56,33 @@ use crate::variables::Globals;
 use crate::variables::VariableMap;
 use crate::variables::Variables;
 use crate::Identifier;
+use crate::Location;
 
 impl File {
     /// Executes this graph DSL file against a source file.  You must provide the parsed syntax
     /// tree (`tree`) as well as the source text that it was parsed from (`source`).  You also
     /// provide the set of functions and global variables that are available during execution.
-    pub fn execute<'tree>(
+    pub fn execute<'a, 'tree>(
         &self,
         tree: &'tree Tree,
+        source_path: &'tree Path,
         source: &'tree str,
+        tsg_path: &'a Path,
+        tsg_source: &'a str,
         config: &mut ExecutionConfig,
         cancellation_flag: &dyn CancellationFlag,
     ) -> Result<Graph<'tree>, ExecutionError> {
         let mut graph = Graph::new();
-        self.execute_into(&mut graph, tree, source, config, cancellation_flag)?;
+        self.execute_into(
+            &mut graph,
+            tree,
+            source_path,
+            source,
+            tsg_path,
+            tsg_source,
+            config,
+            cancellation_flag,
+        )?;
         Ok(graph)
     }
 
@@ -76,18 +91,39 @@ impl File {
     /// text that it was parsed from (`source`).  You also provide the set of functions and global
     /// variables that are available during execution. This variant is useful when you need to
     /// “pre-seed” the graph with some predefined nodes and/or edges before executing the DSL file.
-    pub fn execute_into<'tree>(
+    pub fn execute_into<'a, 'tree>(
         &self,
         graph: &mut Graph<'tree>,
         tree: &'tree Tree,
+        source_path: &'tree Path,
         source: &'tree str,
+        tsg_path: &'a Path,
+        tsg_source: &'a str,
         config: &mut ExecutionConfig,
         cancellation_flag: &dyn CancellationFlag,
     ) -> Result<(), ExecutionError> {
         if config.lazy {
-            self.execute_lazy_into(graph, tree, source, config, cancellation_flag)
+            self.execute_lazy_into(
+                graph,
+                tree,
+                source_path,
+                source,
+                tsg_path,
+                tsg_source,
+                config,
+                cancellation_flag,
+            )
         } else {
-            self.execute_strict_into(graph, tree, source, config, cancellation_flag)
+            self.execute_strict_into(
+                graph,
+                tree,
+                source_path,
+                source,
+                tsg_path,
+                tsg_source,
+                config,
+                cancellation_flag,
+            )
         }
     }
 }
@@ -98,11 +134,14 @@ impl File {
     /// text that it was parsed from (`source`).  You also provide the set of functions and global
     /// variables that are available during execution. This variant is useful when you need to
     /// “pre-seed” the graph with some predefined nodes and/or edges before executing the DSL file.
-    fn execute_strict_into<'tree>(
+    fn execute_strict_into<'a, 'tree>(
         &self,
         graph: &mut Graph<'tree>,
         tree: &'tree Tree,
+        source_path: &'tree Path,
         source: &'tree str,
+        tsg_path: &'a Path,
+        tsg_source: &'a str,
         config: &mut ExecutionConfig,
         cancellation_flag: &dyn CancellationFlag,
     ) -> Result<(), ExecutionError> {
@@ -116,7 +155,10 @@ impl File {
             cancellation_flag.check("executing stanza")?;
             stanza.execute(
                 tree,
+                source_path,
                 source,
+                tsg_path,
+                tsg_source,
                 graph,
                 config,
                 &mut locals,
@@ -316,11 +358,63 @@ impl<'a> ScopedVariables<'a> {
     }
 }
 
+/// Excerpts of source from either the target language file or the tsg rules file.
+pub struct Excerpt<'a> {
+    path: &'a Path,
+    source: Option<&'a str>,
+    location: Location,
+}
+
+impl<'a> Excerpt<'a> {
+    pub fn from_source(path: &'a Path, source: &'a str, location: Location) -> Excerpt<'a> {
+        Excerpt {
+            path,
+            source: source.lines().nth(location.row),
+            location: location,
+        }
+    }
+
+    fn gutter_width(&self) -> usize {
+        ((self.location.row + 1) as f64).log10() as usize + 1
+    }
+}
+
+impl<'a> std::fmt::Display for Excerpt<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "{}:{}:{}:\n{}{}{}\n{}{}{}{}",
+            // path and line/col
+            Colour::White
+                .bold()
+                .paint(self.path.to_str().unwrap_or("<unknown file>")),
+            Colour::White
+                .bold()
+                .paint(format!("{}", self.location.row + 1)),
+            Colour::White
+                .bold()
+                .paint(format!("{}", self.location.column + 1)),
+            // first line: line number & source
+            Colour::Blue.paint(format!("{}", self.location.row + 1)),
+            Colour::Blue.paint(" | "),
+            self.source.unwrap_or("<no source found>"),
+            // second line: caret
+            " ".repeat(self.gutter_width()),
+            Colour::Blue.paint(" | "),
+            " ".repeat(self.location.column),
+            Colour::Green.bold().paint("^")
+        )
+    }
+}
+
 impl Stanza {
-    fn execute<'g, 'l, 's, 'tree>(
+    fn execute<'a, 'g, 'l, 's, 'tree>(
         &self,
         tree: &'tree Tree,
+        source_path: &'tree Path,
         source: &'tree str,
+        tsg_path: &'a Path,
+        tsg_source: &'a str,
         graph: &mut Graph<'tree>,
         config: &mut ExecutionConfig<'_, 'g>,
         locals: &mut VariableMap<'l, Value>,
@@ -348,9 +442,28 @@ impl Stanza {
                 cancellation_flag,
             };
             for statement in &self.statements {
-                statement
-                    .execute(&mut exec)
-                    .with_context(|| format!("Executing {}", statement))?;
+                statement.execute(&mut exec).or_else(|e| {
+                    Err(e).with_context(|| {
+                        let node = mat
+                            .captures
+                            .iter()
+                            .find(|c| c.index as usize == self.full_match_file_capture_index)
+                            .unwrap()
+                            .node;
+                        format!(
+                            "While executing statement {}\n{}\nin stanza\n{}\nmatching ({}) node\n{}",
+                            statement,
+                            Excerpt::from_source(tsg_path, tsg_source, statement.location()),
+                            Excerpt::from_source(tsg_path, tsg_source, self.location),
+                            node.kind(),
+                            Excerpt::from_source(
+                                source_path,
+                                source,
+                                Location::from(node.range().start_point)
+                            )
+                        )
+                    })
+                })?;
             }
         }
         Ok(())
@@ -358,6 +471,22 @@ impl Stanza {
 }
 
 impl Statement {
+    pub fn location(&self) -> Location {
+        match self {
+            Statement::DeclareImmutable(s) => s.location,
+            Statement::DeclareMutable(s) => s.location,
+            Statement::Assign(s) => s.location,
+            Statement::CreateGraphNode(s) => s.location,
+            Statement::AddGraphNodeAttribute(s) => s.location,
+            Statement::CreateEdge(s) => s.location,
+            Statement::AddEdgeAttribute(s) => s.location,
+            Statement::Scan(s) => s.location,
+            Statement::Print(s) => s.location,
+            Statement::If(s) => s.location,
+            Statement::ForIn(s) => s.location,
+        }
+    }
+
     fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
         exec.cancellation_flag.check("executing statement")?;
         match self {
@@ -823,7 +952,7 @@ impl ScopedVariable {
         } else {
             Err(ExecutionError::UndefinedVariable(format!(
                 "{} on node {}",
-                self, scope,
+                self, scope
             )))
         }
     }
@@ -847,7 +976,7 @@ impl ScopedVariable {
         let variables = exec.scoped.get(scope);
         variables
             .add(self.name.clone(), value, mutable)
-            .map_err(|_| ExecutionError::DuplicateVariable(format!(" {}", self)))
+            .map_err(|_| ExecutionError::DuplicateVariable(format!("{}", self)))
     }
 
     fn set(&self, exec: &mut ExecutionContext, value: Value) -> Result<(), ExecutionError> {
@@ -864,7 +993,7 @@ impl ScopedVariable {
         let variables = exec.scoped.get(scope);
         variables
             .set(self.name.clone(), value)
-            .map_err(|_| ExecutionError::DuplicateVariable(format!(" {}", self)))
+            .map_err(|_| ExecutionError::DuplicateVariable(format!("{}", self)))
     }
 }
 

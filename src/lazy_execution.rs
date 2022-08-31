@@ -13,6 +13,7 @@ use anyhow::Context as _;
 use log::{debug, trace};
 
 use std::collections::HashMap;
+use std::path::Path;
 
 use tree_sitter::CaptureQuantifier::One;
 use tree_sitter::QueryCursor;
@@ -21,6 +22,7 @@ use tree_sitter::Tree;
 
 use crate::ast;
 use crate::execution::query_capture_value;
+use crate::execution::Excerpt;
 use crate::execution::ExecutionConfig;
 use crate::execution::ExecutionError;
 use crate::functions::Functions;
@@ -30,6 +32,7 @@ use crate::variables::VariableMap;
 use crate::variables::Variables;
 use crate::CancellationFlag;
 use crate::Identifier;
+use crate::Location;
 
 use statements::*;
 use store::*;
@@ -41,11 +44,14 @@ impl ast::File {
     /// text that it was parsed from (`source`).  You also provide the set of functions and global
     /// variables that are available during execution. This variant is useful when you need to
     /// “pre-seed” the graph with some predefined nodes and/or edges before executing the DSL file.
-    pub(crate) fn execute_lazy_into<'tree>(
+    pub(crate) fn execute_lazy_into<'a, 'tree>(
         &self,
         graph: &mut Graph<'tree>,
         tree: &'tree Tree,
+        source_path: &'tree Path,
         source: &'tree str,
+        tsg_path: &'a Path,
+        tsg_source: &'a str,
         config: &mut ExecutionConfig,
         cancellation_flag: &dyn CancellationFlag,
     ) -> Result<(), ExecutionError> {
@@ -64,7 +70,10 @@ impl ast::File {
             cancellation_flag.check("processing matches")?;
             let stanza = &self.stanzas[mat.pattern_index];
             stanza.execute_lazy(
+                source_path,
                 source,
+                tsg_path,
+                tsg_source,
                 &mat,
                 graph,
                 config,
@@ -137,7 +146,10 @@ pub(super) enum GraphElementKey {
 impl ast::Stanza {
     fn execute_lazy<'a, 'l, 'g, 'q, 'tree>(
         &self,
+        source_path: &'tree Path,
         source: &'tree str,
+        tsg_path: &'a Path,
+        tsg_source: &'a str,
         mat: &QueryMatch<'_, 'tree>,
         graph: &mut Graph<'tree>,
         config: &mut ExecutionConfig,
@@ -173,9 +185,28 @@ impl ast::Stanza {
         for statement in &self.statements {
             exec.cancellation_flag
                 .check("executing stanza statements")?;
-            statement
-                .execute_lazy(&mut exec)
-                .with_context(|| format!("Executing {}", statement))?;
+            statement.execute_lazy(&mut exec).or_else(|e| {
+                Err(e).with_context(|| {
+                    let node = mat
+                        .captures
+                        .iter()
+                        .find(|c| c.index as usize == self.full_match_file_capture_index)
+                        .unwrap()
+                        .node;
+                    format!(
+                        "While executing statement {}\n{}\nin stanza\n{}\nmatching ({}) node\n{}",
+                        statement,
+                        Excerpt::from_source(tsg_path, tsg_source, statement.location()),
+                        Excerpt::from_source(tsg_path, tsg_source, self.location),
+                        node.kind(),
+                        Excerpt::from_source(
+                            source_path,
+                            source,
+                            Location::from(node.range().start_point)
+                        )
+                    )
+                })
+            })?;
         }
         trace!("}}");
         Ok(())
