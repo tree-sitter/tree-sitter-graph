@@ -16,7 +16,6 @@ edition = "2018"
 test = false
 
 [dependencies]
-anyhow = "1.0"
 log = "0.4"
 regex = "1"
 smallvec = { version="1.6", features=["union"] }
@@ -43,7 +42,11 @@ name = "tree-sitter-graph"
 required-features = ["cli"]
 
 [features]
-cli = ["clap", "env_logger", "tree-sitter-config", "tree-sitter-loader"]
+cli = ["anyhow", "clap", "env_logger", "tree-sitter-config", "tree-sitter-loader"]
+
+[dependencies.anyhow]
+optional = true
+version = "1.0"
 
 [dependencies.clap]
 optional = true

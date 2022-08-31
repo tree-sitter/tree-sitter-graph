@@ -7,7 +7,6 @@
 
 //! Defines store and thunks for lazy DSL evaluation
 
-use anyhow::Context as _;
 use log::trace;
 
 use std::cell::Cell;
@@ -18,6 +17,7 @@ use std::fmt;
 use std::rc::Rc;
 
 use crate::execution::ExecutionError;
+use crate::execution::ResultWithExecutionError;
 use crate::graph;
 use crate::graph::SyntaxNodeRef;
 use crate::parser::Location;

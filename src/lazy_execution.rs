@@ -9,7 +9,6 @@ mod statements;
 mod store;
 mod values;
 
-use anyhow::Context as _;
 use log::{debug, trace};
 
 use std::collections::HashMap;
@@ -25,6 +24,7 @@ use crate::execution::query_capture_value;
 use crate::execution::Excerpt;
 use crate::execution::ExecutionConfig;
 use crate::execution::ExecutionError;
+use crate::execution::ResultWithExecutionError;
 use crate::functions::Functions;
 use crate::graph;
 use crate::graph::Graph;

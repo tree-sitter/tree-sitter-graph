@@ -6,7 +6,6 @@
 // ------------------------------------------------------------------------------------------------
 
 use ansi_term::Colour;
-use anyhow::Context as ErrorContext;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::path::Path;
@@ -298,17 +297,36 @@ pub enum ExecutionError {
     UndefinedVariable(String),
     #[error("Cannot add scoped variable after being forced {0}")]
     VariableScopesAlreadyForced(String),
-    #[error(transparent)]
-    Other(#[from] anyhow::Error),
+    #[error("Function {0} failed: {1}")]
+    FunctionFailed(String, String),
+    #[error("{0}: {1}")]
+    InContext(String, Box<ExecutionError>),
 }
 
-impl ExecutionError {
-    /// Wraps an existing [`std::error::Error`][] as an execution error
-    pub fn other<E>(err: E) -> ExecutionError
+pub(crate) trait ResultWithExecutionError<R> {
+    fn context(self, context: String) -> Result<R, ExecutionError>;
+
+    fn with_context<F>(self, with_context: F) -> Result<R, ExecutionError>
     where
-        E: Into<anyhow::Error>,
+        F: FnOnce() -> String;
+}
+
+impl<R> ResultWithExecutionError<R> for Result<R, ExecutionError> {
+    fn context(self, context: String) -> Result<R, ExecutionError> {
+        self.map_err(|e| match e {
+            cancelled @ ExecutionError::Cancelled(_) => cancelled,
+            _ => ExecutionError::InContext(context, Box::new(e)),
+        })
+    }
+
+    fn with_context<F>(self, with_context: F) -> Result<R, ExecutionError>
+    where
+        F: FnOnce() -> String,
     {
-        ExecutionError::Other(err.into())
+        self.map_err(|e| match e {
+            cancelled @ ExecutionError::Cancelled(_) => cancelled,
+            _ => ExecutionError::InContext(with_context(), Box::new(e)),
+        })
     }
 }
 
