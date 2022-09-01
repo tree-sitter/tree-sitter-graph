@@ -28,7 +28,7 @@ use serde_json;
 use smallvec::SmallVec;
 use tree_sitter::Node;
 
-use crate::execution::ExecutionError;
+use crate::execution_error::ExecutionError;
 use crate::Identifier;
 use crate::Location;
 

@@ -6,7 +6,6 @@
 // ------------------------------------------------------------------------------------------------
 
 use indoc::indoc;
-use std::path::Path;
 use tree_sitter::Parser;
 use tree_sitter_graph::ast::File;
 use tree_sitter_graph::functions::Functions;
@@ -38,15 +37,7 @@ fn execute(python_source: &str, dsl_source: &str) -> Result<String, ExecutionErr
         .add(Identifier::from("filename"), "test.py".into())
         .map_err(|_| ExecutionError::DuplicateVariable("filename".into()))?;
     let mut config = ExecutionConfig::new(&functions, &globals);
-    let graph = file.execute(
-        &tree,
-        &Path::new("test.py"),
-        python_source,
-        &Path::new("test.tsg"),
-        dsl_source,
-        &mut config,
-        &NoCancellation,
-    )?;
+    let graph = file.execute(&tree, python_source, &mut config, &NoCancellation)?;
     let result = graph.pretty_print().to_string();
     Ok(result)
 }
