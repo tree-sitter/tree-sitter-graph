@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Library
+
+#### Fixed
+
+- Cancellation errors during execution are now propagated all the way up, instead of being wrapped in other errors.
+
+#### Added
+
+- The `ExecutionError` type now supports formatting errors with excerpts from the program and TSG source by using the `.display_pretty` method.
+
+### CLI
+
+#### Added
+
+- Execution errors now include excerpts from the program and TSG source when printed.
+
 ## 0.6.0 -- 20220-08-23
 
 ### Library
