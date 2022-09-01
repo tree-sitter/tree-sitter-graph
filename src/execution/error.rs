@@ -110,7 +110,7 @@ impl std::fmt::Display for Context {
     }
 }
 
-pub(crate) trait ResultWithExecutionError<R> {
+pub(super) trait ResultWithExecutionError<R> {
     fn with_context<F>(self, with_context: F) -> Result<R, ExecutionError>
     where
         F: FnOnce() -> Context;
@@ -207,7 +207,7 @@ impl DisplayExecutionErrorPretty<'_> {
 }
 
 /// Excerpts of source from either the target language file or the tsg rules file.
-pub struct Excerpt<'a> {
+struct Excerpt<'a> {
     path: &'a Path,
     source: Option<&'a str>,
     location: &'a Location,
