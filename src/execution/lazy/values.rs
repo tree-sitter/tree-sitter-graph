@@ -12,7 +12,7 @@ use log::trace;
 use std::convert::From;
 use std::fmt;
 
-use crate::execution_error::ExecutionError;
+use crate::execution::error::ExecutionError;
 use crate::graph::GraphNodeRef;
 use crate::graph::SyntaxNodeRef;
 use crate::graph::Value;

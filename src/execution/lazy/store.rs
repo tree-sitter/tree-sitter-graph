@@ -16,8 +16,8 @@ use std::convert::From;
 use std::fmt;
 use std::rc::Rc;
 
-use crate::execution_error::ExecutionError;
-use crate::execution_error::ResultWithExecutionError;
+use crate::execution::error::ExecutionError;
+use crate::execution::error::ResultWithExecutionError;
 use crate::graph;
 use crate::graph::SyntaxNodeRef;
 use crate::parser::Location;

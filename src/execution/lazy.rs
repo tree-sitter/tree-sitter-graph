@@ -19,11 +19,11 @@ use tree_sitter::QueryMatch;
 use tree_sitter::Tree;
 
 use crate::ast;
+use crate::execution::error::Context;
+use crate::execution::error::ExecutionError;
+use crate::execution::error::ResultWithExecutionError;
 use crate::execution::query_capture_value;
 use crate::execution::ExecutionConfig;
-use crate::execution_error::Context;
-use crate::execution_error::ExecutionError;
-use crate::execution_error::ResultWithExecutionError;
 use crate::functions::Functions;
 use crate::graph;
 use crate::graph::Graph;
@@ -43,7 +43,7 @@ impl ast::File {
     /// text that it was parsed from (`source`).  You also provide the set of functions and global
     /// variables that are available during execution. This variant is useful when you need to
     /// “pre-seed” the graph with some predefined nodes and/or edges before executing the DSL file.
-    pub(crate) fn execute_lazy_into<'a, 'tree>(
+    pub(super) fn execute_lazy_into<'a, 'tree>(
         &self,
         graph: &mut Graph<'tree>,
         tree: &'tree Tree,

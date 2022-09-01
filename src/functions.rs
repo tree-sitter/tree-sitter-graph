@@ -9,7 +9,7 @@
 
 use std::collections::HashMap;
 
-use crate::execution_error::ExecutionError;
+use crate::execution::error::ExecutionError;
 use crate::graph::Graph;
 use crate::graph::Value;
 use crate::Identifier;
@@ -162,7 +162,7 @@ impl Functions {
 pub mod stdlib {
     use regex::Regex;
 
-    use crate::execution_error::ExecutionError;
+    use crate::execution::error::ExecutionError;
     use crate::graph::Graph;
     use crate::graph::Value;
 
