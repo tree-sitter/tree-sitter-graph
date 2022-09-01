@@ -138,17 +138,13 @@ fn main() -> Result<()> {
 
     let functions = Functions::stdlib();
     let mut config = ExecutionConfig::new(&functions, &globals_).lazy(lazy);
-    let graph = file
-        .execute(
-            &tree,
-            source_path,
-            &source,
-            tsg_path,
-            &tsg,
-            &mut config,
-            &NoCancellation,
-        )
-        .with_context(|| format!("Cannot execute TSG file {}", tsg_path.display()))?;
+    let graph = match file.execute(&tree, &source, &mut config, &NoCancellation) {
+        Ok(graph) => graph,
+        Err(e) => {
+            eprint!("{}", e.display_pretty(source_path, &source, tsg_path, &tsg));
+            return Err(anyhow!("Cannot execute TSG file {}", tsg_path.display()));
+        }
+    };
 
     let json = matches.is_present("json");
     let output_path = matches.value_of("output").map(|str| Path::new(str));

@@ -9,11 +9,9 @@ mod statements;
 mod store;
 mod values;
 
-use anyhow::Context as _;
 use log::{debug, trace};
 
 use std::collections::HashMap;
-use std::path::Path;
 
 use tree_sitter::CaptureQuantifier::One;
 use tree_sitter::QueryCursor;
@@ -22,9 +20,10 @@ use tree_sitter::Tree;
 
 use crate::ast;
 use crate::execution::query_capture_value;
-use crate::execution::Excerpt;
 use crate::execution::ExecutionConfig;
-use crate::execution::ExecutionError;
+use crate::execution_error::Context;
+use crate::execution_error::ExecutionError;
+use crate::execution_error::ResultWithExecutionError;
 use crate::functions::Functions;
 use crate::graph;
 use crate::graph::Graph;
@@ -48,10 +47,7 @@ impl ast::File {
         &self,
         graph: &mut Graph<'tree>,
         tree: &'tree Tree,
-        source_path: &'tree Path,
         source: &'tree str,
-        tsg_path: &'a Path,
-        tsg_source: &'a str,
         config: &mut ExecutionConfig,
         cancellation_flag: &dyn CancellationFlag,
     ) -> Result<(), ExecutionError> {
@@ -70,10 +66,7 @@ impl ast::File {
             cancellation_flag.check("processing matches")?;
             let stanza = &self.stanzas[mat.pattern_index];
             stanza.execute_lazy(
-                source_path,
                 source,
-                tsg_path,
-                tsg_source,
                 &mat,
                 graph,
                 config,
@@ -100,7 +93,7 @@ impl ast::File {
                     prev_element_debug_info: &mut prev_element_debug_info,
                     cancellation_flag,
                 })
-                .with_context(|| format!("Executing {}", graph_stmt))?;
+                .with_context(|| format!("Executing {}", graph_stmt).into())?;
         }
 
         Ok(())
@@ -146,10 +139,7 @@ pub(super) enum GraphElementKey {
 impl ast::Stanza {
     fn execute_lazy<'a, 'l, 'g, 'q, 'tree>(
         &self,
-        source_path: &'tree Path,
         source: &'tree str,
-        tsg_path: &'a Path,
-        tsg_source: &'a str,
         mat: &QueryMatch<'_, 'tree>,
         graph: &mut Graph<'tree>,
         config: &mut ExecutionConfig,
@@ -185,27 +175,20 @@ impl ast::Stanza {
         for statement in &self.statements {
             exec.cancellation_flag
                 .check("executing stanza statements")?;
-            statement.execute_lazy(&mut exec).or_else(|e| {
-                Err(e).with_context(|| {
-                    let node = mat
-                        .captures
-                        .iter()
-                        .find(|c| c.index as usize == self.full_match_file_capture_index)
-                        .unwrap()
-                        .node;
-                    format!(
-                        "While executing statement {}\n{}\nin stanza\n{}\nmatching ({}) node\n{}",
-                        statement,
-                        Excerpt::from_source(tsg_path, tsg_source, statement.location()),
-                        Excerpt::from_source(tsg_path, tsg_source, self.location),
-                        node.kind(),
-                        Excerpt::from_source(
-                            source_path,
-                            source,
-                            Location::from(node.range().start_point)
-                        )
-                    )
-                })
+            statement.execute_lazy(&mut exec).with_context(|| {
+                let node = mat
+                    .captures
+                    .iter()
+                    .find(|c| c.index as usize == self.full_match_file_capture_index)
+                    .unwrap()
+                    .node;
+                Context::Statement {
+                    statement: format!("{}", statement),
+                    statement_location: statement.location(),
+                    stanza_location: self.location,
+                    source_location: Location::from(node.range().start_point),
+                    node_kind: node.kind().to_string(),
+                }
             })?;
         }
         trace!("}}");
@@ -366,12 +349,13 @@ impl ast::Scan {
                     .check("executing scan statements")?;
                 statement
                     .execute_lazy(&mut arm_exec)
-                    .with_context(|| format!("Executing {}", statement))
+                    .with_context(|| format!("Executing {}", statement).into())
                     .with_context(|| {
                         format!(
                             "Matching {} with arm \"{}\" {{ ... }}",
                             match_string, arm.regex,
                         )
+                        .into()
                     })?;
             }
 

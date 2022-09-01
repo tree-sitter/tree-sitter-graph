@@ -74,18 +74,6 @@ pub enum ParseError {
     UnexpectedQueryPatterns(Location),
     #[error(transparent)]
     Check(#[from] crate::checker::CheckError),
-    #[error(transparent)]
-    Other(#[from] anyhow::Error),
-}
-
-impl ParseError {
-    /// Wraps an existing [`std::error::Error`][] as an execution error
-    pub fn other<E>(err: E) -> ParseError
-    where
-        E: Into<anyhow::Error>,
-    {
-        Self::Other(err.into())
-    }
 }
 
 /// The location of a graph DSL entity within its file

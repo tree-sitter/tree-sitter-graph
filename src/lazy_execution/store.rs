@@ -7,7 +7,6 @@
 
 //! Defines store and thunks for lazy DSL evaluation
 
-use anyhow::Context as _;
 use log::trace;
 
 use std::cell::Cell;
@@ -17,7 +16,8 @@ use std::convert::From;
 use std::fmt;
 use std::rc::Rc;
 
-use crate::execution::ExecutionError;
+use crate::execution_error::ExecutionError;
+use crate::execution_error::ResultWithExecutionError;
 use crate::graph;
 use crate::graph::SyntaxNodeRef;
 use crate::parser::Location;
@@ -79,9 +79,9 @@ impl LazyStore {
     ) -> Result<graph::Value, ExecutionError> {
         let variable = &self.elements[variable.store_location];
         let debug_info = variable.debug_info;
-        let value = variable
-            .force(exec)
-            .with_context(|| format!("via {} at {}", (*variable.state.borrow()), debug_info))?;
+        let value = variable.force(exec).with_context(|| {
+            format!("via {} at {}", (*variable.state.borrow()), debug_info).into()
+        })?;
         Ok(value)
     }
 }
@@ -153,6 +153,7 @@ impl LazyScopedVariables {
                             "Evaluating scope of variable _.{} set at {}",
                             name, debug_info
                         )
+                        .into()
                     })?;
                     let prev_debug_info = debug_infos.insert(node, debug_info.clone());
                     match map.insert(node, value.clone()) {

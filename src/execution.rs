@@ -5,11 +5,8 @@
 // Please see the LICENSE-APACHE or LICENSE-MIT files in this distribution for license details.
 // ------------------------------------------------------------------------------------------------
 
-use ansi_term::Colour;
-use anyhow::Context as ErrorContext;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
-use std::path::Path;
 use thiserror::Error;
 use tree_sitter::CaptureQuantifier;
 use tree_sitter::QueryCursor;
@@ -47,6 +44,9 @@ use crate::ast::Statement;
 use crate::ast::StringConstant;
 use crate::ast::UnscopedVariable;
 use crate::ast::Variable;
+use crate::execution_error::Context;
+use crate::execution_error::ExecutionError;
+use crate::execution_error::ResultWithExecutionError;
 use crate::functions::Functions;
 use crate::graph::Attributes;
 use crate::graph::Graph;
@@ -65,24 +65,12 @@ impl File {
     pub fn execute<'a, 'tree>(
         &self,
         tree: &'tree Tree,
-        source_path: &'tree Path,
         source: &'tree str,
-        tsg_path: &'a Path,
-        tsg_source: &'a str,
         config: &mut ExecutionConfig,
         cancellation_flag: &dyn CancellationFlag,
     ) -> Result<Graph<'tree>, ExecutionError> {
         let mut graph = Graph::new();
-        self.execute_into(
-            &mut graph,
-            tree,
-            source_path,
-            source,
-            tsg_path,
-            tsg_source,
-            config,
-            cancellation_flag,
-        )?;
+        self.execute_into(&mut graph, tree, source, config, cancellation_flag)?;
         Ok(graph)
     }
 
@@ -95,35 +83,14 @@ impl File {
         &self,
         graph: &mut Graph<'tree>,
         tree: &'tree Tree,
-        source_path: &'tree Path,
         source: &'tree str,
-        tsg_path: &'a Path,
-        tsg_source: &'a str,
         config: &mut ExecutionConfig,
         cancellation_flag: &dyn CancellationFlag,
     ) -> Result<(), ExecutionError> {
         if config.lazy {
-            self.execute_lazy_into(
-                graph,
-                tree,
-                source_path,
-                source,
-                tsg_path,
-                tsg_source,
-                config,
-                cancellation_flag,
-            )
+            self.execute_lazy_into(graph, tree, source, config, cancellation_flag)
         } else {
-            self.execute_strict_into(
-                graph,
-                tree,
-                source_path,
-                source,
-                tsg_path,
-                tsg_source,
-                config,
-                cancellation_flag,
-            )
+            self.execute_strict_into(graph, tree, source, config, cancellation_flag)
         }
     }
 }
@@ -138,10 +105,7 @@ impl File {
         &self,
         graph: &mut Graph<'tree>,
         tree: &'tree Tree,
-        source_path: &'tree Path,
         source: &'tree str,
-        tsg_path: &'a Path,
-        tsg_source: &'a str,
         config: &mut ExecutionConfig,
         cancellation_flag: &dyn CancellationFlag,
     ) -> Result<(), ExecutionError> {
@@ -155,10 +119,7 @@ impl File {
             cancellation_flag.check("executing stanza")?;
             stanza.execute(
                 tree,
-                source_path,
                 source,
-                tsg_path,
-                tsg_source,
                 graph,
                 config,
                 &mut locals,
@@ -243,75 +204,6 @@ impl<'a, 'g> ExecutionConfig<'a, 'g> {
     }
 }
 
-/// An error that can occur while executing a graph DSL file
-#[derive(Debug, Error)]
-pub enum ExecutionError {
-    #[error(transparent)]
-    Cancelled(#[from] CancellationError),
-    #[error("Cannot assign immutable variable {0}")]
-    CannotAssignImmutableVariable(String),
-    #[error("Cannot assign scoped variable {0}")]
-    CannotAssignScopedVariable(String),
-    #[error("Cannot define mutable scoped variable {0}")]
-    CannotDefineMutableScopedVariable(String),
-    #[error("Duplicate attribute {0}")]
-    DuplicateAttribute(String),
-    #[error("Duplicate edge {0}")]
-    DuplicateEdge(String),
-    #[error("Duplicate variable {0}")]
-    DuplicateVariable(String),
-    #[error("Expected a graph node reference {0}")]
-    ExpectedGraphNode(String),
-    #[error("Expected a list {0}")]
-    ExpectedList(String),
-    #[error("Expected a boolean {0}")]
-    ExpectedBoolean(String),
-    #[error("Expected an integer {0}")]
-    ExpectedInteger(String),
-    #[error("Expected a string {0}")]
-    ExpectedString(String),
-    #[error("Expected a syntax node {0}")]
-    ExpectedSyntaxNode(String),
-    #[error("Invalid parameters {0}")]
-    InvalidParameters(String),
-    #[error("Scoped variables can only be attached to syntax nodes {0}")]
-    InvalidVariableScope(String),
-    #[error("Missing global variable {0}")]
-    MissingGlobalVariable(String),
-    #[error("Recursively defined scoped variable {0}")]
-    RecursivelyDefinedScopedVariable(String),
-    #[error("Recursively defined variable {0}")]
-    RecursivelyDefinedVariable(String),
-    #[error("Undefined capture {0}")]
-    UndefinedCapture(String),
-    #[error("Undefined function {0}")]
-    UndefinedFunction(String),
-    #[error("Undefined regex capture {0}")]
-    UndefinedRegexCapture(String),
-    #[error("Undefined scoped variable {0}")]
-    UndefinedScopedVariable(String),
-    #[error("Empty regex capture {0}")]
-    EmptyRegexCapture(String),
-    #[error("Undefined edge {0}")]
-    UndefinedEdge(String),
-    #[error("Undefined variable {0}")]
-    UndefinedVariable(String),
-    #[error("Cannot add scoped variable after being forced {0}")]
-    VariableScopesAlreadyForced(String),
-    #[error(transparent)]
-    Other(#[from] anyhow::Error),
-}
-
-impl ExecutionError {
-    /// Wraps an existing [`std::error::Error`][] as an execution error
-    pub fn other<E>(err: E) -> ExecutionError
-    where
-        E: Into<anyhow::Error>,
-    {
-        ExecutionError::Other(err.into())
-    }
-}
-
 /// Trait to signal that the execution is cancelled
 pub trait CancellationFlag {
     fn check(&self, at: &'static str) -> Result<(), CancellationError>;
@@ -358,63 +250,11 @@ impl<'a> ScopedVariables<'a> {
     }
 }
 
-/// Excerpts of source from either the target language file or the tsg rules file.
-pub struct Excerpt<'a> {
-    path: &'a Path,
-    source: Option<&'a str>,
-    location: Location,
-}
-
-impl<'a> Excerpt<'a> {
-    pub fn from_source(path: &'a Path, source: &'a str, location: Location) -> Excerpt<'a> {
-        Excerpt {
-            path,
-            source: source.lines().nth(location.row),
-            location: location,
-        }
-    }
-
-    fn gutter_width(&self) -> usize {
-        ((self.location.row + 1) as f64).log10() as usize + 1
-    }
-}
-
-impl<'a> std::fmt::Display for Excerpt<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "{}:{}:{}:\n{}{}{}\n{}{}{}{}",
-            // path and line/col
-            Colour::White
-                .bold()
-                .paint(self.path.to_str().unwrap_or("<unknown file>")),
-            Colour::White
-                .bold()
-                .paint(format!("{}", self.location.row + 1)),
-            Colour::White
-                .bold()
-                .paint(format!("{}", self.location.column + 1)),
-            // first line: line number & source
-            Colour::Blue.paint(format!("{}", self.location.row + 1)),
-            Colour::Blue.paint(" | "),
-            self.source.unwrap_or("<no source found>"),
-            // second line: caret
-            " ".repeat(self.gutter_width()),
-            Colour::Blue.paint(" | "),
-            " ".repeat(self.location.column),
-            Colour::Green.bold().paint("^")
-        )
-    }
-}
-
 impl Stanza {
     fn execute<'a, 'g, 'l, 's, 'tree>(
         &self,
         tree: &'tree Tree,
-        source_path: &'tree Path,
         source: &'tree str,
-        tsg_path: &'a Path,
-        tsg_source: &'a str,
         graph: &mut Graph<'tree>,
         config: &mut ExecutionConfig<'_, 'g>,
         locals: &mut VariableMap<'l, Value>,
@@ -442,27 +282,20 @@ impl Stanza {
                 cancellation_flag,
             };
             for statement in &self.statements {
-                statement.execute(&mut exec).or_else(|e| {
-                    Err(e).with_context(|| {
-                        let node = mat
-                            .captures
-                            .iter()
-                            .find(|c| c.index as usize == self.full_match_file_capture_index)
-                            .unwrap()
-                            .node;
-                        format!(
-                            "While executing statement {}\n{}\nin stanza\n{}\nmatching ({}) node\n{}",
-                            statement,
-                            Excerpt::from_source(tsg_path, tsg_source, statement.location()),
-                            Excerpt::from_source(tsg_path, tsg_source, self.location),
-                            node.kind(),
-                            Excerpt::from_source(
-                                source_path,
-                                source,
-                                Location::from(node.range().start_point)
-                            )
-                        )
-                    })
+                statement.execute(&mut exec).with_context(|| {
+                    let node = mat
+                        .captures
+                        .iter()
+                        .find(|c| c.index as usize == self.full_match_file_capture_index)
+                        .unwrap()
+                        .node;
+                    Context::Statement {
+                        statement: format!("{}", statement),
+                        statement_location: statement.location(),
+                        stanza_location: self.location,
+                        source_location: Location::from(node.range().start_point),
+                        node_kind: node.kind().to_string(),
+                    }
                 })?;
             }
         }
@@ -654,12 +487,13 @@ impl Scan {
             for statement in &arm.statements {
                 statement
                     .execute(&mut arm_exec)
-                    .with_context(|| format!("Executing {}", statement))
+                    .with_context(|| format!("Executing {}", statement).into())
                     .with_context(|| {
                         format!(
                             "Matching {} with arm \"{}\" {{ ... }}",
                             match_string, arm.regex,
                         )
+                        .into()
                     })?;
             }
 

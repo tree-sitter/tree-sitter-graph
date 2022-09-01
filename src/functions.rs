@@ -9,7 +9,7 @@
 
 use std::collections::HashMap;
 
-use crate::execution::ExecutionError;
+use crate::execution_error::ExecutionError;
 use crate::graph::Graph;
 use crate::graph::Value;
 use crate::Identifier;
@@ -160,10 +160,9 @@ impl Functions {
 
 /// Implementations of the [standard library functions][`crate::reference::functions`]
 pub mod stdlib {
-    use anyhow::anyhow;
     use regex::Regex;
 
-    use crate::execution::ExecutionError;
+    use crate::execution_error::ExecutionError;
     use crate::graph::Graph;
     use crate::graph::Value;
 
@@ -210,14 +209,20 @@ pub mod stdlib {
                 let parent = match node.parent() {
                     Some(parent) => parent,
                     None => {
-                        return Err(anyhow!("Cannot call named-child-index on the root node").into())
+                        return Err(ExecutionError::FunctionFailed(
+                            "named-child-index".into(),
+                            format!("Cannot call named-child-index on the root node"),
+                        ))
                     }
                 };
                 let mut tree_cursor = parent.walk();
                 let index = parent
                     .named_children(&mut tree_cursor)
                     .position(|child| child == node)
-                    .ok_or(anyhow!("Called named-child-index on a non-named child"))?;
+                    .ok_or(ExecutionError::FunctionFailed(
+                        "named-child-index".into(),
+                        format!("Called named-child-index on a non-named child"),
+                    ))?;
                 Ok(Value::Integer(index as u32))
             }
         }
@@ -457,7 +462,9 @@ pub mod stdlib {
             ) -> Result<Value, ExecutionError> {
                 let text = parameters.param()?.into_string()?;
                 let pattern = parameters.param()?.into_string()?;
-                let pattern = Regex::new(&pattern).map_err(ExecutionError::other)?;
+                let pattern = Regex::new(&pattern).map_err(|e| {
+                    ExecutionError::FunctionFailed("replace".into(), format!("{}", e))
+                })?;
                 let replacement = parameters.param()?.into_string()?;
                 parameters.finish()?;
                 Ok(Value::String(

@@ -12,7 +12,7 @@ use log::{debug, trace};
 use std::convert::From;
 use std::fmt;
 
-use crate::execution::ExecutionError;
+use crate::execution_error::ExecutionError;
 use crate::Identifier;
 
 use super::store::DebugInfo;
