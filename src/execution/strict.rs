@@ -52,6 +52,7 @@ use crate::graph::Attributes;
 use crate::graph::Graph;
 use crate::graph::SyntaxNodeRef;
 use crate::graph::Value;
+use crate::variables::MutVariables;
 use crate::variables::VariableMap;
 use crate::variables::Variables;
 use crate::Identifier;
@@ -102,7 +103,7 @@ struct ExecutionContext<'a, 'c, 'g, 's, 'tree> {
     source: &'tree str,
     graph: &'a mut Graph<'tree>,
     config: &'a mut ExecutionConfig<'c, 'g>,
-    locals: &'a mut dyn Variables<Value>,
+    locals: &'a mut dyn MutVariables<Value>,
     scoped: &'a mut ScopedVariables<'s>,
     current_regex_captures: &'a Vec<String>,
     function_parameters: &'a mut Vec<Value>,

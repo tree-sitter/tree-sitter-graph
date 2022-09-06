@@ -15,6 +15,7 @@ use tree_sitter::Query;
 
 use crate::ast;
 use crate::parser::FULL_MATCH;
+use crate::variables::MutVariables;
 use crate::variables::VariableError;
 use crate::variables::VariableMap;
 use crate::variables::Variables;
@@ -50,7 +51,7 @@ struct CheckContext<'a> {
     file_query: &'a Query,
     stanza_index: usize,
     stanza_query: &'a Query,
-    locals: &'a mut dyn Variables<ExpressionResult>,
+    locals: &'a mut dyn MutVariables<ExpressionResult>,
 }
 
 //-----------------------------------------------------------------------------

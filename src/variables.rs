@@ -25,20 +25,22 @@ pub enum VariableError {
 
 /// An environment of named variables
 pub(crate) trait Variables<V> {
+    /// Returns the value of a variable, if it exists in this environment.
+    fn get(&self, name: &Identifier) -> Option<&V>;
+}
+
+pub(crate) trait MutVariables<V>: Variables<V> {
     /// Adds a new variable to this environment, returning an error if the variable already
     /// exists.
     fn add(&mut self, name: Identifier, value: V, mutable: bool) -> Result<(), VariableError>;
 
     /// Sets the variable, returning an error if it does not exists in this environment.
     fn set(&mut self, name: Identifier, value: V) -> Result<(), VariableError>;
-
-    /// Returns the value of a variable, if it exists in this environment.
-    fn get(&self, name: &Identifier) -> Option<&V>;
 }
 
 /// A map-like implementation of an environment of named variables
 pub(crate) struct VariableMap<'a, V> {
-    context: Option<&'a mut dyn Variables<V>>,
+    context: Option<&'a mut dyn MutVariables<V>>,
     values: HashMap<Identifier, Variable<V>>,
 }
 
@@ -58,16 +60,11 @@ impl<'a, V> VariableMap<'a, V> {
 
     /// Creates a nested variable environment, that inherits from the given
     /// context environment.
-    pub(crate) fn nested(context: &'a mut dyn Variables<V>) -> Self {
+    pub(crate) fn nested(context: &'a mut dyn MutVariables<V>) -> Self {
         Self {
             context: Some(context),
             values: HashMap::new(),
         }
-    }
-
-    /// Remove a variable from this enviroment, if it exists.
-    pub(crate) fn remove(&mut self, name: &Identifier) {
-        self.values.remove(name);
     }
 
     /// Clears this enviroment.
@@ -77,6 +74,15 @@ impl<'a, V> VariableMap<'a, V> {
 }
 
 impl<V> Variables<V> for VariableMap<'_, V> {
+    fn get(&self, name: &Identifier) -> Option<&V> {
+        self.values
+            .get(name)
+            .map(|v| &v.value)
+            .or_else(|| self.context.as_ref().map(|p| p.get(name)).flatten())
+    }
+}
+
+impl<V> MutVariables<V> for VariableMap<'_, V> {
     fn add(&mut self, name: Identifier, value: V, mutable: bool) -> Result<(), VariableError> {
         match self.values.entry(name) {
             Vacant(v) => {
@@ -110,48 +116,64 @@ impl<V> Variables<V> for VariableMap<'_, V> {
             }
         }
     }
-
-    fn get(&self, name: &Identifier) -> Option<&V> {
-        self.values
-            .get(name)
-            .map(|v| &v.value)
-            .or_else(|| self.context.as_ref().map(|p| p.get(name)).flatten())
-    }
 }
 
 /// Environment of immutable variables
-pub struct Globals<'a>(VariableMap<'a, Value>);
+pub struct Globals<'a> {
+    context: Option<&'a dyn Variables<Value>>,
+    values: HashMap<Identifier, Value>,
+}
 
 impl<'a> Globals<'a> {
     /// Creates a new, empty variable environment.
     pub fn new() -> Self {
-        Self(VariableMap::new())
+        Self {
+            context: None,
+            values: HashMap::new(),
+        }
     }
 
     /// Creates a nested variable environment, that inherits from the given
     /// context environment.
-    pub fn nested(context: &'a mut Globals<'a>) -> Self {
-        Self(VariableMap::nested(&mut context.0))
+    pub fn nested(context: &'a Globals<'a>) -> Self {
+        Self {
+            context: Some(context),
+            values: HashMap::new(),
+        }
     }
 
     /// Adds a new variable to this environment, returning an error if the variable already
     /// exists.
     pub fn add(&mut self, name: Identifier, value: Value) -> Result<(), VariableError> {
-        self.0.add(name, value, false)
+        match self.values.entry(name) {
+            Vacant(v) => {
+                v.insert(value);
+                Ok(())
+            }
+            Occupied(o) => Err(VariableError::VariableAlreadyDefined(o.key().to_string())),
+        }
     }
 
     /// Returns the value of a variable, if it exists in this environment.
     pub fn get(&self, name: &Identifier) -> Option<&Value> {
-        self.0.get(name)
+        self.values
+            .get(name)
+            .or_else(|| self.context.as_ref().map(|p| p.get(name)).flatten())
     }
 
     /// Remove a variable from this enviroment, if it exists.
     pub fn remove(&mut self, name: &Identifier) {
-        self.0.remove(name)
+        self.values.remove(name);
     }
 
     /// Clears this enviroment.
     pub fn clear(&mut self) {
-        self.0.clear()
+        self.values.clear();
+    }
+}
+
+impl Variables<Value> for Globals<'_> {
+    fn get(&self, name: &Identifier) -> Option<&Value> {
+        self.get(name)
     }
 }
