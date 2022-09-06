@@ -27,8 +27,8 @@ use crate::execution::ExecutionConfig;
 use crate::functions::Functions;
 use crate::graph;
 use crate::graph::Graph;
+use crate::variables::MutVariables;
 use crate::variables::VariableMap;
-use crate::variables::Variables;
 use crate::CancellationFlag;
 use crate::Identifier;
 use crate::Location;
@@ -105,7 +105,7 @@ struct ExecutionContext<'a, 'c, 'g, 'tree> {
     source: &'tree str,
     graph: &'a mut Graph<'tree>,
     config: &'a mut ExecutionConfig<'c, 'g>,
-    locals: &'a mut dyn Variables<LazyValue>,
+    locals: &'a mut dyn MutVariables<LazyValue>,
     current_regex_captures: &'a Vec<String>,
     mat: &'a QueryMatch<'a, 'tree>,
     store: &'a mut LazyStore,

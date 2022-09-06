@@ -10,3 +10,4 @@ mod graph;
 mod lazy_execution;
 mod parse_errors;
 mod parser;
+mod variables;
