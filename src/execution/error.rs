@@ -237,37 +237,6 @@ impl<'a> Excerpt<'a> {
 
 impl<'a> std::fmt::Display for Excerpt<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        fn blue<'a>(str: &'a str) -> impl std::fmt::Display {
-            #[cfg(feature = "term-colors")]
-            {
-                str.blue().to_string()
-            }
-            #[cfg(not(feature = "term-colors"))]
-            {
-                str.to_string()
-            }
-        }
-        fn green_bold<'a>(str: &'a str) -> impl std::fmt::Display {
-            #[cfg(feature = "term-colors")]
-            {
-                str.green().bold().to_string()
-            }
-            #[cfg(not(feature = "term-colors"))]
-            {
-                str.to_string()
-            }
-        }
-        fn white_bold<'a>(str: &'a str) -> impl std::fmt::Display {
-            #[cfg(feature = "term-colors")]
-            {
-                str.white().bold()
-            }
-            #[cfg(not(feature = "term-colors"))]
-            {
-                str.to_string()
-            }
-        }
-
         // path and line/col
         writeln!(
             f,
@@ -298,4 +267,33 @@ impl<'a> std::fmt::Display for Excerpt<'a> {
         )?;
         Ok(())
     }
+}
+
+// coloring functions
+
+#[cfg(feature = "term-colors")]
+fn blue(str: &str) -> impl std::fmt::Display {
+    str.blue()
+}
+#[cfg(not(feature = "term-colors"))]
+fn blue<'a>(str: &'a str) -> impl std::fmt::Display + 'a {
+    str
+}
+
+#[cfg(feature = "term-colors")]
+fn green_bold(str: &str) -> impl std::fmt::Display {
+    str.green().bold()
+}
+#[cfg(not(feature = "term-colors"))]
+fn green_bold<'a>(str: &'a str) -> impl std::fmt::Display + 'a {
+    str
+}
+
+#[cfg(feature = "term-colors")]
+fn white_bold(str: &str) -> impl std::fmt::Display {
+    str.white().bold()
+}
+#[cfg(not(feature = "term-colors"))]
+fn white_bold<'a>(str: &'a str) -> impl std::fmt::Display + 'a {
+    str
 }
