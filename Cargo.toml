@@ -42,11 +42,7 @@ required-features = ["cli"]
 
 [features]
 cli = ["anyhow", "clap", "env_logger", "term-colors", "tree-sitter-config", "tree-sitter-loader"]
-term-colors = ["ansi_term"]
-
-[dependencies.ansi_term]
-optional = true
-version = "0.12"
+term-colors = ["colored"]
 
 [dependencies.anyhow]
 optional = true
@@ -55,6 +51,10 @@ version = "1.0"
 [dependencies.clap]
 optional = true
 version = "3.2"
+
+[dependencies.colored]
+optional = true
+version = "2"
 
 [dependencies.env_logger]
 optional = true

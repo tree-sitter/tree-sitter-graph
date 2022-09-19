@@ -6,7 +6,7 @@
 // ------------------------------------------------------------------------------------------------
 
 #[cfg(feature = "term-colors")]
-use ansi_term::Colour;
+use colored::Colorize;
 use std::path::Path;
 use thiserror::Error;
 
@@ -240,7 +240,7 @@ impl<'a> std::fmt::Display for Excerpt<'a> {
         fn blue<'a>(str: &'a str) -> impl std::fmt::Display {
             #[cfg(feature = "term-colors")]
             {
-                Colour::Blue.paint(str).to_string()
+                str.blue().to_string()
             }
             #[cfg(not(feature = "term-colors"))]
             {
@@ -250,7 +250,7 @@ impl<'a> std::fmt::Display for Excerpt<'a> {
         fn green_bold<'a>(str: &'a str) -> impl std::fmt::Display {
             #[cfg(feature = "term-colors")]
             {
-                Colour::Green.bold().paint(str).to_string()
+                str.green().bold().to_string()
             }
             #[cfg(not(feature = "term-colors"))]
             {
@@ -260,7 +260,7 @@ impl<'a> std::fmt::Display for Excerpt<'a> {
         fn white_bold<'a>(str: &'a str) -> impl std::fmt::Display {
             #[cfg(feature = "term-colors")]
             {
-                Colour::White.bold().paint(str).to_string()
+                str.white().bold()
             }
             #[cfg(not(feature = "term-colors"))]
             {
