@@ -5,6 +5,7 @@
 // Please see the LICENSE-APACHE or LICENSE-MIT files in this distribution for license details.
 // ------------------------------------------------------------------------------------------------
 
+#[cfg(feature = "term-colors")]
 use ansi_term::Colour;
 use std::path::Path;
 use thiserror::Error;
@@ -236,28 +237,53 @@ impl<'a> Excerpt<'a> {
 
 impl<'a> std::fmt::Display for Excerpt<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        fn blue<'a>(str: &'a str) -> impl std::fmt::Display {
+            #[cfg(feature = "term-colors")]
+            {
+                Colour::Blue.paint(str).to_string()
+            }
+            #[cfg(not(feature = "term-colors"))]
+            {
+                str.to_string()
+            }
+        }
+        fn green_bold<'a>(str: &'a str) -> impl std::fmt::Display {
+            #[cfg(feature = "term-colors")]
+            {
+                Colour::Green.bold().paint(str).to_string()
+            }
+            #[cfg(not(feature = "term-colors"))]
+            {
+                str.to_string()
+            }
+        }
+        fn white_bold<'a>(str: &'a str) -> impl std::fmt::Display {
+            #[cfg(feature = "term-colors")]
+            {
+                Colour::White.bold().paint(str).to_string()
+            }
+            #[cfg(not(feature = "term-colors"))]
+            {
+                str.to_string()
+            }
+        }
+
         // path and line/col
         writeln!(
             f,
             "{}{}:{}:{}:",
             " ".repeat(self.indent),
-            Colour::White
-                .bold()
-                .paint(self.path.to_str().unwrap_or("<unknown file>")),
-            Colour::White
-                .bold()
-                .paint(format!("{}", self.location.row + 1)),
-            Colour::White
-                .bold()
-                .paint(format!("{}", self.location.column + 1)),
+            white_bold(&self.path.to_str().unwrap_or("<unknown file>")),
+            white_bold(&format!("{}", self.location.row + 1)),
+            white_bold(&format!("{}", self.location.column + 1)),
         )?;
         // first line: line number & source
         writeln!(
             f,
             "{}{}{}{}",
             " ".repeat(self.indent),
-            Colour::Blue.paint(format!("{}", self.location.row + 1)),
-            Colour::Blue.paint(" | "),
+            blue(&format!("{}", self.location.row + 1)),
+            blue(" | "),
             self.source.unwrap_or("<no source found>"),
         )?;
         // second line: caret
@@ -266,9 +292,9 @@ impl<'a> std::fmt::Display for Excerpt<'a> {
             "{}{}{}{}{}",
             " ".repeat(self.indent),
             " ".repeat(self.gutter_width()),
-            Colour::Blue.paint(" | "),
+            blue(" | "),
             " ".repeat(self.location.column),
-            Colour::Green.bold().paint("^")
+            green_bold("^")
         )?;
         Ok(())
     }
