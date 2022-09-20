@@ -33,9 +33,13 @@ jobs:
           key: ${{ runner.OS }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.OS }}-cargo-
-      - name: Build & test library (default features)
+      - name: Build library (default features)
+        run: cargo build
+      - name: Test library (default features)
         run: cargo test
-      - name: Build & test library (all features)
+      - name: Build library (all features)
+        run: cargo build --all-features
+      - name: Test library (all features)
         run: cargo test --all-features
       - name: Build program
         run: cargo build --bin tree-sitter-graph --features=cli
