@@ -5,7 +5,8 @@
 // Please see the LICENSE-APACHE or LICENSE-MIT files in this distribution for license details.
 // ------------------------------------------------------------------------------------------------
 
-use ansi_term::Colour;
+#[cfg(feature = "term-colors")]
+use colored::Colorize;
 use std::path::Path;
 use thiserror::Error;
 
@@ -241,23 +242,17 @@ impl<'a> std::fmt::Display for Excerpt<'a> {
             f,
             "{}{}:{}:{}:",
             " ".repeat(self.indent),
-            Colour::White
-                .bold()
-                .paint(self.path.to_str().unwrap_or("<unknown file>")),
-            Colour::White
-                .bold()
-                .paint(format!("{}", self.location.row + 1)),
-            Colour::White
-                .bold()
-                .paint(format!("{}", self.location.column + 1)),
+            white_bold(&self.path.to_str().unwrap_or("<unknown file>")),
+            white_bold(&format!("{}", self.location.row + 1)),
+            white_bold(&format!("{}", self.location.column + 1)),
         )?;
         // first line: line number & source
         writeln!(
             f,
             "{}{}{}{}",
             " ".repeat(self.indent),
-            Colour::Blue.paint(format!("{}", self.location.row + 1)),
-            Colour::Blue.paint(" | "),
+            blue(&format!("{}", self.location.row + 1)),
+            blue(" | "),
             self.source.unwrap_or("<no source found>"),
         )?;
         // second line: caret
@@ -266,10 +261,39 @@ impl<'a> std::fmt::Display for Excerpt<'a> {
             "{}{}{}{}{}",
             " ".repeat(self.indent),
             " ".repeat(self.gutter_width()),
-            Colour::Blue.paint(" | "),
+            blue(" | "),
             " ".repeat(self.location.column),
-            Colour::Green.bold().paint("^")
+            green_bold("^")
         )?;
         Ok(())
     }
+}
+
+// coloring functions
+
+#[cfg(feature = "term-colors")]
+fn blue(str: &str) -> impl std::fmt::Display {
+    str.blue()
+}
+#[cfg(not(feature = "term-colors"))]
+fn blue<'a>(str: &'a str) -> impl std::fmt::Display + 'a {
+    str
+}
+
+#[cfg(feature = "term-colors")]
+fn green_bold(str: &str) -> impl std::fmt::Display {
+    str.green().bold()
+}
+#[cfg(not(feature = "term-colors"))]
+fn green_bold<'a>(str: &'a str) -> impl std::fmt::Display + 'a {
+    str
+}
+
+#[cfg(feature = "term-colors")]
+fn white_bold(str: &str) -> impl std::fmt::Display {
+    str.white().bold()
+}
+#[cfg(not(feature = "term-colors"))]
+fn white_bold<'a>(str: &'a str) -> impl std::fmt::Display + 'a {
+    str
 }

@@ -16,7 +16,6 @@ edition = "2018"
 test = false
 
 [dependencies]
-ansi_term = "0.12"
 log = "0.4"
 regex = "1"
 serde = "1.0"
@@ -42,7 +41,8 @@ name = "tree-sitter-graph"
 required-features = ["cli"]
 
 [features]
-cli = ["anyhow", "clap", "env_logger", "tree-sitter-config", "tree-sitter-loader"]
+cli = ["anyhow", "clap", "env_logger", "term-colors", "tree-sitter-config", "tree-sitter-loader"]
+term-colors = ["colored"]
 
 [dependencies.anyhow]
 optional = true
@@ -51,6 +51,10 @@ version = "1.0"
 [dependencies.clap]
 optional = true
 version = "3.2"
+
+[dependencies.colored]
+optional = true
+version = "2"
 
 [dependencies.env_logger]
 optional = true
