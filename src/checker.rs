@@ -594,14 +594,6 @@ impl ast::UnscopedVariable {
             ctx.locals.get(&self.name)
         }
         .cloned()
-        // TODO deprecated support for undeclared globals
-        .or_else(|| {
-            eprintln!("Use of undeclared global variable {} is deprecated. Fix by adding an explicit declaration `global {}`", self.name, self.name);
-            Some(ExpressionResult {
-                quantifier: One,
-                is_local: true,
-            })
-        })
         .ok_or_else(|| CheckError::UndefinedVariable(self.name.as_str().to_string(), self.location))
     }
 }
