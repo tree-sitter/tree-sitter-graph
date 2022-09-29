@@ -50,6 +50,8 @@ pub struct Global {
     pub name: Identifier,
     /// The quantifier of the global variable
     pub quantifier: CaptureQuantifier,
+    /// Default value
+    pub default: Option<String>,
     pub location: Location,
 }
 

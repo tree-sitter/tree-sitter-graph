@@ -1199,6 +1199,7 @@ fn can_parse_global() {
         vec![Global {
             name: "root".into(),
             quantifier: One,
+            default: None,
             location: Location { row: 1, column: 15 },
         }]
     );
@@ -1239,6 +1240,46 @@ fn can_parse_global() {
 }
 
 #[test]
+fn can_parse_global_with_default() {
+    let source = r#"
+        global PKG_NAME = ""
+
+        (identifier) {
+          print PKG_NAME
+        }
+    "#;
+    let file = File::from_str(tree_sitter_python::language(), source).expect("Cannot parse file");
+
+    assert_eq!(
+        file.globals,
+        vec![Global {
+            name: "PKG_NAME".into(),
+            quantifier: One,
+            default: Some("".into()),
+            location: Location { row: 1, column: 15 },
+        }]
+    );
+
+    let statements = file
+        .stanzas
+        .into_iter()
+        .map(|s| s.statements)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        statements,
+        vec![vec![Print {
+            values: vec![UnscopedVariable {
+                name: "PKG_NAME".into(),
+                location: Location { row: 4, column: 16 }
+            }
+            .into()],
+            location: Location { row: 4, column: 10 },
+        }
+        .into()]]
+    );
+}
+
+#[test]
 fn cannot_parse_undeclared_global() {
     let source = r#"
         (identifier) {
@@ -1270,6 +1311,7 @@ fn can_parse_list_global() {
         vec![Global {
             name: "roots".into(),
             quantifier: ZeroOrMore,
+            default: None,
             location: Location { row: 1, column: 15 },
         }]
     );
@@ -1342,6 +1384,7 @@ fn can_parse_optional_global() {
         vec![Global {
             name: "root".into(),
             quantifier: ZeroOrOne,
+            default: None,
             location: Location { row: 1, column: 15 },
         }]
     );
