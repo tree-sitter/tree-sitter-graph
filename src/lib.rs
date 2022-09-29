@@ -45,6 +45,8 @@ pub use execution::NoCancellation;
 pub use parser::Location;
 pub use parser::ParseError;
 pub use variables::Globals as Variables;
+pub use variables::Iter as VariableIter;
+pub use variables::VariableError;
 
 use std::borrow::Borrow;
 use std::hash::Hash;

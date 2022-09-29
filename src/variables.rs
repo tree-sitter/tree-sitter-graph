@@ -166,9 +166,27 @@ impl<'a> Globals<'a> {
         self.values.remove(name);
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+
+    pub fn iter<'b>(&'b self) -> Iter<'b> {
+        Iter(self.values.iter())
+    }
+
     /// Clears this enviroment.
     pub fn clear(&mut self) {
         self.values.clear();
+    }
+}
+
+pub struct Iter<'a>(std::collections::hash_map::Iter<'a, Identifier, Value>);
+
+impl<'a> std::iter::Iterator for Iter<'a> {
+    type Item = (&'a Identifier, &'a Value);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
     }
 }
 
