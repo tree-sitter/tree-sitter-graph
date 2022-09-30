@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `Variables` type has additional methods `is_empty` and `iter`.
 
+#### Changed
+
+- References to `ExecutionConfig` passed to `File::execute*` are not required to be mutable anymore.
+
 ## 0.6.1 -- 2022-09-06
 
 ### Library

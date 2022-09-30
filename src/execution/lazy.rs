@@ -48,7 +48,7 @@ impl ast::File {
         graph: &mut Graph<'tree>,
         tree: &'tree Tree,
         source: &'tree str,
-        config: &mut ExecutionConfig,
+        config: &ExecutionConfig,
         cancellation_flag: &dyn CancellationFlag,
     ) -> Result<(), ExecutionError> {
         self.check_globals(config.globals)?;
@@ -104,7 +104,7 @@ impl ast::File {
 struct ExecutionContext<'a, 'c, 'g, 'tree> {
     source: &'tree str,
     graph: &'a mut Graph<'tree>,
-    config: &'a mut ExecutionConfig<'c, 'g>,
+    config: &'a ExecutionConfig<'c, 'g>,
     locals: &'a mut dyn MutVariables<LazyValue>,
     current_regex_captures: &'a Vec<String>,
     mat: &'a QueryMatch<'a, 'tree>,
@@ -142,7 +142,7 @@ impl ast::Stanza {
         source: &'tree str,
         mat: &QueryMatch<'_, 'tree>,
         graph: &mut Graph<'tree>,
-        config: &mut ExecutionConfig,
+        config: &ExecutionConfig,
         locals: &mut VariableMap<'l, LazyValue>,
         store: &mut LazyStore,
         scoped_store: &mut LazyScopedVariables,
