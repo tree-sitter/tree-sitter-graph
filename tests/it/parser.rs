@@ -10,6 +10,7 @@ use tree_sitter::CaptureQuantifier::*;
 use tree_sitter_graph::ast::*;
 use tree_sitter_graph::Identifier;
 use tree_sitter_graph::Location;
+use tree_sitter_graph::ParseError;
 
 #[test]
 fn can_parse_blocks() {
@@ -1531,4 +1532,43 @@ fn cannot_parse_multiple_patterns() {
     if let Ok(_) = File::from_str(tree_sitter_python::language(), source) {
         panic!("Parse succeeded unexpectedly");
     }
+}
+
+#[test]
+fn query_parse_errors_have_file_location() {
+    let source = r#"
+        ; skip the first line
+        (module (non_existing_node))
+        {}
+    "#;
+    let err = match File::from_str(tree_sitter_python::language(), source) {
+        Ok(_) => panic!("Parse succeeded unexpectedly"),
+        Err(ParseError::QueryError(e)) => e,
+        Err(e) => panic!("Unexpected error: {}", e),
+    };
+    assert_eq!(err.row, 2, "expected row 2, got {}", err.row);
+    assert_eq!(err.column, 17, "expected column 17, got {}", err.column);
+    assert_eq!(err.offset, 48, "expected offset 48, got {}", err.offset);
+}
+
+#[test]
+fn multiline_query_parse_errors_have_file_location() {
+    let source = r#"
+        (module) @root
+        {}
+        [
+          (module (pass_statement))
+          (module
+            (non_existing_node))
+        ]
+        {}
+    "#;
+    let err = match File::from_str(tree_sitter_python::language(), source) {
+        Ok(_) => panic!("Parse succeeded unexpectedly"),
+        Err(ParseError::QueryError(e)) => e,
+        Err(e) => panic!("Unexpected error: {}", e),
+    };
+    assert_eq!(err.row, 6, "expected row 6, got {}", err.row);
+    assert_eq!(err.column, 13, "expected column 13, got {}", err.column);
+    assert_eq!(err.offset, 112, "expected offset 112, got {}", err.offset);
 }

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Library
 
+#### Fixed
+
+- Query errors now report the correct column for errors on the first row of a query.
+
 #### Added
 
 - The `Variables` type has additional methods `is_empty` and `iter`.

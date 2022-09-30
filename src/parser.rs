@@ -291,6 +291,12 @@ impl<'a> Parser<'a> {
         self.query_source += &query_source;
         self.query_source += "\n";
         let query = Query::new(language, &query_source).map_err(|mut e| {
+            // the column of the first row of a query pattern must be shifted by the whitespace
+            // that was already consumed
+            if e.row == 0 {
+                // must come before we update e.row!
+                e.column += location.column;
+            }
             e.row += location.row;
             e.offset += query_start;
             e
