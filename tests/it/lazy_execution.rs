@@ -272,6 +272,26 @@ fn can_use_global_variable() {
 }
 
 #[test]
+fn can_omit_global_variable_with_default() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          global pkgname = ""
+
+          (module) @root
+          {
+            node n
+            attr (n) pkgname = pkgname
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            pkgname: ""
+    "#},
+    );
+}
+
+#[test]
 fn cannot_omit_global_variable() {
     fail_execution(
         "pass",

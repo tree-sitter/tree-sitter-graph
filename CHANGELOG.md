@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### DSL
 
+#### Added
+
+- Global variables can be given default string values using `global NAME = "STRING"` syntax.
+
 #### Removed
 
 - References to undefined variables now result in errors, instead of assuming its an undeclared global variable.

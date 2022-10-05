@@ -58,13 +58,24 @@ impl File {
         }
     }
 
-    pub(self) fn check_globals(&self, globals: &Globals) -> Result<(), ExecutionError> {
+    pub(self) fn check_globals(&self, globals: &mut Globals) -> Result<(), ExecutionError> {
         for global in &self.globals {
             match globals.get(&global.name) {
                 None => {
-                    return Err(ExecutionError::MissingGlobalVariable(
-                        global.name.as_str().to_string(),
-                    ));
+                    if let Some(default) = &global.default {
+                        globals
+                            .add(global.name.clone(), default.to_string().into())
+                            .map_err(|_| {
+                                ExecutionError::DuplicateVariable(format!(
+                                    "global variable {} already defined",
+                                    global.name
+                                ))
+                            })?;
+                    } else {
+                        return Err(ExecutionError::MissingGlobalVariable(
+                            global.name.as_str().to_string(),
+                        ));
+                    }
                 }
                 Some(value) => {
                     if global.quantifier == CaptureQuantifier::ZeroOrMore
@@ -79,6 +90,7 @@ impl File {
                 }
             }
         }
+
         Ok(())
     }
 }

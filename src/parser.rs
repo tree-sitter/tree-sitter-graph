@@ -224,9 +224,16 @@ impl<'a> Parser<'a> {
         let location = self.location;
         let name = self.parse_identifier("global variable")?;
         let quantifier = self.parse_quantifier()?;
+        let mut default = None;
+        self.consume_whitespace();
+        if let Ok(_) = self.consume_token("=") {
+            self.consume_whitespace();
+            default = Some(self.parse_string()?);
+        }
         Ok(ast::Global {
             name,
             quantifier,
+            default,
             location,
         })
     }

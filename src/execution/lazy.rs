@@ -27,6 +27,7 @@ use crate::execution::ExecutionConfig;
 use crate::functions::Functions;
 use crate::graph;
 use crate::graph::Graph;
+use crate::variables::Globals;
 use crate::variables::MutVariables;
 use crate::variables::VariableMap;
 use crate::CancellationFlag;
@@ -51,7 +52,16 @@ impl ast::File {
         config: &ExecutionConfig,
         cancellation_flag: &dyn CancellationFlag,
     ) -> Result<(), ExecutionError> {
-        self.check_globals(config.globals)?;
+        let mut globals = Globals::nested(config.globals);
+        self.check_globals(&mut globals)?;
+        let mut config = ExecutionConfig {
+            functions: config.functions,
+            globals: &globals,
+            lazy: config.lazy,
+            location_attr: config.location_attr.clone(),
+            variable_name_attr: config.variable_name_attr.clone(),
+        };
+
         let mut locals = VariableMap::new();
         let mut cursor = QueryCursor::new();
         let mut store = LazyStore::new();
@@ -69,7 +79,7 @@ impl ast::File {
                 source,
                 &mat,
                 graph,
-                config,
+                &mut config,
                 &mut locals,
                 &mut store,
                 &mut scoped_store,
