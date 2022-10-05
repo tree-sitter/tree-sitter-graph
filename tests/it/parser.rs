@@ -1239,52 +1239,16 @@ fn can_parse_global() {
 }
 
 #[test]
-// TODO deprecated support for undeclared globals
-//      change to cannot_parse_undeclared_global once support is removed
-fn can_parse_undeclared_global() {
+fn cannot_parse_undeclared_global() {
     let source = r#"
         (identifier) {
           node n
           edge n -> root
         }
     "#;
-    let file = File::from_str(tree_sitter_python::language(), source).expect("Cannot parse file");
-
-    assert_eq!(file.globals, vec![]);
-
-    let statements = file
-        .stanzas
-        .into_iter()
-        .map(|s| s.statements)
-        .collect::<Vec<_>>();
-    assert_eq!(
-        statements,
-        vec![vec![
-            CreateGraphNode {
-                node: UnscopedVariable {
-                    name: "n".into(),
-                    location: Location { row: 2, column: 15 },
-                }
-                .into(),
-                location: Location { row: 2, column: 10 },
-            }
-            .into(),
-            CreateEdge {
-                source: UnscopedVariable {
-                    name: "n".into(),
-                    location: Location { row: 3, column: 15 },
-                }
-                .into(),
-                sink: UnscopedVariable {
-                    name: "root".into(),
-                    location: Location { row: 3, column: 20 },
-                }
-                .into(),
-                location: Location { row: 3, column: 10 },
-            }
-            .into(),
-        ]]
-    );
+    if let Ok(_) = File::from_str(tree_sitter_python::language(), source) {
+        panic!("Parse succeeded unexpectedly");
+    }
 }
 
 #[test]

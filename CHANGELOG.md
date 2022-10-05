@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### DSL
+
+#### Removed
+
+- References to undefined variables now result in errors, instead of assuming its an undeclared global variable.
+
 ### Library
 
 #### Fixed
