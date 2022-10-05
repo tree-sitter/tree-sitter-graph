@@ -69,7 +69,7 @@ impl File {
         graph: &mut Graph<'tree>,
         tree: &'tree Tree,
         source: &'tree str,
-        config: &mut ExecutionConfig,
+        config: &ExecutionConfig,
         cancellation_flag: &dyn CancellationFlag,
     ) -> Result<(), ExecutionError> {
         self.check_globals(config.globals)?;
@@ -102,7 +102,7 @@ impl File {
 struct ExecutionContext<'a, 'c, 'g, 's, 'tree> {
     source: &'tree str,
     graph: &'a mut Graph<'tree>,
-    config: &'a mut ExecutionConfig<'c, 'g>,
+    config: &'a ExecutionConfig<'c, 'g>,
     locals: &'a mut dyn MutVariables<Value>,
     scoped: &'a mut ScopedVariables<'s>,
     current_regex_captures: &'a Vec<String>,
@@ -134,7 +134,7 @@ impl Stanza {
         tree: &'tree Tree,
         source: &'tree str,
         graph: &mut Graph<'tree>,
-        config: &mut ExecutionConfig<'_, 'g>,
+        config: &ExecutionConfig<'_, 'g>,
         locals: &mut VariableMap<'l, Value>,
         scoped: &mut ScopedVariables<'s>,
         current_regex_captures: &Vec<String>,

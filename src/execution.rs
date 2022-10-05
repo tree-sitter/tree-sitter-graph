@@ -30,7 +30,7 @@ impl File {
         &self,
         tree: &'tree Tree,
         source: &'tree str,
-        config: &mut ExecutionConfig,
+        config: &ExecutionConfig,
         cancellation_flag: &dyn CancellationFlag,
     ) -> Result<Graph<'tree>, ExecutionError> {
         let mut graph = Graph::new();
@@ -48,7 +48,7 @@ impl File {
         graph: &mut Graph<'tree>,
         tree: &'tree Tree,
         source: &'tree str,
-        config: &mut ExecutionConfig,
+        config: &ExecutionConfig,
         cancellation_flag: &dyn CancellationFlag,
     ) -> Result<(), ExecutionError> {
         if config.lazy {
