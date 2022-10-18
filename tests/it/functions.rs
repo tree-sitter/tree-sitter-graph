@@ -178,3 +178,21 @@ fn cannot_format_with_unexpected_closing_brace() {
         "#},
     );
 }
+
+#[test]
+fn can_concat_lists() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node n
+            attr (n) xs = (concat [1, 2] [] [3, 4, 5])
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            xs: [1, 2, 3, 4, 5]
+        "#},
+    );
+}

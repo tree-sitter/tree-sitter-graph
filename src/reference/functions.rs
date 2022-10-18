@@ -104,6 +104,13 @@
 //!
 //! # List functions
 //!
+//! ## `concat`
+//!
+//! Concatenate list arguments.
+//!
+//!  - Input parameters: list values
+//!  - Output: the concatenation of the input lists
+//!
 //! ## `is-empty`
 //!
 //! Test whether a list is empty or not.

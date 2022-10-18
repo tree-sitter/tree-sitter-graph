@@ -131,6 +131,7 @@ impl Functions {
         functions.add(Identifier::from("format"), stdlib::string::Format);
         functions.add(Identifier::from("replace"), stdlib::string::Replace);
         // list functions
+        functions.add(Identifier::from("concat"), stdlib::list::Concat);
         functions.add(Identifier::from("is-empty"), stdlib::list::IsEmpty);
         functions.add(Identifier::from("length"), stdlib::list::Length);
         functions
@@ -580,6 +581,24 @@ pub mod stdlib {
 
     pub mod list {
         use super::*;
+
+        /// The implementation of the standard [`concat`][`crate::reference::functions#concat`] function.
+        pub struct Concat;
+
+        impl Function for Concat {
+            fn call(
+                &self,
+                _graph: &mut Graph,
+                _source: &str,
+                parameters: &mut dyn Parameters,
+            ) -> Result<Value, ExecutionError> {
+                let mut result = Vec::new();
+                while let Ok(list) = parameters.param() {
+                    result.append(&mut list.into_list()?);
+                }
+                Ok(result.into())
+            }
+        }
 
         /// The implementation of the standard [`is-empty`][`crate::reference::functions#is-empty`] function.
         pub struct IsEmpty;
