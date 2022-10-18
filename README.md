@@ -1,5 +1,7 @@
 # tree-sitter-graph
 
+[![DOI](https://zenodo.org/badge/368886913.svg)](https://zenodo.org/badge/latestdoi/368886913)
+
 The `tree-sitter-graph` library defines a DSL for constructing arbitrary graph
 structures from source code that has been parsed using [tree-sitter][].
 
