@@ -1,5 +1,4 @@
 name: Publish release
-
 on:
   push:
     tags:
@@ -35,4 +34,6 @@ jobs:
       - name: Create GitHub release
         uses: ncipollo/release-action@v1
         with:
+          body: |
+            Find more info on all releases at https://crates.io/crates/tree-sitter-graph.
           token: ${{ secrets.GITHUB_TOKEN }}
