@@ -118,6 +118,17 @@
 //!   - Input parameters: a list value
 //!   - Output value: a boolean indicating whether the list is empty or not
 //!
+//! ## `join`
+//!
+//! Join a list of values using the given separator
+//!
+//!  - Input parameters:
+//!    - `list`: A list of values
+//!    - `sep`: An optional separator string
+//! - Output value:
+//!   - A string consisting of the formatted values from the list separated by
+//!     the separator string
+//!
 //! ## `length`
 //!
 //! Determine the length of a list.

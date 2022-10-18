@@ -196,3 +196,39 @@ fn can_concat_lists() {
         "#},
     );
 }
+
+#[test]
+fn can_join_list_with_separator() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node n
+            attr (n) str = (join [1, 2, 3] ".")
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            str: "1.2.3"
+        "#},
+    );
+}
+
+#[test]
+fn can_join_list_without_separator() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node n
+            attr (n) str = (join [1, 2, 3])
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            str: "123"
+        "#},
+    );
+}

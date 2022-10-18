@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Function `eq` to compare two values for equality.
 - Function `format` to format strings.
 - Function `concat` to concatenate lists.
+- Function `join` to join a list of values using an optional separator.
 
 #### Removed
 

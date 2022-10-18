@@ -133,6 +133,7 @@ impl Functions {
         // list functions
         functions.add(Identifier::from("concat"), stdlib::list::Concat);
         functions.add(Identifier::from("is-empty"), stdlib::list::IsEmpty);
+        functions.add(Identifier::from("join"), stdlib::list::Join);
         functions.add(Identifier::from("length"), stdlib::list::Length);
         functions
     }
@@ -612,6 +613,31 @@ pub mod stdlib {
             ) -> Result<Value, ExecutionError> {
                 let list = parameters.param()?.into_list()?;
                 Ok(list.is_empty().into())
+            }
+        }
+
+        /// The implementation of the standard [`join`][`crate::reference::functions#join`] function.
+        pub struct Join;
+
+        impl Function for Join {
+            fn call(
+                &self,
+                _graph: &mut Graph,
+                _source: &str,
+                parameters: &mut dyn Parameters,
+            ) -> Result<Value, ExecutionError> {
+                let list = parameters.param()?.into_list()?;
+                let sep = match parameters.param() {
+                    Ok(sep) => sep.into_string()?,
+                    Err(_) => "".to_string(),
+                };
+                parameters.finish()?;
+                let result = list
+                    .into_iter()
+                    .map(|x| format!("{}", x))
+                    .collect::<Vec<_>>()
+                    .join(&sep);
+                Ok(result.into())
             }
         }
 
