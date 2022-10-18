@@ -399,7 +399,7 @@ impl Print {
                 eprint!("{}", expr.value);
             } else {
                 let value = value.evaluate(exec)?;
-                eprint!("{}", value);
+                eprint!("{:?}", value);
             }
         }
         eprintln!();
