@@ -14,6 +14,13 @@
 //!
 //! # General functions
 //!
+//! ## `eq`
+//!
+//! Check if values are equal.
+//!
+//!   - Input parameters: two values
+//!   - Output: a boolean indicating whether the values are equal or not
+//!
 //! ## `is-null`
 //!
 //! Check if an optional value is missing.

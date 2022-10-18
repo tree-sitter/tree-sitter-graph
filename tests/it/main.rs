@@ -6,6 +6,7 @@
 // ------------------------------------------------------------------------------------------------
 
 mod execution;
+mod functions;
 mod graph;
 mod lazy_execution;
 mod parse_errors;

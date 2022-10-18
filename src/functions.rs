@@ -99,6 +99,7 @@ impl Functions {
     pub fn stdlib() -> Functions {
         let mut functions = Functions::new();
         // general functions
+        functions.add(Identifier::from("eq"), stdlib::Eq);
         functions.add(Identifier::from("is-null"), stdlib::IsNull);
         // tree functions
         functions.add(
@@ -168,6 +169,71 @@ pub mod stdlib {
 
     use super::Function;
     use super::Parameters;
+
+    /// The implementation of the standard [`eq`][`crate::reference::functions#eq`] function.
+    pub struct Eq;
+
+    impl Function for Eq {
+        fn call(
+            &self,
+            _graph: &mut Graph,
+            _source: &str,
+            parameters: &mut dyn Parameters,
+        ) -> Result<Value, ExecutionError> {
+            let left = parameters.param()?;
+            let right = parameters.param()?;
+            parameters.finish()?;
+
+            match &left {
+                Value::Null => match right {
+                    Value::Null => return Ok(true.into()),
+                    _ => return Ok(false.into()),
+                },
+                Value::Boolean(left) => match &right {
+                    Value::Null => return Ok(false.into()),
+                    Value::Boolean(right) => return Ok((left == right).into()),
+                    _ => {}
+                },
+                Value::Integer(left) => match &right {
+                    Value::Null => return Ok(false.into()),
+                    Value::Integer(right) => return Ok((left == right).into()),
+                    _ => {}
+                },
+                Value::String(left) => match &right {
+                    Value::Null => return Ok(false.into()),
+                    Value::String(right) => return Ok((left == right).into()),
+                    _ => {}
+                },
+                Value::List(left) => match &right {
+                    Value::Null => return Ok(false.into()),
+                    Value::List(right) => return Ok((left == right).into()),
+                    _ => {}
+                },
+                Value::Set(left) => match &right {
+                    Value::Null => return Ok(false.into()),
+                    Value::Set(right) => return Ok((left == right).into()),
+                    _ => {}
+                },
+                Value::SyntaxNode(left) => match &right {
+                    Value::Null => return Ok(false.into()),
+                    Value::SyntaxNode(right) => return Ok((left == right).into()),
+                    _ => {}
+                },
+                Value::GraphNode(left) => match &right {
+                    Value::Null => return Ok(false.into()),
+                    Value::GraphNode(right) => return Ok((left == right).into()),
+                    _ => {}
+                },
+            };
+            Err(ExecutionError::FunctionFailed(
+                "eq".into(),
+                format!(
+                    "Cannot compare values of different types: {} and {}",
+                    left, right
+                ),
+            ))
+        }
+    }
 
     /// The implementation of the standard [`is-null`][`crate::reference::functions#is-null`] function.
     pub struct IsNull;
