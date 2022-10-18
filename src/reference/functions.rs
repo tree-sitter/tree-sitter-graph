@@ -14,12 +14,22 @@
 //!
 //! # General functions
 //!
+//! ## `eq`
+//!
+//! Check if values are equal.
+//!
+//!   - Input parameters: two values
+//!   - Output value: a boolean indicating whether the values are equal or not
+//!
+//! The compared values must be of the same type. Null values are equal to each
+//! other and can be compared to values of any type.
+//!
 //! ## `is-null`
 //!
 //! Check if an optional value is missing.
 //!
 //!   - Input parameters: one value
-//!   - Output: a boolean indicating whether the value is null or not
+//!   - Output value: a boolean indicating whether the value is null or not
 //!
 //! # Graph manipulation functions
 //!
@@ -28,7 +38,7 @@
 //! Creates a new graph node.
 //!
 //!   - Input parameters: none
-//!   - Output: a reference to the new graph node
+//!   - Output value: a reference to the new graph node
 //!
 //! # Logical functions
 //!
@@ -37,7 +47,7 @@
 //! Negates a boolean value.
 //!
 //!   - Input parameters: one boolean
-//!   - Output: the negation of the input value
+//!   - Output value: the negation of the input value
 //!
 //! ## `and`
 //!
@@ -45,7 +55,7 @@
 //! true if none of the inputs are false, otherwise false.
 //!
 //!   - Input parameters: zero or more booleans
-//!   - Output: the conjunction of all the input booleans
+//!   - Output value: the conjunction of all the input booleans
 //!
 //! ## `or`
 //!
@@ -53,7 +63,7 @@
 //! true if any of the inputs are true, otherwise false.
 //!
 //!   - Input parameters: zero or more booleans
-//!   - Output: the disjunction of all the input booleans
+//!   - Output value: the disjunction of all the input booleans
 //!
 //! # Mathematical functions
 //!
@@ -62,9 +72,21 @@
 //! Adds integers together.
 //!
 //!   - Input parameters: zero or more integers
-//!   - Output: the sum of all of the input integers
+//!   - Output value: the sum of all of the input integers
 //!
 //! # String functions
+//!
+//! ## `format`
+//!
+//! Formats a string according to the given format string and arguments.
+//!
+//!   - Input parameters:
+//!     - `format`: a format string containing placeholders
+//!     - as many additional parameters as there are placeholders in the format string
+//!
+//!   - Output value: a formatted string with the placeholders replaced by formatted values
+//!
+//! Placeholders are written as `{}`. To produce literal braces, use `{{` and `}}` instead.
 //!
 //! ## `replace`
 //!
@@ -85,19 +107,37 @@
 //!
 //! # List functions
 //!
+//! ## `concat`
+//!
+//! Concatenate list arguments.
+//!
+//!  - Input parameters: list values
+//!  - Output value: the concatenation of the input lists
+//!
 //! ## `is-empty`
 //!
 //! Test whether a list is empty or not.
 //!
 //!   - Input parameters: a list value
-//!   - Output parameters: a boolean indicating whether the list is empty or not
+//!   - Output value: a boolean indicating whether the list is empty or not
+//!
+//! ## `join`
+//!
+//! Join a list of values using the given separator
+//!
+//!  - Input parameters:
+//!    - `list`: A list of values
+//!    - `sep`: An optional separator string
+//! - Output value:
+//!   - A string consisting of the formatted values from the list separated by
+//!     the separator string
 //!
 //! ## `length`
 //!
 //! Determine the length of a list.
 //!
 //!   - Input parameters: a list value
-//!   - Output parameters: an integer indicating the length of the list
+//!   - Output value: an integer indicating the length of the list
 //!
 //! # Syntax manipulation functions
 //!
@@ -107,7 +147,7 @@
 //!
 //!   - Input parameters:
 //!     - `node`: A syntax node
-//!   - Output parameter:
+//!   - Output value:
 //!     - The index of `node` within its parent's list of _named_ children (i.e., the index that
 //!       would cause `ts_node_named_child` to return `node`)
 //!
@@ -117,7 +157,7 @@
 //!
 //!   - Input parameters:
 //!     - `node`: A syntax node
-//!   - Output parameter:
+//!   - Output value:
 //!     - The number of _named_ children in `node`
 //!
 //! ## `source-text`
@@ -126,7 +166,7 @@
 //!
 //!   - Input parameters:
 //!     - `node`: A syntax node
-//!   - Output parameter:
+//!   - Output value:
 //!     - A string containing the source text represented by `node`
 //!
 //! ## `node-type`
@@ -136,7 +176,7 @@
 //!
 //!   - Input parameters:
 //!     - `node`: A syntax node
-//!   - Output parameter:
+//!   - Output value:
 //!     - A string containing the type of `node`
 //!
 //! ## `start-column`
@@ -145,7 +185,7 @@
 //!
 //!   - Input parameters:
 //!     - `node`: A syntax node
-//!   - Output parameter:
+//!   - Output value:
 //!     - The zero-based start column of `node`
 //!
 //! ## `start-row`
@@ -154,7 +194,7 @@
 //!
 //!   - Input parameters:
 //!     - `node`: A syntax node
-//!   - Output parameter:
+//!   - Output value:
 //!     - The zero-based start row of `node`
 //!
 //! ## `end-column`
@@ -163,7 +203,7 @@
 //!
 //!   - Input parameters:
 //!     - `node`: A syntax node
-//!   - Output parameter:
+//!   - Output value:
 //!     - The zero-based end column of `node`
 //!
 //! ## `end-row`
@@ -172,5 +212,5 @@
 //!
 //!   - Input parameters:
 //!     - `node`: A syntax node
-//!   - Output parameter:
+//!   - Output value:
 //!     - The zero-based end row of `node`

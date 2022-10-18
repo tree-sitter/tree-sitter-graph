@@ -276,7 +276,7 @@ impl LazyPrint {
                 LazyPrintArgument::Text(string) => eprint!("{}", string),
                 LazyPrintArgument::Value(value) => {
                     let value = value.evaluate(exec)?;
-                    eprint!("{}", value);
+                    eprint!("{:?}", value);
                 }
             }
         }

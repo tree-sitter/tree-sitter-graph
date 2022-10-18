@@ -307,7 +307,7 @@ impl std::fmt::Display for Attributes {
         keys.sort_by(|a, b| a.cmp(b));
         for key in &keys {
             let value = &self.values[*key];
-            write!(f, "  {}: {}\n", key, value)?;
+            write!(f, "  {}: {:?}\n", key, value)?;
         }
         Ok(())
     }
@@ -324,7 +324,7 @@ impl Serialize for Attributes {
 }
 
 /// The value of an attribute
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Value {
     // Scalar
     Null,
@@ -499,7 +499,7 @@ impl std::fmt::Display for Value {
                 }
             }
             Value::Integer(value) => write!(f, "{}", value),
-            Value::String(value) => write!(f, "{:?}", value),
+            Value::String(value) => write!(f, "{}", value),
             Value::List(value) => {
                 write!(f, "[")?;
                 let mut first = true;
@@ -522,6 +522,51 @@ impl std::fmt::Display for Value {
                         first = false;
                     } else {
                         write!(f, ", {}", element)?;
+                    }
+                }
+                write!(f, "}}")
+            }
+            Value::SyntaxNode(node) => node.fmt(f),
+            Value::GraphNode(node) => node.fmt(f),
+        }
+    }
+}
+
+impl std::fmt::Debug for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Value::Null => write!(f, "#null"),
+            Value::Boolean(value) => {
+                if *value {
+                    write!(f, "#true")
+                } else {
+                    write!(f, "#false")
+                }
+            }
+            Value::Integer(value) => write!(f, "{:?}", value),
+            Value::String(value) => write!(f, "{:?}", value),
+            Value::List(value) => {
+                write!(f, "[")?;
+                let mut first = true;
+                for element in value {
+                    if first {
+                        write!(f, "{:?}", element)?;
+                        first = false;
+                    } else {
+                        write!(f, ", {:?}", element)?;
+                    }
+                }
+                write!(f, "]")
+            }
+            Value::Set(value) => {
+                write!(f, "{{")?;
+                let mut first = true;
+                for element in value {
+                    if first {
+                        write!(f, "{:?}", element)?;
+                        first = false;
+                    } else {
+                        write!(f, ", {:?}", element)?;
                     }
                 }
                 write!(f, "}}")
@@ -587,7 +632,7 @@ impl Serialize for Value {
 }
 
 /// A reference to a syntax node in a graph
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct SyntaxNodeRef {
     index: SyntaxNodeID,
     kind: &'static str,
@@ -627,8 +672,20 @@ impl std::fmt::Display for SyntaxNodeRef {
     }
 }
 
+impl std::fmt::Debug for SyntaxNodeRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "[syntax node {} ({}, {})]",
+            self.kind,
+            self.position.row + 1,
+            self.position.column + 1,
+        )
+    }
+}
+
 /// A reference to a graph node
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct GraphNodeRef(GraphNodeID);
 
 impl GraphNodeRef {
@@ -645,6 +702,12 @@ impl From<GraphNodeRef> for Value {
 }
 
 impl std::fmt::Display for GraphNodeRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "[graph node {}]", self.0)
+    }
+}
+
+impl std::fmt::Debug for GraphNodeRef {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "[graph node {}]", self.0)
     }

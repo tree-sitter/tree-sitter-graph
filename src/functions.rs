@@ -99,6 +99,7 @@ impl Functions {
     pub fn stdlib() -> Functions {
         let mut functions = Functions::new();
         // general functions
+        functions.add(Identifier::from("eq"), stdlib::Eq);
         functions.add(Identifier::from("is-null"), stdlib::IsNull);
         // tree functions
         functions.add(
@@ -127,9 +128,12 @@ impl Functions {
         // math functions
         functions.add(Identifier::from("plus"), stdlib::math::Plus);
         // string functions
+        functions.add(Identifier::from("format"), stdlib::string::Format);
         functions.add(Identifier::from("replace"), stdlib::string::Replace);
         // list functions
+        functions.add(Identifier::from("concat"), stdlib::list::Concat);
         functions.add(Identifier::from("is-empty"), stdlib::list::IsEmpty);
+        functions.add(Identifier::from("join"), stdlib::list::Join);
         functions.add(Identifier::from("length"), stdlib::list::Length);
         functions
     }
@@ -168,6 +172,71 @@ pub mod stdlib {
 
     use super::Function;
     use super::Parameters;
+
+    /// The implementation of the standard [`eq`][`crate::reference::functions#eq`] function.
+    pub struct Eq;
+
+    impl Function for Eq {
+        fn call(
+            &self,
+            _graph: &mut Graph,
+            _source: &str,
+            parameters: &mut dyn Parameters,
+        ) -> Result<Value, ExecutionError> {
+            let left = parameters.param()?;
+            let right = parameters.param()?;
+            parameters.finish()?;
+
+            match &left {
+                Value::Null => match right {
+                    Value::Null => return Ok(true.into()),
+                    _ => return Ok(false.into()),
+                },
+                Value::Boolean(left) => match &right {
+                    Value::Null => return Ok(false.into()),
+                    Value::Boolean(right) => return Ok((left == right).into()),
+                    _ => {}
+                },
+                Value::Integer(left) => match &right {
+                    Value::Null => return Ok(false.into()),
+                    Value::Integer(right) => return Ok((left == right).into()),
+                    _ => {}
+                },
+                Value::String(left) => match &right {
+                    Value::Null => return Ok(false.into()),
+                    Value::String(right) => return Ok((left == right).into()),
+                    _ => {}
+                },
+                Value::List(left) => match &right {
+                    Value::Null => return Ok(false.into()),
+                    Value::List(right) => return Ok((left == right).into()),
+                    _ => {}
+                },
+                Value::Set(left) => match &right {
+                    Value::Null => return Ok(false.into()),
+                    Value::Set(right) => return Ok((left == right).into()),
+                    _ => {}
+                },
+                Value::SyntaxNode(left) => match &right {
+                    Value::Null => return Ok(false.into()),
+                    Value::SyntaxNode(right) => return Ok((left == right).into()),
+                    _ => {}
+                },
+                Value::GraphNode(left) => match &right {
+                    Value::Null => return Ok(false.into()),
+                    Value::GraphNode(right) => return Ok((left == right).into()),
+                    _ => {}
+                },
+            };
+            Err(ExecutionError::FunctionFailed(
+                "eq".into(),
+                format!(
+                    "Cannot compare values of different types: {} and {}",
+                    left, right
+                ),
+            ))
+        }
+    }
 
     /// The implementation of the standard [`is-null`][`crate::reference::functions#is-null`] function.
     pub struct IsNull;
@@ -450,6 +519,43 @@ pub mod stdlib {
     pub mod string {
         use super::*;
 
+        /// The implementation of the standard [`format`][`crate::reference::functions#format`] function.
+        pub struct Format;
+
+        impl Function for Format {
+            fn call(
+                &self,
+                _graph: &mut Graph,
+                _source: &str,
+                parameters: &mut dyn Parameters,
+            ) -> Result<Value, ExecutionError> {
+                let format = parameters.param()?.into_string()?;
+                let mut result = String::new();
+                let mut it = format.chars().enumerate().into_iter();
+                while let Some((_, c)) = it.next() {
+                    match c {
+                        '{' => match it.next() {
+                            Some((_, '{')) => result.push('{'),
+                            Some((_, '}')) => {
+                                let value = parameters.param()?;
+                                result += &value.to_string();
+                            },
+                            Some((i, c)) => return Err(ExecutionError::FunctionFailed("format".into(), format!("Unexpected character `{}` after `{{` at position {} in format string `{}`. Expected `{{` or `}}`.", c, i + 1, format))),
+                            None => return Err(ExecutionError::FunctionFailed("format".into(), format!("Unexpected end of format string `{}` after `{{`. Expected `{{` or `}}`.", format))),
+                        },
+                        '}' => match it.next() {
+                            Some((_, '}')) => result.push('}'),
+                            Some((i, c)) => return Err(ExecutionError::FunctionFailed("format".into(), format!("Unexpected character `{}` after `}}` at position {} in format string `{}`. Expected `}}`.", c, i + 1, format))),
+                            None => return Err(ExecutionError::FunctionFailed("format".into(), format!("Unexpected end of format string `{}` after `{{. Expected `}}`.", format))),
+                        },
+                        c => result.push(c),
+                    }
+                }
+                parameters.finish()?;
+                Ok(result.into())
+            }
+        }
+
         /// The implementation of the standard [`replace`][`crate::reference::functions#replace`] function.
         pub struct Replace;
 
@@ -477,6 +583,24 @@ pub mod stdlib {
     pub mod list {
         use super::*;
 
+        /// The implementation of the standard [`concat`][`crate::reference::functions#concat`] function.
+        pub struct Concat;
+
+        impl Function for Concat {
+            fn call(
+                &self,
+                _graph: &mut Graph,
+                _source: &str,
+                parameters: &mut dyn Parameters,
+            ) -> Result<Value, ExecutionError> {
+                let mut result = Vec::new();
+                while let Ok(list) = parameters.param() {
+                    result.append(&mut list.into_list()?);
+                }
+                Ok(result.into())
+            }
+        }
+
         /// The implementation of the standard [`is-empty`][`crate::reference::functions#is-empty`] function.
         pub struct IsEmpty;
 
@@ -489,6 +613,31 @@ pub mod stdlib {
             ) -> Result<Value, ExecutionError> {
                 let list = parameters.param()?.into_list()?;
                 Ok(list.is_empty().into())
+            }
+        }
+
+        /// The implementation of the standard [`join`][`crate::reference::functions#join`] function.
+        pub struct Join;
+
+        impl Function for Join {
+            fn call(
+                &self,
+                _graph: &mut Graph,
+                _source: &str,
+                parameters: &mut dyn Parameters,
+            ) -> Result<Value, ExecutionError> {
+                let list = parameters.param()?.into_list()?;
+                let sep = match parameters.param() {
+                    Ok(sep) => sep.into_string()?,
+                    Err(_) => "".to_string(),
+                };
+                parameters.finish()?;
+                let result = list
+                    .into_iter()
+                    .map(|x| format!("{}", x))
+                    .collect::<Vec<_>>()
+                    .join(&sep);
+                Ok(result.into())
             }
         }
 

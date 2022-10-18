@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Added
 
 - Global variables can be given default string values using `global NAME = "STRING"` syntax.
+- Function `eq` to compare two values for equality.
+- Function `format` to format strings.
+- Function `concat` to concatenate lists.
+- Function `join` to join a list of values using an optional separator.
 
 #### Removed
 
