@@ -21,6 +21,9 @@
 //!   - Input parameters: two values
 //!   - Output value: a boolean indicating whether the values are equal or not
 //!
+//! The compared values must be of the same type. Null values are equal to each
+//! other and can be compared to values of any type.
+//!
 //! ## `is-null`
 //!
 //! Check if an optional value is missing.
