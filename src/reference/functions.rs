@@ -73,6 +73,18 @@
 //!
 //! # String functions
 //!
+//! ## `format`
+//!
+//! Formats a string according to the given format string and arguments.
+//!
+//!   - Input parameters:
+//!     - `format`: a format string containing placeholders
+//!     - as many additional parameters as there are placeholders in the format string
+//!
+//!   - Output: a formatted string with the placeholders replaced by formatted values
+//!
+//! Placeholders are written as `{}`. To produce literal braces, use `{{` and `}}` instead.
+//!
 //! ## `replace`
 //!
 //! Applies a regular expression to a string, replacing any text that matches.

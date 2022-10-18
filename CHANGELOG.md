@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Global variables can be given default string values using `global NAME = "STRING"` syntax.
 - Function `eq` to compare two values for equality.
+- Function `format` to format strings.
 
 #### Removed
 

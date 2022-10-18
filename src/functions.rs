@@ -128,6 +128,7 @@ impl Functions {
         // math functions
         functions.add(Identifier::from("plus"), stdlib::math::Plus);
         // string functions
+        functions.add(Identifier::from("format"), stdlib::string::Format);
         functions.add(Identifier::from("replace"), stdlib::string::Replace);
         // list functions
         functions.add(Identifier::from("is-empty"), stdlib::list::IsEmpty);
@@ -515,6 +516,43 @@ pub mod stdlib {
 
     pub mod string {
         use super::*;
+
+        /// The implementation of the standard [`format`][`crate::reference::functions#format`] function.
+        pub struct Format;
+
+        impl Function for Format {
+            fn call(
+                &self,
+                _graph: &mut Graph,
+                _source: &str,
+                parameters: &mut dyn Parameters,
+            ) -> Result<Value, ExecutionError> {
+                let format = parameters.param()?.into_string()?;
+                let mut result = String::new();
+                let mut it = format.chars().enumerate().into_iter();
+                while let Some((_, c)) = it.next() {
+                    match c {
+                        '{' => match it.next() {
+                            Some((_, '{')) => result.push('{'),
+                            Some((_, '}')) => {
+                                let value = parameters.param()?;
+                                result += &value.to_string();
+                            },
+                            Some((i, c)) => return Err(ExecutionError::FunctionFailed("format".into(), format!("Unexpected character `{}` after `{{` at position {} in format string `{}`. Expected `{{` or `}}`.", c, i + 1, format))),
+                            None => return Err(ExecutionError::FunctionFailed("format".into(), format!("Unexpected end of format string `{}` after `{{`. Expected `{{` or `}}`.", format))),
+                        },
+                        '}' => match it.next() {
+                            Some((_, '}')) => result.push('}'),
+                            Some((i, c)) => return Err(ExecutionError::FunctionFailed("format".into(), format!("Unexpected character `{}` after `}}` at position {} in format string `{}`. Expected `}}`.", c, i + 1, format))),
+                            None => return Err(ExecutionError::FunctionFailed("format".into(), format!("Unexpected end of format string `{}` after `{{. Expected `}}`.", format))),
+                        },
+                        c => result.push(c),
+                    }
+                }
+                parameters.finish()?;
+                Ok(result.into())
+            }
+        }
 
         /// The implementation of the standard [`replace`][`crate::reference::functions#replace`] function.
         pub struct Replace;

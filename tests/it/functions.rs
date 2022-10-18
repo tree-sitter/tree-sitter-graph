@@ -104,3 +104,77 @@ fn cannot_eq_bool_and_string() {
         "#},
     );
 }
+
+#[test]
+fn can_format_string_null_and_escaped_braces() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node n
+            attr (n) str = (format "{} : {{ {} }}" "foo" #null)
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            str: "foo : { #null }"
+        "#},
+    );
+}
+
+#[test]
+fn cannot_format_with_missing_parameter() {
+    fail_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node n
+            attr (n) str = (format "{} : {{ {} }}" "foo")
+          }
+        "#},
+    );
+}
+
+#[test]
+fn cannot_format_with_extra_parameter() {
+    fail_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node n
+            attr (n) str = (format "{} : {{ {} }}" "foo" #null 42)
+          }
+        "#},
+    );
+}
+
+#[test]
+fn cannot_format_with_unexpected_opening_brace() {
+    fail_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node n
+            attr (n) str = (format "{} : { {} }}" "foo" #null)
+          }
+        "#},
+    );
+}
+
+#[test]
+fn cannot_format_with_unexpected_closing_brace() {
+    fail_execution(
+        "pass",
+        indoc! {r#"
+          (module) @root
+          {
+            node n
+            attr (n) str = (format "{} : {{ {} }" "foo" #null)
+          }
+        "#},
+    );
+}
