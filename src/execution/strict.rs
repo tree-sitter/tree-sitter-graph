@@ -174,7 +174,7 @@ impl Stanza {
                     let node = mat
                         .captures
                         .iter()
-                        .find(|c| c.index as usize == self.full_match_file_capture_index)
+                        .find(|c| c.index as usize == self.full_match_stanza_capture_index)
                         .unwrap()
                         .node;
                     Context::Statement {

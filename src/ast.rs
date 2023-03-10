@@ -62,6 +62,8 @@ pub struct Stanza {
     pub query: Query,
     /// The list of statements in the stanza
     pub statements: Vec<Statement>,
+    /// Capture index of the full match in the stanza query
+    pub full_match_stanza_capture_index: usize,
     /// Capture index of the full match in the file query
     pub full_match_file_capture_index: usize,
     pub location: Location,
