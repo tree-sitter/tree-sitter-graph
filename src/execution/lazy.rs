@@ -190,7 +190,7 @@ impl ast::Stanza {
                     .captures
                     .iter()
                     .find(|c| c.index as usize == self.full_match_file_capture_index)
-                    .unwrap()
+                    .expect("missing capture for full match")
                     .node;
                 Context::Statement {
                     statement: format!("{}", statement),
@@ -308,7 +308,12 @@ impl ast::Scan {
                 exec.cancellation_flag.check("processing scan matches")?;
                 let captures = arm.regex.captures(&match_string[i..]);
                 if let Some(captures) = captures {
-                    if captures.get(0).unwrap().range().is_empty() {
+                    if captures
+                        .get(0)
+                        .expect("missing regex capture")
+                        .range()
+                        .is_empty()
+                    {
                         return Err(ExecutionError::EmptyRegexCapture(format!(
                             "for regular expression /{}/",
                             arm.regex
@@ -323,7 +328,7 @@ impl ast::Scan {
             }
 
             matches.sort_by_key(|(captures, index)| {
-                let range = captures.get(0).unwrap().range();
+                let range = captures.get(0).expect("missing regex capture").range();
                 (range.start, *index)
             });
 
@@ -369,7 +374,11 @@ impl ast::Scan {
                     })?;
             }
 
-            i += regex_captures.get(0).unwrap().range().end;
+            i += regex_captures
+                .get(0)
+                .expect("missing regex capture")
+                .range()
+                .end;
         }
 
         Ok(())

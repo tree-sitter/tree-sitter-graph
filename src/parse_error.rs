@@ -100,7 +100,11 @@ impl std::fmt::Display for ParseErrorDisplay<'_> {
                 let text = &self.source[node.start_byte()..end_byte];
                 write!(f, ": {}", text)?;
             } else {
-                let text = self.source.lines().nth(line).unwrap();
+                let text = self
+                    .source
+                    .lines()
+                    .nth(line)
+                    .expect("parse error has invalid row");
                 writeln!(f, ":")?;
                 writeln!(f, "")?;
                 writeln!(f, "| {}", text)?;
