@@ -104,7 +104,9 @@ impl ast::Stanza {
             locals: &mut locals,
         };
         self.full_match_file_capture_index =
-            ctx.file_query.capture_index_for_name(FULL_MATCH).unwrap() as usize;
+            ctx.file_query
+                .capture_index_for_name(FULL_MATCH)
+                .expect("missing capture index for full match") as usize;
         for statement in &mut self.statements {
             statement.check(&mut ctx)?;
         }
@@ -471,7 +473,10 @@ impl ast::Capture {
             .capture_index_for_name(&name)
             .ok_or_else(|| CheckError::UndefinedSyntaxCapture(name.clone(), self.location))?
             as usize;
-        self.file_capture_index = ctx.file_query.capture_index_for_name(&name).unwrap() as usize;
+        self.file_capture_index = ctx
+            .file_query
+            .capture_index_for_name(&name)
+            .expect("missing capture index for name") as usize; // if the previous lookup succeeded, this one should succeed as well
         self.quantifier =
             ctx.file_query.capture_quantifiers(ctx.stanza_index)[self.file_capture_index];
         Ok(ExpressionResult {

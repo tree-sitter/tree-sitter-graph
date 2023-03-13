@@ -276,18 +276,19 @@ impl<'a> Parser<'a> {
 
     fn parse_stanza(&mut self, language: Language) -> Result<ast::Stanza, ParseError> {
         let location = self.location;
-        let query = self.parse_query(language)?;
+        let (query, full_match_stanza_capture_index) = self.parse_query(language)?;
         self.consume_whitespace();
         let statements = self.parse_statements()?;
         Ok(ast::Stanza {
             query,
             statements,
+            full_match_stanza_capture_index,
             full_match_file_capture_index: usize::MAX, // set in checker
             location,
         })
     }
 
-    fn parse_query(&mut self, language: Language) -> Result<Query, ParseError> {
+    fn parse_query(&mut self, language: Language) -> Result<(Query, usize), ParseError> {
         let location = self.location;
         let query_start = self.offset;
         self.skip_query()?;
@@ -311,7 +312,11 @@ impl<'a> Parser<'a> {
         if query.pattern_count() > 1 {
             return Err(ParseError::UnexpectedQueryPatterns(location));
         }
-        Ok(query)
+        let full_match_capture_index = query
+            .capture_index_for_name(FULL_MATCH)
+            .expect("missing capture index for full match")
+            as usize;
+        Ok((query, full_match_capture_index))
     }
 
     fn skip_query(&mut self) -> Result<(), ParseError> {

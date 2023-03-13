@@ -174,8 +174,8 @@ impl Stanza {
                     let node = mat
                         .captures
                         .iter()
-                        .find(|c| c.index as usize == self.full_match_file_capture_index)
-                        .unwrap()
+                        .find(|c| c.index as usize == self.full_match_stanza_capture_index)
+                        .expect("missing capture for full match")
                         .node;
                     Context::Statement {
                         statement: format!("{}", statement),
@@ -330,7 +330,12 @@ impl Scan {
             for (index, arm) in self.arms.iter().enumerate() {
                 let captures = arm.regex.captures(&match_string[i..]);
                 if let Some(captures) = captures {
-                    if captures.get(0).unwrap().range().is_empty() {
+                    if captures
+                        .get(0)
+                        .expect("missing regex capture")
+                        .range()
+                        .is_empty()
+                    {
                         return Err(ExecutionError::EmptyRegexCapture(format!(
                             "for regular expression /{}/",
                             arm.regex
@@ -345,7 +350,7 @@ impl Scan {
             }
 
             matches.sort_by_key(|(captures, index)| {
-                let range = captures.get(0).unwrap().range();
+                let range = captures.get(0).expect("missing regex capture").range();
                 (range.start, *index)
             });
 
@@ -385,7 +390,11 @@ impl Scan {
                     })?;
             }
 
-            i += regex_captures.get(0).unwrap().range().end;
+            i += regex_captures
+                .get(0)
+                .expect("missing regex capture")
+                .range()
+                .end;
         }
 
         Ok(())

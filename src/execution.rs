@@ -169,9 +169,9 @@ pub(self) fn query_capture_value<'tree>(
         .filter(|c| c.index as usize == index)
         .map(|c| c.node);
     match quantifier {
-        CaptureQuantifier::Zero => panic!("Capture with quantifier 0 has no value"),
+        CaptureQuantifier::Zero => unreachable!(),
         CaptureQuantifier::One => {
-            let syntax_node = graph.add_syntax_node(nodes.next().unwrap());
+            let syntax_node = graph.add_syntax_node(nodes.next().expect("missing capture"));
             syntax_node.into()
         }
         CaptureQuantifier::ZeroOrMore | CaptureQuantifier::OneOrMore => {
