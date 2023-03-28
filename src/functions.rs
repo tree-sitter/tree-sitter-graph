@@ -8,6 +8,7 @@
 //! Functions that can be called by graph DSL files
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::execution::error::ExecutionError;
 use crate::graph::Graph;
@@ -85,7 +86,7 @@ where
 /// A library of named functions.
 #[derive(Default)]
 pub struct Functions {
-    functions: HashMap<Identifier, Box<dyn Function>>,
+    functions: HashMap<Identifier, Arc<dyn Function + Send + Sync>>,
 }
 
 impl Functions {
@@ -141,9 +142,9 @@ impl Functions {
     /// Adds a new function to this library.
     pub fn add<F>(&mut self, name: Identifier, function: F)
     where
-        F: Function + 'static,
+        F: Function + Send + Sync + 'static,
     {
-        self.functions.insert(name, Box::new(function));
+        self.functions.insert(name, Arc::new(function));
     }
 
     /// Calls a named function, returning an error if there is no function with that name.
