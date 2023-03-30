@@ -19,9 +19,9 @@ use tree_sitter::QueryMatch;
 use tree_sitter::Tree;
 
 use crate::ast;
-use crate::execution::error::Context;
 use crate::execution::error::ExecutionError;
 use crate::execution::error::ResultWithExecutionError;
+use crate::execution::error::StatementContext;
 use crate::execution::query_capture_value;
 use crate::execution::ExecutionConfig;
 use crate::functions::Functions;
@@ -92,18 +92,16 @@ impl ast::File {
         }
 
         for graph_stmt in &lazy_graph {
-            graph_stmt
-                .evaluate(&mut EvaluationContext {
-                    source,
-                    graph,
-                    functions: config.functions,
-                    store: &mut store,
-                    scoped_store: &mut scoped_store,
-                    function_parameters: &mut function_parameters,
-                    prev_element_debug_info: &mut prev_element_debug_info,
-                    cancellation_flag,
-                })
-                .with_context(|| format!("Executing {}", graph_stmt).into())?;
+            graph_stmt.evaluate(&mut EvaluationContext {
+                source,
+                graph,
+                functions: config.functions,
+                store: &mut store,
+                scoped_store: &mut scoped_store,
+                function_parameters: &mut function_parameters,
+                prev_element_debug_info: &mut prev_element_debug_info,
+                cancellation_flag,
+            })?;
         }
 
         Ok(())
@@ -123,6 +121,7 @@ struct ExecutionContext<'a, 'c, 'g, 'tree> {
     lazy_graph: &'a mut Vec<LazyStatement>,
     function_parameters: &'a mut Vec<graph::Value>, // re-usable buffer to reduce memory allocations
     prev_element_debug_info: &'a mut HashMap<GraphElementKey, DebugInfo>,
+    error_context: StatementContext,
     shorthands: &'a ast::AttributeShorthands,
     cancellation_flag: &'a dyn CancellationFlag,
 }
@@ -164,42 +163,45 @@ impl ast::Stanza {
     ) -> Result<(), ExecutionError> {
         let current_regex_captures = vec![];
         locals.clear();
-        let mut exec = ExecutionContext {
-            source,
-            graph,
-            config,
-            locals,
-            current_regex_captures: &current_regex_captures,
-            mat,
-            store,
-            scoped_store,
-            lazy_graph,
-            function_parameters,
-            prev_element_debug_info,
-            shorthands,
-            cancellation_flag,
-        };
-        let node = query_capture_value(self.full_match_file_capture_index, One, &mat, exec.graph);
+        let node = query_capture_value(self.full_match_file_capture_index, One, &mat, graph);
         debug!("match {} at {}", node, self.location);
         trace!("{{");
         for statement in &self.statements {
-            exec.cancellation_flag
-                .check("executing stanza statements")?;
-            statement.execute_lazy(&mut exec).with_context(|| {
+            cancellation_flag.check("executing stanza statements")?;
+            let error_context = {
                 let node = mat
                     .captures
                     .iter()
                     .find(|c| c.index as usize == self.full_match_file_capture_index)
                     .expect("missing capture for full match")
                     .node;
-                Context::Statement {
+                StatementContext {
                     statement: format!("{}", statement),
                     statement_location: statement.location(),
                     stanza_location: self.location,
                     source_location: Location::from(node.range().start_point),
                     node_kind: node.kind().to_string(),
                 }
-            })?;
+            };
+            let mut exec = ExecutionContext {
+                source,
+                graph,
+                config,
+                locals,
+                current_regex_captures: &current_regex_captures,
+                mat,
+                store,
+                scoped_store,
+                lazy_graph,
+                function_parameters,
+                prev_element_debug_info,
+                error_context: error_context,
+                shorthands,
+                cancellation_flag,
+            };
+            statement
+                .execute_lazy(&mut exec)
+                .with_context(|| exec.error_context.into())?;
         }
         trace!("}}");
         Ok(())
@@ -265,7 +267,8 @@ impl ast::AddGraphNodeAttribute {
                 .check("executing graph node attributes")?;
             attribute.execute_lazy(exec, &mut add_attribute)?;
         }
-        let stmt = LazyAddGraphNodeAttribute::new(node, attributes, self.location.into());
+        let stmt =
+            LazyAddGraphNodeAttribute::new(node, attributes, exec.error_context.clone().into());
         exec.lazy_graph.push(stmt.into());
         Ok(())
     }
@@ -275,7 +278,7 @@ impl ast::CreateEdge {
     fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
         let source = self.source.evaluate_lazy(exec)?;
         let sink = self.sink.evaluate_lazy(exec)?;
-        let stmt = LazyCreateEdge::new(source, sink, self.location.into());
+        let stmt = LazyCreateEdge::new(source, sink, exec.error_context.clone().into());
         exec.lazy_graph.push(stmt.into());
         Ok(())
     }
@@ -290,7 +293,8 @@ impl ast::AddEdgeAttribute {
         for attribute in &self.attributes {
             attribute.execute_lazy(exec, &mut add_attribute)?;
         }
-        let stmt = LazyAddEdgeAttribute::new(source, sink, attributes, self.location.into());
+        let stmt =
+            LazyAddEdgeAttribute::new(source, sink, attributes, exec.error_context.clone().into());
         exec.lazy_graph.push(stmt.into());
         Ok(())
     }
@@ -354,6 +358,7 @@ impl ast::Scan {
                 lazy_graph: exec.lazy_graph,
                 function_parameters: exec.function_parameters,
                 prev_element_debug_info: exec.prev_element_debug_info,
+                error_context: exec.error_context.clone(),
                 shorthands: exec.shorthands,
                 cancellation_flag: exec.cancellation_flag,
             };
@@ -362,16 +367,18 @@ impl ast::Scan {
                 arm_exec
                     .cancellation_flag
                     .check("executing scan statements")?;
+                arm_exec.error_context.statement = format!("{}", statement);
+                arm_exec.error_context.statement_location = statement.location();
                 statement
                     .execute_lazy(&mut arm_exec)
-                    .with_context(|| format!("Executing {}", statement).into())
                     .with_context(|| {
                         format!(
                             "Matching {} with arm \"{}\" {{ ... }}",
                             match_string, arm.regex,
                         )
                         .into()
-                    })?;
+                    })
+                    .with_context(|| arm_exec.error_context.clone().into())?;
             }
 
             i += regex_captures
@@ -396,7 +403,7 @@ impl ast::Print {
             };
             arguments.push(argument);
         }
-        let stmt = LazyPrint::new(arguments, self.location.into());
+        let stmt = LazyPrint::new(arguments, exec.error_context.clone().into());
         exec.lazy_graph.push(stmt.into());
         Ok(())
     }
@@ -423,6 +430,7 @@ impl ast::If {
                     lazy_graph: exec.lazy_graph,
                     function_parameters: exec.function_parameters,
                     prev_element_debug_info: exec.prev_element_debug_info,
+                    error_context: exec.error_context.clone(),
                     shorthands: exec.shorthands,
                     cancellation_flag: exec.cancellation_flag,
                 };
@@ -430,6 +438,8 @@ impl ast::If {
                     arm_exec
                         .cancellation_flag
                         .check("executing if statements")?;
+                    arm_exec.error_context.statement = format!("{}", stmt);
+                    arm_exec.error_context.statement_location = stmt.location();
                     stmt.execute_lazy(&mut arm_exec)?;
                 }
                 break;
@@ -469,12 +479,18 @@ impl ast::ForIn {
                 lazy_graph: exec.lazy_graph,
                 function_parameters: exec.function_parameters,
                 prev_element_debug_info: exec.prev_element_debug_info,
+                error_context: exec.error_context.clone(),
                 shorthands: exec.shorthands,
                 cancellation_flag: exec.cancellation_flag,
             };
             self.variable
                 .add_lazy(&mut loop_exec, value.into(), false)?;
             for stmt in &self.statements {
+                loop_exec
+                    .cancellation_flag
+                    .check("executing scan statements")?;
+                loop_exec.error_context.statement = format!("{}", stmt);
+                loop_exec.error_context.statement_location = stmt.location();
                 loop_exec
                     .cancellation_flag
                     .check("executing for statements")?;
@@ -563,6 +579,7 @@ impl ast::ListComprehension {
                 lazy_graph: exec.lazy_graph,
                 function_parameters: exec.function_parameters,
                 prev_element_debug_info: exec.prev_element_debug_info,
+                error_context: exec.error_context.clone(),
                 shorthands: exec.shorthands,
                 cancellation_flag: exec.cancellation_flag,
             };
@@ -606,6 +623,7 @@ impl ast::SetComprehension {
                 lazy_graph: exec.lazy_graph,
                 function_parameters: exec.function_parameters,
                 prev_element_debug_info: exec.prev_element_debug_info,
+                error_context: exec.error_context.clone(),
                 shorthands: exec.shorthands,
                 cancellation_flag: exec.cancellation_flag,
             };
@@ -701,12 +719,12 @@ impl ast::ScopedVariable {
             )));
         }
         let scope = self.scope.evaluate_lazy(exec)?;
-        let variable = exec.store.add(value, self.location.into());
+        let variable = exec.store.add(value, exec.error_context.clone().into());
         exec.scoped_store.add(
             scope,
             self.name.clone(),
             variable.into(),
-            self.location.into(),
+            exec.error_context.clone().into(),
         )
     }
 
@@ -746,7 +764,7 @@ impl ast::UnscopedVariable {
                 self
             )));
         }
-        let value = exec.store.add(value, self.location.into());
+        let value = exec.store.add(value, exec.error_context.clone().into());
         exec.locals
             .add(self.name.clone(), value.into(), mutable)
             .map_err(|_| ExecutionError::DuplicateVariable(format!(" local {}", self)))
@@ -763,7 +781,7 @@ impl ast::UnscopedVariable {
                 self
             )));
         }
-        let value = exec.store.add(value, self.location.into());
+        let value = exec.store.add(value, exec.error_context.clone().into());
         exec.locals
             .set(self.name.clone(), value.into())
             .map_err(|_| {
@@ -820,6 +838,7 @@ impl ast::AttributeShorthand {
             lazy_graph: exec.lazy_graph,
             function_parameters: exec.function_parameters,
             prev_element_debug_info: exec.prev_element_debug_info,
+            error_context: exec.error_context.clone(),
             shorthands: exec.shorthands,
             cancellation_flag: exec.cancellation_flag,
         };

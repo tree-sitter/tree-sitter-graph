@@ -74,16 +74,25 @@ pub enum ExecutionError {
     InContext(Context, Box<ExecutionError>),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Context {
-    Statement {
-        statement: String,
-        statement_location: Location,
-        stanza_location: Location,
-        source_location: Location,
-        node_kind: String,
-    },
+    Statement(StatementContext),
     Other(String),
+}
+
+#[derive(Clone, Debug)]
+pub struct StatementContext {
+    pub statement: String,
+    pub statement_location: Location,
+    pub stanza_location: Location,
+    pub source_location: Location,
+    pub node_kind: String,
+}
+
+impl From<StatementContext> for Context {
+    fn from(value: StatementContext) -> Self {
+        Self::Statement(value)
+    }
 }
 
 impl From<String> for Context {
@@ -95,13 +104,13 @@ impl From<String> for Context {
 impl std::fmt::Display for Context {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Statement {
+            Self::Statement(StatementContext {
                 statement,
                 stanza_location,
                 source_location,
                 node_kind,
                 ..
-            } => write!(
+            }) => write!(
                 f,
                 "Executing {} in stanza at {} matching ({}) node at {}",
                 statement, stanza_location, node_kind, source_location
@@ -124,6 +133,7 @@ impl<R> ResultWithExecutionError<R> for Result<R, ExecutionError> {
     {
         self.map_err(|e| match e {
             cancelled @ ExecutionError::Cancelled(_) => cancelled,
+            in_context @ ExecutionError::InContext(_, _) => in_context,
             _ => ExecutionError::InContext(with_context(), Box::new(e)),
         })
     }
@@ -171,13 +181,13 @@ impl DisplayExecutionErrorPretty<'_> {
         match error {
             ExecutionError::InContext(context, cause) => {
                 match context {
-                    Context::Statement {
+                    Context::Statement(StatementContext {
                         statement,
                         statement_location,
                         stanza_location,
                         source_location,
                         node_kind,
-                    } => {
+                    }) => {
                         writeln!(f, "{:>5}: Error executing statement {}", index, statement)?;
                         write!(
                             f,

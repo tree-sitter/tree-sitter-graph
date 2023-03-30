@@ -12,15 +12,15 @@ use log::trace;
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::convert::From;
 use std::fmt;
 use std::rc::Rc;
 
+use crate::execution::error::Context;
 use crate::execution::error::ExecutionError;
 use crate::execution::error::ResultWithExecutionError;
+use crate::execution::error::StatementContext;
 use crate::graph;
 use crate::graph::SyntaxNodeRef;
-use crate::parser::Location;
 use crate::Identifier;
 
 use super::values::*;
@@ -78,10 +78,8 @@ impl LazyStore {
         exec: &mut EvaluationContext,
     ) -> Result<graph::Value, ExecutionError> {
         let variable = &self.elements[variable.store_location];
-        let debug_info = variable.debug_info;
-        let value = variable.force(exec).with_context(|| {
-            format!("via {} at {}", (*variable.state.borrow()), debug_info).into()
-        })?;
+        let debug_info = variable.debug_info.clone();
+        let value = variable.force(exec).with_context(|| debug_info.0.into())?;
         Ok(value)
     }
 }
@@ -148,13 +146,10 @@ impl LazyScopedVariables {
                 let mut map = HashMap::new();
                 let mut debug_infos = HashMap::new();
                 for (scope, value, debug_info) in pairs.into_iter() {
-                    let node = scope.evaluate_as_syntax_node(exec).with_context(|| {
-                        format!(
-                            "Evaluating scope of variable _.{} set at {}",
-                            name, debug_info
-                        )
-                        .into()
-                    })?;
+                    let node = scope
+                        .evaluate_as_syntax_node(exec)
+                        .with_context(|| format!("Evaluating scope of variable _.{}", name,).into())
+                        .with_context(|| debug_info.0.clone().into())?;
                     let prev_debug_info = debug_infos.insert(node, debug_info.clone());
                     match map.insert(node, value.clone()) {
                         Some(_) => {
@@ -260,17 +255,29 @@ impl Thunk {
 }
 
 /// Debug info for tracking origins of values
-#[derive(Debug, Clone, Copy)]
-pub(super) struct DebugInfo(Location);
+#[derive(Debug, Clone)]
+pub(super) struct DebugInfo(StatementContext);
 
-impl From<Location> for DebugInfo {
-    fn from(value: Location) -> Self {
+impl From<StatementContext> for DebugInfo {
+    fn from(value: StatementContext) -> Self {
         Self(value)
+    }
+}
+
+impl From<DebugInfo> for StatementContext {
+    fn from(value: DebugInfo) -> Self {
+        value.0
+    }
+}
+
+impl From<DebugInfo> for Context {
+    fn from(value: DebugInfo) -> Self {
+        value.0.into()
     }
 }
 
 impl fmt::Display for DebugInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "{}", self.0.statement_location)
     }
 }

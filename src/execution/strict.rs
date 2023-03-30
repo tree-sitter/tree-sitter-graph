@@ -42,7 +42,6 @@ use crate::ast::Statement;
 use crate::ast::StringConstant;
 use crate::ast::UnscopedVariable;
 use crate::ast::Variable;
-use crate::execution::error::Context;
 use crate::execution::error::ExecutionError;
 use crate::execution::error::ResultWithExecutionError;
 use crate::execution::query_capture_value;
@@ -58,6 +57,8 @@ use crate::variables::VariableMap;
 use crate::variables::Variables;
 use crate::Identifier;
 use crate::Location;
+
+use super::error::StatementContext;
 
 impl File {
     /// Executes this graph DSL file against a source file, saving the results into an existing
@@ -177,13 +178,14 @@ impl Stanza {
                         .find(|c| c.index as usize == self.full_match_stanza_capture_index)
                         .expect("missing capture for full match")
                         .node;
-                    Context::Statement {
+                    StatementContext {
                         statement: format!("{}", statement),
                         statement_location: statement.location(),
                         stanza_location: self.location,
                         source_location: Location::from(node.range().start_point),
                         node_kind: node.kind().to_string(),
                     }
+                    .into()
                 })?;
             }
         }
