@@ -151,7 +151,10 @@ impl<R> ResultWithExecutionError<R> for Result<R, ExecutionError> {
     {
         self.map_err(|e| match e {
             cancelled @ ExecutionError::Cancelled(_) => cancelled,
-            in_context @ ExecutionError::InContext(_, _) => in_context,
+            in_other_context @ ExecutionError::InContext(Context::Other(_), _) => {
+                ExecutionError::InContext(with_context(), Box::new(in_other_context))
+            }
+            in_stmt_context @ ExecutionError::InContext(_, _) => in_stmt_context,
             _ => ExecutionError::InContext(with_context(), Box::new(e)),
         })
     }
