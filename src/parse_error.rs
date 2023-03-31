@@ -7,6 +7,10 @@
 
 //! Data types and functions for finding and displaying tree-sitter parse errors.
 
+#[cfg(feature = "term-colors")]
+use colored::Colorize;
+use std::ops::Range;
+use std::path::Path;
 use tree_sitter::Node;
 use tree_sitter::Tree;
 
@@ -57,69 +61,110 @@ impl<'tree> ParseError<'tree> {
         }
     }
 
-    pub fn display(&self, source: &'tree str, verbose: bool) -> ParseErrorDisplay {
+    pub fn display(
+        &'tree self,
+        path: &'tree Path,
+        source: &'tree str,
+    ) -> impl std::fmt::Display + 'tree {
         ParseErrorDisplay {
             error: self,
+            path,
             source,
-            verbose,
+        }
+    }
+
+    pub fn display_pretty(
+        &'tree self,
+        path: &'tree Path,
+        source: &'tree str,
+    ) -> impl std::fmt::Display + 'tree {
+        ParseErrorDisplayPretty {
+            error: self,
+            path,
+            source,
         }
     }
 }
 
-pub struct ParseErrorDisplay<'tree> {
+struct ParseErrorDisplay<'tree> {
     error: &'tree ParseError<'tree>,
+    path: &'tree Path,
     source: &'tree str,
-    verbose: bool,
 }
 
 impl std::fmt::Display for ParseErrorDisplay<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let node = self.error.node();
+        write!(
+            f,
+            "{}:{}:{}: ",
+            self.path.display(),
+            node.start_position().row + 1,
+            node.start_position().column + 1
+        )?;
         let node = match self.error {
             ParseError::Missing(node) => {
-                write!(f, "Missing syntax")?;
+                write!(f, "missing syntax")?;
                 node
             }
             ParseError::Unexpected(node) => {
-                write!(f, "Unexpected syntax")?;
+                write!(f, "unexpected syntax")?;
                 node
             }
         };
-        let line = node.start_position().row;
-        let start_column = node.start_position().column;
         if node.byte_range().is_empty() {
             writeln!(f, "")?;
         } else {
-            let (end_column, end_byte) = self.source[node.byte_range()]
+            let end_byte = self.source[node.byte_range()]
                 .chars()
                 .take_while(|c| *c != '\n')
-                .fold(
-                    (node.start_position().column, node.start_byte()),
-                    |(column, byte), c| (column + 1, byte + c.len_utf8()),
-                );
-            if !self.verbose {
-                let text = &self.source[node.start_byte()..end_byte];
-                write!(f, ": {}", text)?;
-            } else {
-                let text = self
-                    .source
-                    .lines()
-                    .nth(line)
-                    .expect("parse error has invalid row");
-                writeln!(f, ":")?;
-                writeln!(f, "")?;
-                writeln!(f, "| {}", text)?;
-                write!(
-                    f,
-                    "  {}{}",
-                    " ".repeat(start_column),
-                    "^".repeat(end_column - start_column)
-                )?;
-                if node.end_position().row == line {
-                    writeln!(f, "")?;
-                } else {
-                    writeln!(f, "...")?;
-                }
+                .map(|c| c.len_utf8())
+                .sum();
+            let text = &self.source[node.start_byte()..end_byte];
+            write!(f, ": {}", text)?;
+        }
+        Ok(())
+    }
+}
+
+struct ParseErrorDisplayPretty<'tree> {
+    error: &'tree ParseError<'tree>,
+    path: &'tree Path,
+    source: &'tree str,
+}
+
+impl std::fmt::Display for ParseErrorDisplayPretty<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let node = match self.error {
+            ParseError::Missing(node) => {
+                writeln!(f, "missing syntax")?;
+                node
             }
+            ParseError::Unexpected(node) => {
+                writeln!(f, "unexpected syntax")?;
+                node
+            }
+        };
+        if node.byte_range().is_empty() {
+            writeln!(f, "")?;
+        } else {
+            let start_column = node.start_position().column;
+            let end_column = node.start_position().column
+                + self.source[node.byte_range()]
+                    .chars()
+                    .take_while(|c| *c != '\n')
+                    .count();
+            write!(
+                f,
+                "{}",
+                Excerpt::from_source(
+                    self.path,
+                    self.source,
+                    node.start_position().row,
+                    start_column..end_column,
+                    0,
+                ),
+            )?;
         }
         Ok(())
     }
@@ -308,3 +353,103 @@ impl std::fmt::Debug for TreeWithParseErrorVec {
 // This is okay because Send and Sync _are_ implemented for Tree, which also holds ffi::TSTree
 unsafe impl Send for TreeWithParseErrorVec {}
 unsafe impl Sync for TreeWithParseErrorVec {}
+
+//-----------------------------------------------------------------------------
+
+/// Excerpts of source from either the target language file or the tsg rules file.
+pub(crate) struct Excerpt<'a> {
+    path: &'a Path,
+    source: Option<&'a str>,
+    row: usize,
+    columns: Range<usize>,
+    indent: usize,
+}
+
+impl<'a> Excerpt<'a> {
+    pub fn from_source(
+        path: &'a Path,
+        source: &'a str,
+        row: usize,
+        columns: Range<usize>,
+        indent: usize,
+    ) -> Excerpt<'a> {
+        Excerpt {
+            path,
+            source: source.lines().nth(row),
+            row,
+            columns,
+            indent,
+        }
+    }
+
+    fn gutter_width(&self) -> usize {
+        ((self.row + 1) as f64).log10() as usize + 1
+    }
+}
+
+impl<'a> std::fmt::Display for Excerpt<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        // path and line/col
+        writeln!(
+            f,
+            "{}{}:{}:{}:",
+            " ".repeat(self.indent),
+            white_bold(&self.path.to_str().unwrap_or("<unknown file>")),
+            white_bold(&format!("{}", self.row + 1)),
+            white_bold(&format!("{}", self.columns.start + 1)),
+        )?;
+        if let Some(source) = self.source {
+            // first line: line number & source
+            writeln!(
+                f,
+                "{}{}{}{}",
+                " ".repeat(self.indent),
+                blue(&format!("{}", self.row + 1)),
+                blue(" | "),
+                source,
+            )?;
+            // second line: caret
+            writeln!(
+                f,
+                "{}{}{}{}{}",
+                " ".repeat(self.indent),
+                " ".repeat(self.gutter_width()),
+                blue(" | "),
+                " ".repeat(self.columns.start),
+                green_bold(&"^".repeat(self.columns.len()))
+            )?;
+        } else {
+            writeln!(f, "{}{}", " ".repeat(self.indent), "<missing source>",)?;
+        }
+        Ok(())
+    }
+}
+
+// coloring functions
+
+#[cfg(feature = "term-colors")]
+fn blue(str: &str) -> impl std::fmt::Display {
+    str.blue()
+}
+#[cfg(not(feature = "term-colors"))]
+fn blue<'a>(str: &'a str) -> impl std::fmt::Display + 'a {
+    str
+}
+
+#[cfg(feature = "term-colors")]
+fn green_bold(str: &str) -> impl std::fmt::Display {
+    str.green().bold()
+}
+#[cfg(not(feature = "term-colors"))]
+fn green_bold<'a>(str: &'a str) -> impl std::fmt::Display + 'a {
+    str
+}
+
+#[cfg(feature = "term-colors")]
+fn white_bold(str: &str) -> impl std::fmt::Display {
+    str.white().bold()
+}
+#[cfg(not(feature = "term-colors"))]
+fn white_bold<'a>(str: &'a str) -> impl std::fmt::Display + 'a {
+    str
+}

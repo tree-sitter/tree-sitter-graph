@@ -7,6 +7,7 @@
 
 use std::fmt::Display;
 use std::iter::Peekable;
+use std::ops::Range;
 use std::str::Chars;
 
 use regex::Regex;
@@ -91,6 +92,10 @@ impl Location {
         } else {
             self.column += 1;
         }
+    }
+
+    pub(crate) fn to_column_range(&self) -> Range<usize> {
+        self.column..self.column + 1
     }
 }
 

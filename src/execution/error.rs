@@ -5,13 +5,13 @@
 // Please see the LICENSE-APACHE or LICENSE-MIT files in this distribution for license details.
 // ------------------------------------------------------------------------------------------------
 
-#[cfg(feature = "term-colors")]
-use colored::Colorize;
 use std::path::Path;
 use thiserror::Error;
 
-use crate::ast::{Stanza, Statement};
+use crate::ast::Stanza;
+use crate::ast::Statement;
 use crate::execution::CancellationError;
+use crate::parse_error::Excerpt;
 use crate::Location;
 
 /// An error that can occur while executing a graph DSL file
@@ -213,19 +213,37 @@ impl DisplayExecutionErrorPretty<'_> {
                         write!(
                             f,
                             "{}",
-                            Excerpt::from_source(self.tsg_path, self.tsg, statement_location, 7)
+                            Excerpt::from_source(
+                                self.tsg_path,
+                                self.tsg,
+                                statement_location.row,
+                                statement_location.to_column_range(),
+                                7
+                            )
                         )?;
                         writeln!(f, "{}in stanza", " ".repeat(7))?;
                         write!(
                             f,
                             "{}",
-                            Excerpt::from_source(self.tsg_path, self.tsg, stanza_location, 7)
+                            Excerpt::from_source(
+                                self.tsg_path,
+                                self.tsg,
+                                stanza_location.row,
+                                stanza_location.to_column_range(),
+                                7
+                            )
                         )?;
                         writeln!(f, "{}matching ({}) node", " ".repeat(7), node_kind)?;
                         write!(
                             f,
                             "{}",
-                            Excerpt::from_source(self.source_path, self.source, source_location, 7)
+                            Excerpt::from_source(
+                                self.source_path,
+                                self.source,
+                                source_location.row,
+                                source_location.to_column_range(),
+                                7
+                            )
                         )?;
                         Ok(())
                     }
@@ -236,100 +254,4 @@ impl DisplayExecutionErrorPretty<'_> {
             other => writeln!(f, "{:>5}: {}", index, other),
         }
     }
-}
-
-/// Excerpts of source from either the target language file or the tsg rules file.
-struct Excerpt<'a> {
-    path: &'a Path,
-    source: Option<&'a str>,
-    location: &'a Location,
-    indent: usize,
-}
-
-impl<'a> Excerpt<'a> {
-    pub fn from_source(
-        path: &'a Path,
-        source: &'a str,
-        location: &'a Location,
-        indent: usize,
-    ) -> Excerpt<'a> {
-        Excerpt {
-            path,
-            source: source.lines().nth(location.row),
-            location,
-            indent,
-        }
-    }
-
-    fn gutter_width(&self) -> usize {
-        ((self.location.row + 1) as f64).log10() as usize + 1
-    }
-}
-
-impl<'a> std::fmt::Display for Excerpt<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        // path and line/col
-        write!(
-            f,
-            "{}{}:{}:{}:",
-            " ".repeat(self.indent),
-            white_bold(&self.path.to_str().unwrap_or("<unknown file>")),
-            white_bold(&format!("{}", self.location.row + 1)),
-            white_bold(&format!("{}", self.location.column + 1)),
-        )?;
-        if let Some(source) = self.source {
-            writeln!(f)?;
-            // first line: line number & source
-            writeln!(
-                f,
-                "{}{}{}{}",
-                " ".repeat(self.indent),
-                blue(&format!("{}", self.location.row + 1)),
-                blue(" | "),
-                source,
-            )?;
-            // second line: caret
-            writeln!(
-                f,
-                "{}{}{}{}{}",
-                " ".repeat(self.indent),
-                " ".repeat(self.gutter_width()),
-                blue(" | "),
-                " ".repeat(self.location.column),
-                green_bold("^")
-            )?;
-        } else {
-            writeln!(f, " <missing source>")?;
-        }
-        Ok(())
-    }
-}
-
-// coloring functions
-
-#[cfg(feature = "term-colors")]
-fn blue(str: &str) -> impl std::fmt::Display {
-    str.blue()
-}
-#[cfg(not(feature = "term-colors"))]
-fn blue<'a>(str: &'a str) -> impl std::fmt::Display + 'a {
-    str
-}
-
-#[cfg(feature = "term-colors")]
-fn green_bold(str: &str) -> impl std::fmt::Display {
-    str.green().bold()
-}
-#[cfg(not(feature = "term-colors"))]
-fn green_bold<'a>(str: &'a str) -> impl std::fmt::Display + 'a {
-    str
-}
-
-#[cfg(feature = "term-colors")]
-fn white_bold(str: &str) -> impl std::fmt::Display {
-    str.white().bold()
-}
-#[cfg(not(feature = "term-colors"))]
-fn white_bold<'a>(str: &'a str) -> impl std::fmt::Display + 'a {
-    str
 }
