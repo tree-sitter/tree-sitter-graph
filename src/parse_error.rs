@@ -61,73 +61,110 @@ impl<'tree> ParseError<'tree> {
         }
     }
 
-    pub fn display<'a: 'tree>(
-        &'a self,
+    pub fn display(
+        &'tree self,
+        path: &'tree Path,
         source: &'tree str,
-        verbose: bool,
-    ) -> impl std::fmt::Display + 'a + 'tree {
+    ) -> impl std::fmt::Display + 'tree {
         ParseErrorDisplay {
             error: self,
+            path,
             source,
-            verbose,
+        }
+    }
+
+    pub fn display_pretty(
+        &'tree self,
+        path: &'tree Path,
+        source: &'tree str,
+    ) -> impl std::fmt::Display + 'tree {
+        ParseErrorDisplayPretty {
+            error: self,
+            path,
+            source,
         }
     }
 }
 
 struct ParseErrorDisplay<'tree> {
     error: &'tree ParseError<'tree>,
+    path: &'tree Path,
     source: &'tree str,
-    verbose: bool,
 }
 
 impl std::fmt::Display for ParseErrorDisplay<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let node = self.error.node();
+        write!(
+            f,
+            "{}:{}:{}: ",
+            self.path.display(),
+            node.start_position().row + 1,
+            node.start_position().column + 1
+        )?;
         let node = match self.error {
             ParseError::Missing(node) => {
-                write!(f, "Missing syntax")?;
+                write!(f, "missing syntax")?;
                 node
             }
             ParseError::Unexpected(node) => {
-                write!(f, "Unexpected syntax")?;
+                write!(f, "unexpected syntax")?;
                 node
             }
         };
-        let line = node.start_position().row;
-        let start_column = node.start_position().column;
         if node.byte_range().is_empty() {
             writeln!(f, "")?;
         } else {
-            let (end_column, end_byte) = self.source[node.byte_range()]
+            let end_byte = self.source[node.byte_range()]
                 .chars()
                 .take_while(|c| *c != '\n')
-                .fold(
-                    (node.start_position().column, node.start_byte()),
-                    |(column, byte), c| (column + 1, byte + c.len_utf8()),
-                );
-            if !self.verbose {
-                let text = &self.source[node.start_byte()..end_byte];
-                write!(f, ": {}", text)?;
-            } else {
-                let text = self
-                    .source
-                    .lines()
-                    .nth(line)
-                    .expect("parse error has invalid row");
-                writeln!(f, ":")?;
-                writeln!(f, "")?;
-                writeln!(f, "| {}", text)?;
-                write!(
-                    f,
-                    "  {}{}",
-                    " ".repeat(start_column),
-                    "^".repeat(end_column - start_column)
-                )?;
-                if node.end_position().row == line {
-                    writeln!(f, "")?;
-                } else {
-                    writeln!(f, "...")?;
-                }
+                .map(|c| c.len_utf8())
+                .sum();
+            let text = &self.source[node.start_byte()..end_byte];
+            write!(f, ": {}", text)?;
+        }
+        Ok(())
+    }
+}
+
+struct ParseErrorDisplayPretty<'tree> {
+    error: &'tree ParseError<'tree>,
+    path: &'tree Path,
+    source: &'tree str,
+}
+
+impl std::fmt::Display for ParseErrorDisplayPretty<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let node = match self.error {
+            ParseError::Missing(node) => {
+                writeln!(f, "missing syntax")?;
+                node
             }
+            ParseError::Unexpected(node) => {
+                writeln!(f, "unexpected syntax")?;
+                node
+            }
+        };
+        if node.byte_range().is_empty() {
+            writeln!(f, "")?;
+        } else {
+            let start_column = node.start_position().column;
+            let end_column = node.start_position().column
+                + self.source[node.byte_range()]
+                    .chars()
+                    .take_while(|c| *c != '\n')
+                    .count();
+            write!(
+                f,
+                "{}",
+                Excerpt::from_source(
+                    self.path,
+                    self.source,
+                    node.start_position().row,
+                    start_column..end_column,
+                    0,
+                ),
+            )?;
         }
         Ok(())
     }

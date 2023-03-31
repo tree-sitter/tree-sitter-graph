@@ -114,15 +114,7 @@ fn main() -> Result<()> {
         let parse_errors = ParseError::all(&tree);
         if !parse_errors.is_empty() {
             for parse_error in parse_errors.iter().take(MAX_PARSE_ERRORS) {
-                let line = parse_error.node().start_position().row;
-                let column = parse_error.node().start_position().column;
-                eprintln!(
-                    "{}:{}:{}: {}",
-                    source_path.display(),
-                    line + 1,
-                    column + 1,
-                    parse_error.display(&source, true)
-                );
+                eprintln!("{}", parse_error.display_pretty(source_path, &source));
             }
             if parse_errors.len() > MAX_PARSE_ERRORS {
                 let more_errors = parse_errors.len() - MAX_PARSE_ERRORS;
@@ -141,7 +133,7 @@ fn main() -> Result<()> {
     let graph = match file.execute(&tree, &source, &mut config, &NoCancellation) {
         Ok(graph) => graph,
         Err(e) => {
-            eprint!("{}", e.display_pretty(source_path, &source, tsg_path, &tsg));
+            eprintln!("{}", e.display_pretty(source_path, &source, tsg_path, &tsg));
             return Err(anyhow!("Cannot execute TSG file {}", tsg_path.display()));
         }
     };

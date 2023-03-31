@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Library
+
+#### Changed
+
+- The method `ParseError::display(source: &str, verbose: bool)` has been replaced by two methods `ParseError::display(path: &path, source: &str)` and `ParseError::display_pretty(path: &Path, source: &str)`.
+
+### CLI
+
+#### Changed
+
+- Parse errors are now displayed with the same excerpt style as execution errors.
+
 ## 0.8.0 -- 2023-03-29
 
 ### Library
