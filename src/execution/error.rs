@@ -10,6 +10,7 @@ use colored::Colorize;
 use std::path::Path;
 use thiserror::Error;
 
+use crate::ast::{Stanza, Statement};
 use crate::execution::CancellationError;
 use crate::Location;
 
@@ -87,6 +88,23 @@ pub struct StatementContext {
     pub stanza_location: Location,
     pub source_location: Location,
     pub node_kind: String,
+}
+
+impl StatementContext {
+    pub(crate) fn new(stmt: &Statement, stanza: &Stanza, source_node: &tree_sitter::Node) -> Self {
+        Self {
+            statement: format!("{}", stmt),
+            statement_location: stmt.location(),
+            stanza_location: stanza.location,
+            source_location: Location::from(source_node.range().start_point),
+            node_kind: source_node.kind().to_string(),
+        }
+    }
+
+    pub(crate) fn update_statement(&mut self, stmt: &Statement) {
+        self.statement = format!("{}", stmt);
+        self.statement_location = stmt.location();
+    }
 }
 
 impl From<StatementContext> for Context {

@@ -119,6 +119,7 @@ struct ExecutionContext<'a, 'c, 'g, 's, 'tree> {
     current_regex_captures: &'a Vec<String>,
     function_parameters: &'a mut Vec<Value>,
     mat: &'a QueryMatch<'a, 'tree>,
+    error_context: StatementContext,
     shorthands: &'a AttributeShorthands,
     cancellation_flag: &'a dyn CancellationFlag,
 }
@@ -158,35 +159,32 @@ impl Stanza {
         for mat in matches {
             cancellation_flag.check("processing matches")?;
             locals.clear();
-            let mut exec = ExecutionContext {
-                source,
-                graph,
-                config,
-                locals,
-                scoped,
-                current_regex_captures,
-                function_parameters,
-                mat: &mat,
-                shorthands: shorthands,
-                cancellation_flag,
-            };
             for statement in &self.statements {
-                statement.execute(&mut exec).with_context(|| {
+                let error_context = {
                     let node = mat
                         .captures
                         .iter()
                         .find(|c| c.index as usize == self.full_match_stanza_capture_index)
                         .expect("missing capture for full match")
                         .node;
-                    StatementContext {
-                        statement: format!("{}", statement),
-                        statement_location: statement.location(),
-                        stanza_location: self.location,
-                        source_location: Location::from(node.range().start_point),
-                        node_kind: node.kind().to_string(),
-                    }
-                    .into()
-                })?;
+                    StatementContext::new(&statement, &self, &node)
+                };
+                let mut exec = ExecutionContext {
+                    source,
+                    graph,
+                    config,
+                    locals,
+                    scoped,
+                    current_regex_captures,
+                    function_parameters,
+                    mat: &mat,
+                    error_context,
+                    shorthands,
+                    cancellation_flag,
+                };
+                statement
+                    .execute(&mut exec)
+                    .with_context(|| exec.error_context.into())?;
             }
         }
         Ok(())
@@ -375,21 +373,19 @@ impl Scan {
                 current_regex_captures: &current_regex_captures,
                 function_parameters: exec.function_parameters,
                 mat: exec.mat,
+                error_context: exec.error_context.clone(),
                 shorthands: exec.shorthands,
                 cancellation_flag: exec.cancellation_flag,
             };
 
             for statement in &arm.statements {
+                arm_exec.error_context.update_statement(statement);
                 statement
                     .execute(&mut arm_exec)
-                    .with_context(|| format!("Executing {}", statement).into())
                     .with_context(|| {
-                        format!(
-                            "Matching {} with arm \"{}\" {{ ... }}",
-                            match_string, arm.regex,
-                        )
-                        .into()
-                    })?;
+                        format!("matching {} with arm \"{}\"", match_string, arm.regex,).into()
+                    })
+                    .with_context(|| arm_exec.error_context.clone().into())?;
             }
 
             i += regex_captures
@@ -436,11 +432,14 @@ impl If {
                     current_regex_captures: exec.current_regex_captures,
                     function_parameters: exec.function_parameters,
                     mat: exec.mat,
+                    error_context: exec.error_context.clone(),
                     shorthands: exec.shorthands,
                     cancellation_flag: exec.cancellation_flag,
                 };
                 for stmt in &arm.statements {
-                    stmt.execute(&mut arm_exec)?;
+                    arm_exec.error_context.update_statement(stmt);
+                    stmt.execute(&mut arm_exec)
+                        .with_context(|| arm_exec.error_context.clone().into())?;
                 }
                 break;
             }
@@ -474,12 +473,15 @@ impl ForIn {
                 current_regex_captures: exec.current_regex_captures,
                 function_parameters: exec.function_parameters,
                 mat: exec.mat,
+                error_context: exec.error_context.clone(),
                 shorthands: exec.shorthands,
                 cancellation_flag: exec.cancellation_flag,
             };
             self.variable.add(&mut loop_exec, value, false)?;
             for stmt in &self.statements {
-                stmt.execute(&mut loop_exec)?;
+                loop_exec.error_context.update_statement(stmt);
+                stmt.execute(&mut loop_exec)
+                    .with_context(|| loop_exec.error_context.clone().into())?;
             }
         }
         Ok(())
@@ -545,6 +547,7 @@ impl ListComprehension {
                 current_regex_captures: exec.current_regex_captures,
                 function_parameters: exec.function_parameters,
                 mat: exec.mat,
+                error_context: exec.error_context.clone(),
                 shorthands: exec.shorthands,
                 cancellation_flag: exec.cancellation_flag,
             };
@@ -583,6 +586,7 @@ impl SetComprehension {
                 current_regex_captures: exec.current_regex_captures,
                 function_parameters: exec.function_parameters,
                 mat: exec.mat,
+                error_context: exec.error_context.clone(),
                 shorthands: exec.shorthands,
                 cancellation_flag: exec.cancellation_flag,
             };
@@ -839,6 +843,7 @@ impl AttributeShorthand {
             current_regex_captures: exec.current_regex_captures,
             function_parameters: exec.function_parameters,
             mat: exec.mat,
+            error_context: exec.error_context.clone(),
             shorthands: exec.shorthands,
             cancellation_flag: exec.cancellation_flag,
         };

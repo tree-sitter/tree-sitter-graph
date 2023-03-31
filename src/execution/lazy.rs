@@ -32,7 +32,6 @@ use crate::variables::MutVariables;
 use crate::variables::VariableMap;
 use crate::CancellationFlag;
 use crate::Identifier;
-use crate::Location;
 
 use statements::*;
 use store::*;
@@ -167,7 +166,6 @@ impl ast::Stanza {
         debug!("match {} at {}", node, self.location);
         trace!("{{");
         for statement in &self.statements {
-            cancellation_flag.check("executing stanza statements")?;
             let error_context = {
                 let node = mat
                     .captures
@@ -175,13 +173,7 @@ impl ast::Stanza {
                     .find(|c| c.index as usize == self.full_match_file_capture_index)
                     .expect("missing capture for full match")
                     .node;
-                StatementContext {
-                    statement: format!("{}", statement),
-                    statement_location: statement.location(),
-                    stanza_location: self.location,
-                    source_location: Location::from(node.range().start_point),
-                    node_kind: node.kind().to_string(),
-                }
+                StatementContext::new(&statement, &self, &node)
             };
             let mut exec = ExecutionContext {
                 source,
@@ -195,7 +187,7 @@ impl ast::Stanza {
                 lazy_graph,
                 function_parameters,
                 prev_element_debug_info,
-                error_context: error_context,
+                error_context,
                 shorthands,
                 cancellation_flag,
             };
@@ -263,8 +255,6 @@ impl ast::AddGraphNodeAttribute {
         let mut attributes = Vec::new();
         let mut add_attribute = |a| attributes.push(a);
         for attribute in &self.attributes {
-            exec.cancellation_flag
-                .check("executing graph node attributes")?;
             attribute.execute_lazy(exec, &mut add_attribute)?;
         }
         let stmt =
@@ -364,19 +354,12 @@ impl ast::Scan {
             };
 
             for statement in &arm.statements {
-                arm_exec
-                    .cancellation_flag
-                    .check("executing scan statements")?;
                 arm_exec.error_context.statement = format!("{}", statement);
                 arm_exec.error_context.statement_location = statement.location();
                 statement
                     .execute_lazy(&mut arm_exec)
                     .with_context(|| {
-                        format!(
-                            "Matching {} with arm \"{}\" {{ ... }}",
-                            match_string, arm.regex,
-                        )
-                        .into()
+                        format!("matching {} with arm \"{}\"", match_string, arm.regex,).into()
                     })
                     .with_context(|| arm_exec.error_context.clone().into())?;
             }
@@ -435,9 +418,6 @@ impl ast::If {
                     cancellation_flag: exec.cancellation_flag,
                 };
                 for stmt in &arm.statements {
-                    arm_exec
-                        .cancellation_flag
-                        .check("executing if statements")?;
                     arm_exec.error_context.statement = format!("{}", stmt);
                     arm_exec.error_context.statement_location = stmt.location();
                     stmt.execute_lazy(&mut arm_exec)?;
@@ -486,14 +466,8 @@ impl ast::ForIn {
             self.variable
                 .add_lazy(&mut loop_exec, value.into(), false)?;
             for stmt in &self.statements {
-                loop_exec
-                    .cancellation_flag
-                    .check("executing scan statements")?;
                 loop_exec.error_context.statement = format!("{}", stmt);
                 loop_exec.error_context.statement_location = stmt.location();
-                loop_exec
-                    .cancellation_flag
-                    .check("executing for statements")?;
                 stmt.execute_lazy(&mut loop_exec)?;
             }
         }
@@ -564,8 +538,6 @@ impl ast::ListComprehension {
         let mut elements = Vec::new();
         let mut loop_locals = VariableMap::nested(exec.locals);
         for value in values {
-            exec.cancellation_flag
-                .check("executing list comprehension values")?;
             loop_locals.clear();
             let mut loop_exec = ExecutionContext {
                 source: exec.source,
@@ -608,8 +580,6 @@ impl ast::SetComprehension {
         let mut elements = Vec::new();
         let mut loop_locals = VariableMap::nested(exec.locals);
         for value in values {
-            exec.cancellation_flag
-                .check("executing set comprehension values")?;
             loop_locals.clear();
             let mut loop_exec = ExecutionContext {
                 source: exec.source,
@@ -803,8 +773,7 @@ impl ast::Attribute {
     where
         F: FnMut(LazyAttribute) -> (),
     {
-        exec.cancellation_flag
-            .check("executing shorthand attributes")?;
+        exec.cancellation_flag.check("executing attribute")?;
         let value = self.value.evaluate_lazy(exec)?;
         if let Some(shorthand) = exec.shorthands.get(&self.name) {
             shorthand.execute_lazy(exec, add_attribute, value)
