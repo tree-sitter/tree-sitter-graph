@@ -13,6 +13,7 @@ use std::convert::From;
 use std::fmt;
 
 use crate::execution::error::ExecutionError;
+use crate::execution::error::ResultWithExecutionError;
 use crate::Identifier;
 
 use super::store::DebugInfo;
@@ -35,10 +36,18 @@ impl LazyStatement {
         debug!("eval {}", self);
         trace!("{{");
         let result = match self {
-            Self::AddGraphNodeAttribute(stmt) => stmt.evaluate(exec),
-            Self::CreateEdge(stmt) => stmt.evaluate(exec),
-            Self::AddEdgeAttribute(stmt) => stmt.evaluate(exec),
-            Self::Print(stmt) => stmt.evaluate(exec),
+            Self::AddGraphNodeAttribute(stmt) => stmt
+                .evaluate(exec)
+                .with_context(|| stmt.debug_info.clone().into()),
+            Self::CreateEdge(stmt) => stmt
+                .evaluate(exec)
+                .with_context(|| stmt.debug_info.clone().into()),
+            Self::AddEdgeAttribute(stmt) => stmt
+                .evaluate(exec)
+                .with_context(|| stmt.debug_info.clone().into()),
+            Self::Print(stmt) => stmt
+                .evaluate(exec)
+                .with_context(|| stmt.debug_info.clone().into()),
         };
         trace!("}}");
         result
@@ -107,7 +116,7 @@ impl LazyAddGraphNodeAttribute {
             let value = attribute.value.evaluate(exec)?;
             let prev_debug_info = exec.prev_element_debug_info.insert(
                 GraphElementKey::NodeAttribute(node, attribute.name.clone()),
-                self.debug_info,
+                self.debug_info.clone(),
             );
             exec.graph[node]
                 .attributes
@@ -158,7 +167,7 @@ impl LazyCreateEdge {
         let sink = self.sink.evaluate_as_graph_node(exec)?;
         let prev_debug_info = exec
             .prev_element_debug_info
-            .insert(GraphElementKey::Edge(source, sink), self.debug_info);
+            .insert(GraphElementKey::Edge(source, sink), self.debug_info.clone());
         if let Err(_) = exec.graph[source].add_edge(sink) {
             Err(ExecutionError::DuplicateEdge(format!(
                 "({} -> {}) at {} and {}",
@@ -220,7 +229,7 @@ impl LazyAddEdgeAttribute {
             }?;
             let prev_debug_info = exec.prev_element_debug_info.insert(
                 GraphElementKey::EdgeAttribute(source, sink, attribute.name.clone()),
-                self.debug_info,
+                self.debug_info.clone(),
             );
             edge.attributes
                 .add(attribute.name.clone(), value)

@@ -10,6 +10,7 @@ use colored::Colorize;
 use std::path::Path;
 use thiserror::Error;
 
+use crate::ast::{Stanza, Statement};
 use crate::execution::CancellationError;
 use crate::Location;
 
@@ -74,16 +75,42 @@ pub enum ExecutionError {
     InContext(Context, Box<ExecutionError>),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Context {
-    Statement {
-        statement: String,
-        statement_location: Location,
-        stanza_location: Location,
-        source_location: Location,
-        node_kind: String,
-    },
+    Statement(StatementContext),
     Other(String),
+}
+
+#[derive(Clone, Debug)]
+pub struct StatementContext {
+    pub statement: String,
+    pub statement_location: Location,
+    pub stanza_location: Location,
+    pub source_location: Location,
+    pub node_kind: String,
+}
+
+impl StatementContext {
+    pub(crate) fn new(stmt: &Statement, stanza: &Stanza, source_node: &tree_sitter::Node) -> Self {
+        Self {
+            statement: format!("{}", stmt),
+            statement_location: stmt.location(),
+            stanza_location: stanza.location,
+            source_location: Location::from(source_node.range().start_point),
+            node_kind: source_node.kind().to_string(),
+        }
+    }
+
+    pub(crate) fn update_statement(&mut self, stmt: &Statement) {
+        self.statement = format!("{}", stmt);
+        self.statement_location = stmt.location();
+    }
+}
+
+impl From<StatementContext> for Context {
+    fn from(value: StatementContext) -> Self {
+        Self::Statement(value)
+    }
 }
 
 impl From<String> for Context {
@@ -95,13 +122,13 @@ impl From<String> for Context {
 impl std::fmt::Display for Context {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Statement {
+            Self::Statement(StatementContext {
                 statement,
                 stanza_location,
                 source_location,
                 node_kind,
                 ..
-            } => write!(
+            }) => write!(
                 f,
                 "Executing {} in stanza at {} matching ({}) node at {}",
                 statement, stanza_location, node_kind, source_location
@@ -124,6 +151,10 @@ impl<R> ResultWithExecutionError<R> for Result<R, ExecutionError> {
     {
         self.map_err(|e| match e {
             cancelled @ ExecutionError::Cancelled(_) => cancelled,
+            in_other_context @ ExecutionError::InContext(Context::Other(_), _) => {
+                ExecutionError::InContext(with_context(), Box::new(in_other_context))
+            }
+            in_stmt_context @ ExecutionError::InContext(_, _) => in_stmt_context,
             _ => ExecutionError::InContext(with_context(), Box::new(e)),
         })
     }
@@ -171,13 +202,13 @@ impl DisplayExecutionErrorPretty<'_> {
         match error {
             ExecutionError::InContext(context, cause) => {
                 match context {
-                    Context::Statement {
+                    Context::Statement(StatementContext {
                         statement,
                         statement_location,
                         stanza_location,
                         source_location,
                         node_kind,
-                    } => {
+                    }) => {
                         writeln!(f, "{:>5}: Error executing statement {}", index, statement)?;
                         write!(
                             f,
@@ -238,7 +269,7 @@ impl<'a> Excerpt<'a> {
 impl<'a> std::fmt::Display for Excerpt<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         // path and line/col
-        writeln!(
+        write!(
             f,
             "{}{}:{}:{}:",
             " ".repeat(self.indent),
@@ -246,25 +277,30 @@ impl<'a> std::fmt::Display for Excerpt<'a> {
             white_bold(&format!("{}", self.location.row + 1)),
             white_bold(&format!("{}", self.location.column + 1)),
         )?;
-        // first line: line number & source
-        writeln!(
-            f,
-            "{}{}{}{}",
-            " ".repeat(self.indent),
-            blue(&format!("{}", self.location.row + 1)),
-            blue(" | "),
-            self.source.unwrap_or("<no source found>"),
-        )?;
-        // second line: caret
-        writeln!(
-            f,
-            "{}{}{}{}{}",
-            " ".repeat(self.indent),
-            " ".repeat(self.gutter_width()),
-            blue(" | "),
-            " ".repeat(self.location.column),
-            green_bold("^")
-        )?;
+        if let Some(source) = self.source {
+            writeln!(f)?;
+            // first line: line number & source
+            writeln!(
+                f,
+                "{}{}{}{}",
+                " ".repeat(self.indent),
+                blue(&format!("{}", self.location.row + 1)),
+                blue(" | "),
+                source,
+            )?;
+            // second line: caret
+            writeln!(
+                f,
+                "{}{}{}{}{}",
+                " ".repeat(self.indent),
+                " ".repeat(self.gutter_width()),
+                blue(" | "),
+                " ".repeat(self.location.column),
+                green_bold("^")
+            )?;
+        } else {
+            writeln!(f, " <missing source>")?;
+        }
         Ok(())
     }
 }
