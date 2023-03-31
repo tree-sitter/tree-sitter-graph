@@ -266,7 +266,7 @@ impl<'a> Excerpt<'a> {
 impl<'a> std::fmt::Display for Excerpt<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         // path and line/col
-        writeln!(
+        write!(
             f,
             "{}{}:{}:{}:",
             " ".repeat(self.indent),
@@ -275,6 +275,7 @@ impl<'a> std::fmt::Display for Excerpt<'a> {
             white_bold(&format!("{}", self.location.column + 1)),
         )?;
         if let Some(source) = self.source {
+            writeln!(f)?;
             // first line: line number & source
             writeln!(
                 f,
@@ -295,7 +296,7 @@ impl<'a> std::fmt::Display for Excerpt<'a> {
                 green_bold("^")
             )?;
         } else {
-            writeln!(f, "{}{}", " ".repeat(self.indent), "<missing source>",)?;
+            writeln!(f, " <missing source>")?;
         }
         Ok(())
     }
