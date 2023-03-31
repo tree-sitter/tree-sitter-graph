@@ -274,25 +274,29 @@ impl<'a> std::fmt::Display for Excerpt<'a> {
             white_bold(&format!("{}", self.location.row + 1)),
             white_bold(&format!("{}", self.location.column + 1)),
         )?;
-        // first line: line number & source
-        writeln!(
-            f,
-            "{}{}{}{}",
-            " ".repeat(self.indent),
-            blue(&format!("{}", self.location.row + 1)),
-            blue(" | "),
-            self.source.unwrap_or("<no source found>"),
-        )?;
-        // second line: caret
-        writeln!(
-            f,
-            "{}{}{}{}{}",
-            " ".repeat(self.indent),
-            " ".repeat(self.gutter_width()),
-            blue(" | "),
-            " ".repeat(self.location.column),
-            green_bold("^")
-        )?;
+        if let Some(source) = self.source {
+            // first line: line number & source
+            writeln!(
+                f,
+                "{}{}{}{}",
+                " ".repeat(self.indent),
+                blue(&format!("{}", self.location.row + 1)),
+                blue(" | "),
+                source,
+            )?;
+            // second line: caret
+            writeln!(
+                f,
+                "{}{}{}{}{}",
+                " ".repeat(self.indent),
+                " ".repeat(self.gutter_width()),
+                blue(" | "),
+                " ".repeat(self.location.column),
+                green_bold("^")
+            )?;
+        } else {
+            writeln!(f, "{}{}", " ".repeat(self.indent), "<missing source>",)?;
+        }
         Ok(())
     }
 }
