@@ -98,8 +98,13 @@ fn main() -> Result<()> {
     let tsg = std::fs::read(tsg_path)
         .with_context(|| format!("Cannot read TSG file {}", tsg_path.display()))?;
     let tsg = String::from_utf8(tsg)?;
-    let file = File::from_str(language, &tsg)
-        .with_context(|| format!("Cannot parsing TSG file {}", tsg_path.display()))?;
+    let file = match File::from_str(language, &tsg) {
+        Ok(file) => file,
+        Err(err) => {
+            eprintln!("{}", err.display_pretty(tsg_path, &tsg));
+            return Err(anyhow!("Cannot parse TSG file {}", tsg_path.display()));
+        }
+    };
 
     let source = std::fs::read(source_path)
         .with_context(|| format!("Cannot read source file {}", source_path.display()))?;
