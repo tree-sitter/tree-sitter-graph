@@ -5,6 +5,8 @@
 // Please see the LICENSE-APACHE or LICENSE-MIT files in this distribution for license details.
 // ------------------------------------------------------------------------------------------------
 
+use std::path::Path;
+
 use thiserror::Error;
 use tree_sitter::CaptureQuantifier;
 use tree_sitter::CaptureQuantifier::One;
@@ -14,6 +16,7 @@ use tree_sitter::CaptureQuantifier::ZeroOrOne;
 use tree_sitter::Query;
 
 use crate::ast;
+use crate::parse_error::Excerpt;
 use crate::parser::FULL_MATCH;
 use crate::variables::MutVariables;
 use crate::variables::VariableError;
@@ -41,8 +44,58 @@ pub enum CheckError {
     UndefinedSyntaxCapture(String, Location),
     #[error("Undefined variable {0} at {1}")]
     UndefinedVariable(String, Location),
-    #[error("{0}: {1}")]
-    Variable(VariableError, String),
+    #[error("{0}: {1} at {2}")]
+    Variable(VariableError, String, Location),
+}
+
+impl CheckError {
+    pub fn display_pretty<'a>(
+        &'a self,
+        path: &'a Path,
+        source: &'a str,
+    ) -> impl std::fmt::Display + 'a {
+        DisplayCheckErrorPretty {
+            error: self,
+            path,
+            source,
+        }
+    }
+}
+
+struct DisplayCheckErrorPretty<'a> {
+    error: &'a CheckError,
+    path: &'a Path,
+    source: &'a str,
+}
+
+impl std::fmt::Display for DisplayCheckErrorPretty<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let location = match self.error {
+            CheckError::CannotHideGlobalVariable(_, location) => *location,
+            CheckError::CannotSetGlobalVariable(_, location) => *location,
+            CheckError::DuplicateGlobalVariable(_, location) => *location,
+            CheckError::ExpectedListValue(location) => *location,
+            CheckError::ExpectedLocalValue(location) => *location,
+            CheckError::ExpectedOptionalValue(location) => *location,
+            CheckError::NullableRegex(_, location) => *location,
+            CheckError::UndefinedSyntaxCapture(_, location) => *location,
+            CheckError::UndefinedVariable(_, location) => *location,
+            CheckError::Variable(_, _, location) => *location,
+        };
+        writeln!(f, "{}", self.error)?;
+        write!(
+            f,
+            "{}",
+            Excerpt::from_source(
+                self.path,
+                self.source,
+                location.row,
+                location.to_column_range(),
+                0
+            )
+        )?;
+        Ok(())
+    }
 }
 
 /// Checker context
@@ -567,7 +620,7 @@ impl ast::UnscopedVariable {
         }
         ctx.locals
             .add(self.name.clone(), value, mutable)
-            .map_err(|e| CheckError::Variable(e, format!("{}", self.name)))
+            .map_err(|e| CheckError::Variable(e, format!("{}", self.name), self.location))
     }
 
     fn check_set(
@@ -589,7 +642,7 @@ impl ast::UnscopedVariable {
         value.is_local = false;
         ctx.locals
             .set(self.name.clone(), value)
-            .map_err(|e| CheckError::Variable(e, format!("{}", self.name)))
+            .map_err(|e| CheckError::Variable(e, format!("{}", self.name), self.location))
     }
 
     fn check_get(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {

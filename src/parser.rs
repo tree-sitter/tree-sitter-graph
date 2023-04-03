@@ -8,6 +8,7 @@
 use std::fmt::Display;
 use std::iter::Peekable;
 use std::ops::Range;
+use std::path::Path;
 use std::str::Chars;
 
 use regex::Regex;
@@ -23,6 +24,7 @@ use tree_sitter::Query;
 use tree_sitter::QueryError;
 
 use crate::ast;
+use crate::parse_error::Excerpt;
 use crate::Identifier;
 
 pub const FULL_MATCH: &str = "__tsg__full_match";
@@ -45,6 +47,9 @@ impl ast::File {
         Parser::new(content).parse_into_file(self)
     }
 }
+
+// ----------------------------------------------------------------------------
+// Parse errors
 
 /// An error that can occur while parsing a graph DSL file
 #[derive(Debug, Error)]
@@ -77,6 +82,68 @@ pub enum ParseError {
     Check(#[from] crate::checker::CheckError),
 }
 
+impl ParseError {
+    pub fn display_pretty<'a>(
+        &'a self,
+        path: &'a Path,
+        source: &'a str,
+    ) -> impl std::fmt::Display + 'a {
+        DisplayParseErrorPretty {
+            error: self,
+            path,
+            source,
+        }
+    }
+}
+
+struct DisplayParseErrorPretty<'a> {
+    error: &'a ParseError,
+    path: &'a Path,
+    source: &'a str,
+}
+
+impl std::fmt::Display for DisplayParseErrorPretty<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let location = match self.error {
+            ParseError::ExpectedQuantifier(location) => *location,
+            ParseError::ExpectedToken(_, location) => *location,
+            ParseError::ExpectedVariable(location) => *location,
+            ParseError::ExpectedUnscopedVariable(location) => *location,
+            ParseError::InvalidRegex(_, location) => *location,
+            ParseError::InvalidRegexCapture(location) => *location,
+            ParseError::QueryError(err) => Location {
+                row: err.row,
+                column: err.column,
+            },
+            ParseError::UnexpectedCharacter(_, _, location) => *location,
+            ParseError::UnexpectedEOF(location) => *location,
+            ParseError::UnexpectedKeyword(_, location) => *location,
+            ParseError::UnexpectedLiteral(_, location) => *location,
+            ParseError::UnexpectedQueryPatterns(location) => *location,
+            ParseError::Check(err) => {
+                write!(f, "{}", err.display_pretty(self.path, self.source))?;
+                return Ok(());
+            }
+        };
+        writeln!(f, "{}", self.error)?;
+        write!(
+            f,
+            "{}",
+            Excerpt::from_source(
+                self.path,
+                self.source,
+                location.row,
+                location.to_column_range(),
+                0
+            )
+        )?;
+        Ok(())
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Location
+
 /// The location of a graph DSL entity within its file
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct Location {
@@ -104,6 +171,9 @@ impl Display for Location {
         write!(f, "({}, {})", self.row + 1, self.column + 1)
     }
 }
+
+// ----------------------------------------------------------------------------
+// Parser
 
 struct Parser<'a> {
     source: &'a str,
