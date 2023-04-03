@@ -125,7 +125,6 @@ impl std::fmt::Display for DisplayParseErrorPretty<'_> {
                 return Ok(());
             }
         };
-        writeln!(f, "{}", self.source)?;
         writeln!(f, "{}", self.error)?;
         write!(
             f,
