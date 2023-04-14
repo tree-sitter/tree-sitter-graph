@@ -357,7 +357,7 @@ unsafe impl Sync for TreeWithParseErrorVec {}
 //-----------------------------------------------------------------------------
 
 /// Excerpts of source from either the target language file or the tsg rules file.
-pub(crate) struct Excerpt<'a> {
+pub struct Excerpt<'a> {
     path: &'a Path,
     source: Option<&'a str>,
     row: usize,
@@ -370,12 +370,14 @@ impl<'a> Excerpt<'a> {
         path: &'a Path,
         source: &'a str,
         row: usize,
-        columns: Range<usize>,
+        mut columns: Range<usize>,
         indent: usize,
     ) -> Excerpt<'a> {
+        let source = source.lines().nth(row);
+        columns.end = std::cmp::min(columns.end, source.map(|s| s.len()).unwrap_or_default());
         Excerpt {
             path,
-            source: source.lines().nth(row),
+            source,
             row,
             columns,
             indent,
@@ -394,7 +396,7 @@ impl<'a> std::fmt::Display for Excerpt<'a> {
             f,
             "{}{}:{}:{}:",
             " ".repeat(self.indent),
-            white_bold(&self.path.to_str().unwrap_or("<unknown file>")),
+            white_bold(&self.path.to_string_lossy()),
             white_bold(&format!("{}", self.row + 1)),
             white_bold(&format!("{}", self.columns.start + 1)),
         )?;

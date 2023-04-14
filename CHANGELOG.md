@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.9.2 -- 2023-04-14
+
+### Library
+
+#### Added
+
+- The `parse_error::Excerpt` type, which is used to show source excerpts, is now public.
+
 ## v0.9.1 -- 2023-04-03
 
 ### CLI
