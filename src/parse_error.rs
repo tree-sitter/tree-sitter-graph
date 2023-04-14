@@ -394,7 +394,7 @@ impl<'a> std::fmt::Display for Excerpt<'a> {
             f,
             "{}{}:{}:{}:",
             " ".repeat(self.indent),
-            white_bold(&self.path.to_str().unwrap_or("<unknown file>")),
+            white_bold(&self.path.to_string_lossy()),
             white_bold(&format!("{}", self.row + 1)),
             white_bold(&format!("{}", self.columns.start + 1)),
         )?;
