@@ -370,12 +370,14 @@ impl<'a> Excerpt<'a> {
         path: &'a Path,
         source: &'a str,
         row: usize,
-        columns: Range<usize>,
+        mut columns: Range<usize>,
         indent: usize,
     ) -> Excerpt<'a> {
+        let source = source.lines().nth(row);
+        columns.end = std::cmp::min(columns.end, source.map(|s| s.len()).unwrap_or_default());
         Excerpt {
             path,
-            source: source.lines().nth(row),
+            source,
             row,
             columns,
             indent,
