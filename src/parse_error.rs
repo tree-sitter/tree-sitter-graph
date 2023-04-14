@@ -357,7 +357,7 @@ unsafe impl Sync for TreeWithParseErrorVec {}
 //-----------------------------------------------------------------------------
 
 /// Excerpts of source from either the target language file or the tsg rules file.
-pub(crate) struct Excerpt<'a> {
+pub struct Excerpt<'a> {
     path: &'a Path,
     source: Option<&'a str>,
     row: usize,
