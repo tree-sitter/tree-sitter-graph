@@ -85,7 +85,8 @@ impl LazyStore {
 
     pub(super) fn evaluate_all(&self, exec: &mut EvaluationContext) -> Result<(), ExecutionError> {
         for variable in &self.elements {
-            variable.force(exec)?;
+            let debug_info = variable.debug_info.clone();
+            variable.force(exec).with_context(|| debug_info.0.into())?;
         }
         Ok(())
     }
@@ -161,12 +162,10 @@ impl LazyScopedVariables {
                     match map.insert(node, value.clone()) {
                         Some(_) => {
                             return Err(ExecutionError::DuplicateVariable(format!(
-                                "{}.{} set at {} and {}",
-                                node,
-                                name,
-                                prev_debug_info.unwrap(),
-                                debug_info,
-                            )));
+                                "{}.{}",
+                                node, name,
+                            )))
+                            .with_context(|| (prev_debug_info.unwrap().0, debug_info.0).into());
                         }
                         _ => {}
                     };
