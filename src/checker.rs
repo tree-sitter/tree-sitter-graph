@@ -5,6 +5,7 @@
 // Please see the LICENSE-APACHE or LICENSE-MIT files in this distribution for license details.
 // ------------------------------------------------------------------------------------------------
 
+use std::collections::HashSet;
 use std::path::Path;
 
 use thiserror::Error;
@@ -22,6 +23,7 @@ use crate::variables::MutVariables;
 use crate::variables::VariableError;
 use crate::variables::VariableMap;
 use crate::variables::Variables;
+use crate::Identifier;
 use crate::Location;
 
 #[derive(Debug, Error)]
@@ -120,6 +122,7 @@ impl ast::File {
                     ExpressionResult {
                         quantifier: global.quantifier,
                         is_local: true,
+                        used_captures: HashSet::new(),
                     },
                     false,
                 )
@@ -221,6 +224,7 @@ impl ast::CreateGraphNode {
             ExpressionResult {
                 is_local: true,
                 quantifier: One,
+                used_captures: HashSet::new(),
             },
             false,
         )?;
@@ -385,6 +389,7 @@ impl ast::ForIn {
 struct ExpressionResult {
     is_local: bool,
     quantifier: CaptureQuantifier,
+    used_captures: HashSet<Identifier>,
 }
 
 impl ast::Expression {
@@ -393,14 +398,17 @@ impl ast::Expression {
             Self::FalseLiteral => Ok(ExpressionResult {
                 is_local: true,
                 quantifier: One,
+                used_captures: HashSet::new(),
             }),
             Self::NullLiteral => Ok(ExpressionResult {
                 is_local: true,
                 quantifier: One,
+                used_captures: HashSet::new(),
             }),
             Self::TrueLiteral => Ok(ExpressionResult {
                 is_local: true,
                 quantifier: One,
+                used_captures: HashSet::new(),
             }),
             Self::IntegerConstant(expr) => expr.check(ctx),
             Self::StringConstant(expr) => expr.check(ctx),
@@ -421,6 +429,7 @@ impl ast::IntegerConstant {
         Ok(ExpressionResult {
             is_local: true,
             quantifier: One,
+            used_captures: HashSet::new(),
         })
     }
 }
@@ -430,6 +439,7 @@ impl ast::StringConstant {
         Ok(ExpressionResult {
             is_local: true,
             quantifier: One,
+            used_captures: HashSet::new(),
         })
     }
 }
@@ -437,13 +447,16 @@ impl ast::StringConstant {
 impl ast::ListLiteral {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
         let mut is_local = true;
+        let mut used_captures = HashSet::new();
         for element in &mut self.elements {
             let element_result = element.check(ctx)?;
             is_local &= element_result.is_local;
+            used_captures.extend(element_result.used_captures);
         }
         Ok(ExpressionResult {
             is_local,
             quantifier: ZeroOrMore,
+            used_captures,
         })
     }
 }
@@ -451,19 +464,24 @@ impl ast::ListLiteral {
 impl ast::SetLiteral {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
         let mut is_local = true;
+        let mut used_captures = HashSet::new();
         for element in &mut self.elements {
             let element_result = element.check(ctx)?;
             is_local &= element_result.is_local;
+            used_captures.extend(element_result.used_captures);
         }
         Ok(ExpressionResult {
             is_local,
             quantifier: ZeroOrMore,
+            used_captures,
         })
     }
 }
 
 impl ast::ListComprehension {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
+        let mut used_captures = HashSet::new();
+
         let value_result = self.value.check(ctx)?;
         if !value_result.is_local {
             return Err(CheckError::ExpectedLocalValue(self.location));
@@ -471,6 +489,7 @@ impl ast::ListComprehension {
         if value_result.quantifier != ZeroOrMore && value_result.quantifier != OneOrMore {
             return Err(CheckError::ExpectedListValue(self.location));
         }
+        used_captures.extend(value_result.used_captures.iter().cloned());
 
         let mut loop_locals = VariableMap::nested(ctx.locals);
         let mut loop_ctx = CheckContext {
@@ -484,15 +503,20 @@ impl ast::ListComprehension {
             .check_add(&mut loop_ctx, value_result, false)?;
 
         let element_result = self.element.check(&mut loop_ctx)?;
+        used_captures.extend(element_result.used_captures);
+
         Ok(ExpressionResult {
             is_local: element_result.is_local,
             quantifier: ZeroOrMore,
+            used_captures,
         })
     }
 }
 
 impl ast::SetComprehension {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
+        let mut used_captures = HashSet::new();
+
         let value_result = self.value.check(ctx)?;
         if !value_result.is_local {
             return Err(CheckError::ExpectedLocalValue(self.location));
@@ -500,6 +524,7 @@ impl ast::SetComprehension {
         if value_result.quantifier != ZeroOrMore && value_result.quantifier != OneOrMore {
             return Err(CheckError::ExpectedListValue(self.location));
         }
+        used_captures.extend(value_result.used_captures.iter().cloned());
 
         let mut loop_locals = VariableMap::nested(ctx.locals);
         let mut loop_ctx = CheckContext {
@@ -513,9 +538,12 @@ impl ast::SetComprehension {
             .check_add(&mut loop_ctx, value_result, false)?;
 
         let element_result = self.element.check(&mut loop_ctx)?;
+        used_captures.extend(element_result.used_captures);
+
         Ok(ExpressionResult {
             is_local: element_result.is_local,
             quantifier: ZeroOrMore,
+            used_captures,
         })
     }
 }
@@ -537,6 +565,7 @@ impl ast::Capture {
         Ok(ExpressionResult {
             is_local: true,
             quantifier: self.quantifier,
+            used_captures: HashSet::from([self.name.clone()]),
         })
     }
 }
@@ -544,13 +573,16 @@ impl ast::Capture {
 impl ast::Call {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
         let mut is_local = true;
+        let mut used_captures = HashSet::new();
         for parameter in &mut self.parameters {
             let parameter_result = parameter.check(ctx)?;
             is_local &= parameter_result.is_local;
+            used_captures.extend(parameter_result.used_captures);
         }
         Ok(ExpressionResult {
             is_local,
             quantifier: One, // FIXME we don't really know
+            used_captures,
         })
     }
 }
@@ -560,6 +592,7 @@ impl ast::RegexCapture {
         Ok(ExpressionResult {
             is_local: true,
             quantifier: One,
+            used_captures: HashSet::new(),
         })
     }
 }
@@ -683,6 +716,7 @@ impl ast::ScopedVariable {
         Ok(ExpressionResult {
             is_local: false,
             quantifier: One, // FIXME we don't really know
+            used_captures: HashSet::new(),
         })
     }
 }
