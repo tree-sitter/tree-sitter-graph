@@ -16,7 +16,7 @@ use tree_sitter_graph::ParseError;
 fn can_parse_blocks() {
     let source = r#"
         (function_definition
-          name: (identifier) @cap1) @cap2
+          name: (identifier) @_cap1) @cap2
         {
           node loc1
           node @cap2.prop1
@@ -1079,7 +1079,7 @@ fn cannot_parse_scan_of_nonlocal_variable() {
 #[test]
 fn can_parse_list_comprehension() {
     let source = r#"
-        (module (_)* @xs)@mod
+        (module (_)* @xs)
         {
           print [ (named-child-index x) for x in @xs ]
         }
@@ -1132,7 +1132,7 @@ fn can_parse_list_comprehension() {
 #[test]
 fn can_parse_set_comprehension() {
     let source = r#"
-        (module (_)* @xs)@mod
+        (module (_)* @xs)
         {
           print { (named-child-index x) for x in @xs }
         }
@@ -1578,4 +1578,24 @@ fn multiline_query_parse_errors_have_file_location() {
     assert_eq!(err.row, 6, "expected row 6, got {}", err.row);
     assert_eq!(err.column, 13, "expected column 13, got {}", err.column);
     assert_eq!(err.offset, 112, "expected offset 112, got {}", err.offset);
+}
+
+#[test]
+fn cannot_parse_unused_capture() {
+    let source = r#"
+        (function_definition name: (identifier) @name) {
+        }
+    "#;
+    if let Ok(_) = File::from_str(tree_sitter_python::language(), source) {
+        panic!("Parse succeeded unexpectedly");
+    }
+}
+
+#[test]
+fn can_parse_explicitly_unused_capture() {
+    let source = r#"
+        (function_definition name: (identifier) @_name) {
+        }
+    "#;
+    File::from_str(tree_sitter_python::language(), source).expect("parse to succeed");
 }

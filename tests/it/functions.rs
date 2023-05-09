@@ -60,7 +60,7 @@ fn can_eq_equal_bools() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             node n
             attr (n) eq = (eq #true #true)
@@ -78,7 +78,7 @@ fn can_eq_nonequal_bools() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             node n
             attr (n) eq = (eq #true #false)
@@ -96,7 +96,7 @@ fn cannot_eq_bool_and_string() {
     fail_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             node n
             attr (n) eq = (eq #true "false")
@@ -110,7 +110,7 @@ fn can_format_string_null_and_escaped_braces() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             node n
             attr (n) str = (format "{} : {{ {} }}" "foo" #null)
@@ -128,7 +128,7 @@ fn cannot_format_with_missing_parameter() {
     fail_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             node n
             attr (n) str = (format "{} : {{ {} }}" "foo")
@@ -142,7 +142,7 @@ fn cannot_format_with_extra_parameter() {
     fail_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             node n
             attr (n) str = (format "{} : {{ {} }}" "foo" #null 42)
@@ -156,7 +156,7 @@ fn cannot_format_with_unexpected_opening_brace() {
     fail_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             node n
             attr (n) str = (format "{} : { {} }}" "foo" #null)
@@ -170,7 +170,7 @@ fn cannot_format_with_unexpected_closing_brace() {
     fail_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             node n
             attr (n) str = (format "{} : {{ {} }" "foo" #null)
@@ -184,7 +184,7 @@ fn can_concat_lists() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             node n
             attr (n) xs = (concat [1, 2] [] [3, 4, 5])
@@ -202,7 +202,7 @@ fn can_join_list_with_separator() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             node n
             attr (n) str = (join [1, 2, 3] ".")
@@ -220,7 +220,7 @@ fn can_join_list_without_separator() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             node n
             attr (n) str = (join [1, 2, 3])

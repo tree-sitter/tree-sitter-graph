@@ -77,7 +77,7 @@ pub enum ExecutionError {
 
 #[derive(Clone, Debug)]
 pub enum Context {
-    Statement(StatementContext),
+    Statement(Vec<StatementContext>),
     Other(String),
 }
 
@@ -109,7 +109,13 @@ impl StatementContext {
 
 impl From<StatementContext> for Context {
     fn from(value: StatementContext) -> Self {
-        Self::Statement(value)
+        Self::Statement(vec![value])
+    }
+}
+
+impl From<(StatementContext, StatementContext)> for Context {
+    fn from((left, right): (StatementContext, StatementContext)) -> Self {
+        Self::Statement(vec![left, right])
     }
 }
 
@@ -122,19 +128,32 @@ impl From<String> for Context {
 impl std::fmt::Display for Context {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Statement(StatementContext {
-                statement,
-                stanza_location,
-                source_location,
-                node_kind,
-                ..
-            }) => write!(
-                f,
-                "Executing {} in stanza at {} matching ({}) node at {}",
-                statement, stanza_location, node_kind, source_location
-            ),
-            Self::Other(msg) => write!(f, "{}", msg),
+            Self::Statement(stmts) => {
+                let mut first = true;
+                for stmt in stmts {
+                    stmt.fmt(f, first)?;
+                    first = false;
+                }
+            }
+            Self::Other(msg) => write!(f, "{}", msg)?,
         }
+        Ok(())
+    }
+}
+
+impl StatementContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>, first: bool) -> std::fmt::Result {
+        if first {
+            write!(f, "Error executing",)?;
+        } else {
+            write!(f, " and executing",)?;
+        }
+        write!(
+            f,
+            " {} in stanza at {} matching ({}) node at {}",
+            self.statement, self.stanza_location, self.node_kind, self.source_location
+        )?;
+        Ok(())
     }
 }
 
@@ -202,56 +221,86 @@ impl DisplayExecutionErrorPretty<'_> {
         match error {
             ExecutionError::InContext(context, cause) => {
                 match context {
-                    Context::Statement(StatementContext {
-                        statement,
-                        statement_location,
-                        stanza_location,
-                        source_location,
-                        node_kind,
-                    }) => {
-                        writeln!(f, "{:>5}: Error executing statement {}", index, statement)?;
-                        write!(
-                            f,
-                            "{}",
-                            Excerpt::from_source(
-                                self.tsg_path,
-                                self.tsg,
-                                statement_location.row,
-                                statement_location.to_column_range(),
-                                7
-                            )
-                        )?;
-                        writeln!(f, "{}in stanza", " ".repeat(7))?;
-                        write!(
-                            f,
-                            "{}",
-                            Excerpt::from_source(
-                                self.tsg_path,
-                                self.tsg,
-                                stanza_location.row,
-                                stanza_location.to_column_range(),
-                                7
-                            )
-                        )?;
-                        writeln!(f, "{}matching ({}) node", " ".repeat(7), node_kind)?;
-                        write!(
-                            f,
-                            "{}",
-                            Excerpt::from_source(
+                    Context::Statement(stmts) => {
+                        let mut first = true;
+                        for stmt in stmts {
+                            stmt.fmt_pretty(
+                                f,
                                 self.source_path,
                                 self.source,
-                                source_location.row,
-                                source_location.to_column_range(),
-                                7
-                            )
-                        )?;
-                        Ok(())
+                                self.tsg_path,
+                                self.tsg,
+                                index,
+                                first,
+                            )?;
+                            first = false;
+                        }
                     }
-                    Context::Other(msg) => writeln!(f, "{:>5}: {}", index, msg),
-                }?;
-                self.fmt_entry(f, index + 1, cause)
+                    Context::Other(msg) => writeln!(f, "{:>5}: {}", index, msg)?,
+                };
+                self.fmt_entry(f, index + 1, cause)?;
+                Ok(())
             }
             other => writeln!(f, "{:>5}: {}", index, other),
         }
+    }
+}
+
+impl StatementContext {
+    fn fmt_pretty(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+        source_path: &Path,
+        source: &str,
+        tsg_path: &Path,
+        tsg: &str,
+        index: usize,
+        first: bool,
+    ) -> std::fmt::Result {
+        if first {
+            writeln!(
+                f,
+                "{:>5}: Error executing statement {}",
+                index, self.statement
+            )?;
+        } else {
+            writeln!(f, "     > and executing statement {}", self.statement)?;
+        }
+        write!(
+            f,
+            "{}",
+            Excerpt::from_source(
+                tsg_path,
+                tsg,
+                self.statement_location.row,
+                self.statement_location.to_column_range(),
+                7
+            )
+        )?;
+        writeln!(f, "{}in stanza", " ".repeat(7))?;
+        write!(
+            f,
+            "{}",
+            Excerpt::from_source(
+                tsg_path,
+                tsg,
+                self.stanza_location.row,
+                self.stanza_location.to_column_range(),
+                7
+            )
+        )?;
+        writeln!(f, "{}matching ({}) node", " ".repeat(7), self.node_kind)?;
+        write!(
+            f,
+            "{}",
+            Excerpt::from_source(
+                source_path,
+                source,
+                self.source_location.row,
+                self.source_location.to_column_range(),
+                7
+            )
+        )?;
+        Ok(())
     }
 }
