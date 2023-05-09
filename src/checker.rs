@@ -46,6 +46,8 @@ pub enum CheckError {
     UndefinedSyntaxCapture(String, Location),
     #[error("Undefined variable {0} at {1}")]
     UndefinedVariable(String, Location),
+    #[error("Unused capture(s) {0} at {1}. Remove or prefix with _.")]
+    UnusedCaptures(String, Location),
     #[error("{0}: {1} at {2}")]
     Variable(VariableError, String, Location),
 }
@@ -82,6 +84,7 @@ impl std::fmt::Display for DisplayCheckErrorPretty<'_> {
             CheckError::NullableRegex(_, location) => *location,
             CheckError::UndefinedSyntaxCapture(_, location) => *location,
             CheckError::UndefinedVariable(_, location) => *location,
+            CheckError::UnusedCaptures(_, location) => *location,
             CheckError::Variable(_, _, location) => *location,
         };
         writeln!(f, "{}", self.error)?;
@@ -163,9 +166,37 @@ impl ast::Stanza {
             ctx.file_query
                 .capture_index_for_name(FULL_MATCH)
                 .expect("missing capture index for full match") as usize;
+
+        let mut used_captures = HashSet::new();
         for statement in &mut self.statements {
-            statement.check(&mut ctx)?;
+            let stmt_result = statement.check(&mut ctx)?;
+            used_captures.extend(stmt_result.used_captures);
         }
+
+        let all_captures = self
+            .query
+            .capture_names()
+            .into_iter()
+            .filter(|cn| {
+                self.query
+                    .capture_index_for_name(cn)
+                    .expect("capture should have index")
+                    != self.full_match_stanza_capture_index as u32
+            })
+            .map(|cn| Identifier::from(cn.as_str()))
+            .collect::<HashSet<_>>();
+        let unused_captures = all_captures
+            .difference(&used_captures)
+            .filter(|i| !i.starts_with("_"))
+            .map(|i| format!("@{}", i))
+            .collect::<Vec<_>>();
+        if !unused_captures.is_empty() {
+            return Err(CheckError::UnusedCaptures(
+                unused_captures.join(" "),
+                self.location,
+            ));
+        }
+
         Ok(())
     }
 }
@@ -198,34 +229,40 @@ impl ast::Statement {
 
 impl ast::DeclareImmutable {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
+        let mut used_captures = HashSet::new();
         let value = self.value.check(ctx)?;
-        let used_captures = value.used_captures.clone();
-        self.variable.check_add(ctx, value, false)?;
+        used_captures.extend(value.used_captures.iter().cloned());
+        let var_result = self.variable.check_add(ctx, value, false)?;
+        used_captures.extend(var_result.used_captures);
         Ok(StatementResult { used_captures })
     }
 }
 
 impl ast::DeclareMutable {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
+        let mut used_captures = HashSet::new();
         let value = self.value.check(ctx)?;
-        let used_captures = value.used_captures.clone();
-        self.variable.check_add(ctx, value, true)?;
+        used_captures.extend(value.used_captures.iter().cloned());
+        let var_result = self.variable.check_add(ctx, value, true)?;
+        used_captures.extend(var_result.used_captures);
         Ok(StatementResult { used_captures })
     }
 }
 
 impl ast::Assign {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
+        let mut used_captures = HashSet::new();
         let value = self.value.check(ctx)?;
-        let used_captures = value.used_captures.clone();
-        self.variable.check_set(ctx, value)?;
+        used_captures.extend(value.used_captures.iter().cloned());
+        let var_result = self.variable.check_set(ctx, value)?;
+        used_captures.extend(var_result.used_captures);
         Ok(StatementResult { used_captures })
     }
 }
 
 impl ast::CreateGraphNode {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
-        self.node.check_add(
+        let node_result = self.node.check_add(
             ctx,
             ExpressionResult {
                 is_local: true,
@@ -235,7 +272,7 @@ impl ast::CreateGraphNode {
             false,
         )?;
         Ok(StatementResult {
-            used_captures: HashSet::default(),
+            used_captures: node_result.used_captures,
         })
     }
 }
@@ -406,8 +443,11 @@ impl ast::ForIn {
             stanza_query: ctx.stanza_query,
             locals: &mut loop_locals,
         };
-        self.variable
+        let var_result = self
+            .variable
             .check_add(&mut loop_ctx, value_result, false)?;
+        used_captures.extend(var_result.used_captures);
+
         for statement in &mut self.statements {
             let stmt_result = statement.check(&mut loop_ctx)?;
             used_captures.extend(stmt_result.used_captures);
@@ -535,8 +575,10 @@ impl ast::ListComprehension {
             stanza_query: ctx.stanza_query,
             locals: &mut loop_locals,
         };
-        self.variable
+        let var_result = self
+            .variable
             .check_add(&mut loop_ctx, value_result, false)?;
+        used_captures.extend(var_result.used_captures);
 
         let element_result = self.element.check(&mut loop_ctx)?;
         used_captures.extend(element_result.used_captures);
@@ -570,8 +612,10 @@ impl ast::SetComprehension {
             stanza_query: ctx.stanza_query,
             locals: &mut loop_locals,
         };
-        self.variable
+        let var_result = self
+            .variable
             .check_add(&mut loop_ctx, value_result, false)?;
+        used_captures.extend(var_result.used_captures);
 
         let element_result = self.element.check(&mut loop_ctx)?;
         used_captures.extend(element_result.used_captures);
@@ -636,13 +680,18 @@ impl ast::RegexCapture {
 //-----------------------------------------------------------------------------
 // Variables
 
+#[derive(Clone, Debug)]
+struct VariableResult {
+    used_captures: HashSet<Identifier>,
+}
+
 impl ast::Variable {
     fn check_add(
         &mut self,
         ctx: &mut CheckContext,
         value: ExpressionResult,
         mutable: bool,
-    ) -> Result<(), CheckError> {
+    ) -> Result<VariableResult, CheckError> {
         match self {
             Self::Unscoped(v) => v.check_add(ctx, value, mutable),
             Self::Scoped(v) => v.check_add(ctx, value, mutable),
@@ -653,7 +702,7 @@ impl ast::Variable {
         &mut self,
         ctx: &mut CheckContext,
         value: ExpressionResult,
-    ) -> Result<(), CheckError> {
+    ) -> Result<VariableResult, CheckError> {
         match self {
             Self::Unscoped(v) => v.check_set(ctx, value),
             Self::Scoped(v) => v.check_set(ctx, value),
@@ -674,7 +723,7 @@ impl ast::UnscopedVariable {
         ctx: &mut CheckContext,
         value: ExpressionResult,
         mutable: bool,
-    ) -> Result<(), CheckError> {
+    ) -> Result<VariableResult, CheckError> {
         if ctx.globals.get(&self.name).is_some() {
             return Err(CheckError::CannotHideGlobalVariable(
                 self.name.as_str().to_string(),
@@ -689,16 +738,22 @@ impl ast::UnscopedVariable {
         if mutable {
             value.is_local = false;
         }
+        let used_captures = value.used_captures.clone();
+        value.used_captures.clear(); // prevent used captures from escaping
+                                     // we may want to separate quantifier/is_local from
+                                     // the used_captures and only store the former in the
+                                     // future for a cleaner solution
         ctx.locals
             .add(self.name.clone(), value, mutable)
-            .map_err(|e| CheckError::Variable(e, format!("{}", self.name), self.location))
+            .map_err(|e| CheckError::Variable(e, format!("{}", self.name), self.location))?;
+        Ok(VariableResult { used_captures })
     }
 
     fn check_set(
         &mut self,
         ctx: &mut CheckContext,
         value: ExpressionResult,
-    ) -> Result<(), CheckError> {
+    ) -> Result<VariableResult, CheckError> {
         if ctx.globals.get(&self.name).is_some() {
             return Err(CheckError::CannotSetGlobalVariable(
                 self.name.as_str().to_string(),
@@ -711,9 +766,15 @@ impl ast::UnscopedVariable {
         // Since we process all statement in order, we don't have info on later
         // assignments, and can assume non-local to be sound.
         value.is_local = false;
+        let used_captures = value.used_captures.clone();
+        value.used_captures.clear(); // prevent used captures from escaping
+                                     // we may want to separate quantifier/is_local from
+                                     // the used_captures and only store the former in the
+                                     // future for a cleaner solution
         ctx.locals
             .set(self.name.clone(), value)
-            .map_err(|e| CheckError::Variable(e, format!("{}", self.name), self.location))
+            .map_err(|e| CheckError::Variable(e, format!("{}", self.name), self.location))?;
+        Ok(VariableResult { used_captures })
     }
 
     fn check_get(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
@@ -733,26 +794,30 @@ impl ast::ScopedVariable {
         ctx: &mut CheckContext,
         _value: ExpressionResult,
         _mutable: bool,
-    ) -> Result<(), CheckError> {
-        self.scope.check(ctx)?;
-        Ok(())
+    ) -> Result<VariableResult, CheckError> {
+        let scope_result = self.scope.check(ctx)?;
+        Ok(VariableResult {
+            used_captures: scope_result.used_captures,
+        })
     }
 
     fn check_set(
         &mut self,
         ctx: &mut CheckContext,
         _value: ExpressionResult,
-    ) -> Result<(), CheckError> {
-        self.scope.check(ctx)?;
-        Ok(())
+    ) -> Result<VariableResult, CheckError> {
+        let scope_result = self.scope.check(ctx)?;
+        Ok(VariableResult {
+            used_captures: scope_result.used_captures,
+        })
     }
 
     fn check_get(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
-        self.scope.check(ctx)?;
+        let scope_result = self.scope.check(ctx)?;
         Ok(ExpressionResult {
             is_local: false,
             quantifier: One, // FIXME we don't really know
-            used_captures: HashSet::new(),
+            used_captures: scope_result.used_captures,
         })
     }
 }

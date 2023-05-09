@@ -91,7 +91,7 @@ fn can_scan_strings() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             var new_node = #null
             var current_node = (node)
@@ -137,7 +137,7 @@ fn variables_in_scan_arms_are_local() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             var current_node = (node)
 
@@ -258,7 +258,7 @@ fn can_use_global_variable() {
         indoc! {r#"
           global filename
 
-          (module) @root
+          (module)
           {
             node n
             attr (n) filename = filename
@@ -278,7 +278,7 @@ fn can_omit_global_variable_with_default() {
         indoc! {r#"
           global pkgname = ""
 
-          (module) @root
+          (module)
           {
             node n
             attr (n) pkgname = pkgname
@@ -311,7 +311,7 @@ fn can_use_variable_multiple_times() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             let x = (node)
             let y = x
@@ -334,7 +334,7 @@ fn can_nest_function_calls() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             node node0
             attr (node0) val = (replace "accacc" (replace "abc" "b" "c") (replace "abc" "a" "b"))
@@ -352,7 +352,7 @@ fn cannot_use_nullable_regex() {
     fail_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             scan "abc" {
               "^\\b" {
@@ -446,7 +446,7 @@ fn can_execute_if_some() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module (pass_statement)? @x) @root
+          (module (pass_statement)? @x)
           {
             node node0
             if some @x {
@@ -468,7 +468,7 @@ fn can_execute_if_none() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module (import_statement)? @x) @root
+          (module (import_statement)? @x)
           {
             node node0
             if none @x {
@@ -490,7 +490,7 @@ fn can_execute_if_some_and_none() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module (import_statement)? @x (pass_statement)? @y) @root
+          (module (import_statement)? @x (pass_statement)? @y)
           {
             node node0
             if none @x, some @y {
@@ -512,7 +512,7 @@ fn can_execute_elif() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module (import_statement)? @x (pass_statement)? @y) @root
+          (module (import_statement)? @x (pass_statement)? @y)
           {
             node node0
             if some @x {
@@ -534,7 +534,7 @@ fn can_execute_else() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module (import_statement)? @x) @root
+          (module (import_statement)? @x)
           {
             node node0
             if some @x {
@@ -556,7 +556,7 @@ fn can_execute_if_literal() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module (import_statement)? @x) @root
+          (module (import_statement)?)
           {
             node node0
             if #true {
@@ -578,7 +578,7 @@ fn skip_if_without_true_conditions() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module (import_statement)? @x (import_statement)? @y) @root
+          (module (import_statement)? @x (import_statement)? @y)
           {
             node node0
             if some @x {
@@ -601,7 +601,7 @@ fn variables_are_local_in_if_body() {
           pass
         "#,
         indoc! {r#"
-          (module (pass_statement)? @x) @root
+          (module (pass_statement)? @x)
           {
             let n = 1
             if some @x {
@@ -625,7 +625,7 @@ fn variables_do_not_escape_if_body() {
           pass
         "#,
         indoc! {r#"
-          (module (pass_statement)? @x) @root
+          (module (pass_statement)? @x)
           {
             var n = 1
             if some @x {
@@ -649,7 +649,7 @@ fn variables_are_inherited_in_if_body() {
           pass
         "#,
         indoc! {r#"
-          (module (pass_statement)? @x) @root
+          (module (pass_statement)? @x)
           {
             var n = 1
             if some @x {
@@ -675,7 +675,7 @@ fn can_execute_for_in_nonempty_list_capture() {
           pass
         "#,
         indoc! {r#"
-          (module (pass_statement)* @xs) @root
+          (module (pass_statement)* @xs)
           {
             var n = 0
             for x in @xs {
@@ -699,7 +699,7 @@ fn can_execute_for_in_empty_list_capture() {
           pass
         "#,
         indoc! {r#"
-          (module (import_statement)* @xs) @root
+          (module (import_statement)* @xs)
           {
             var n = 0
             for x in @xs {
@@ -723,7 +723,7 @@ fn can_execute_for_in_list_literal() {
           pass
         "#,
         indoc! {r#"
-          (module) @root
+          (module)
           {
             var n = 0
             for x in [#null, #null, #null] {
@@ -747,7 +747,7 @@ fn variables_are_local_in_for_in_body() {
           pass
         "#,
         indoc! {r#"
-          (module (pass_statement)* @xs) @root
+          (module (pass_statement)* @xs)
           {
             let n = 1
             for x in @xs {
@@ -771,7 +771,7 @@ fn variables_do_not_escape_for_in_body() {
           pass
         "#,
         indoc! {r#"
-          (module (pass_statement)* @xs) @root
+          (module (pass_statement)* @xs)
           {
             var n = 1
             for x in @xs {
@@ -797,7 +797,7 @@ fn variables_are_inherited_in_for_in_body() {
           pass
         "#,
         indoc! {r#"
-          (module (pass_statement)+ @xs) @root
+          (module (pass_statement)+ @xs)
           {
             var n = 0
             for x in @xs {
@@ -823,7 +823,7 @@ fn can_execute_list_comprehension() {
           pass
         "#,
         indoc! {r#"
-          (module (pass_statement)* @xs) @root
+          (module (pass_statement)* @xs)
           {
             node node0
             attr (node0) val = [ (named-child-index x) for x in @xs ]
@@ -845,7 +845,7 @@ fn can_execute_set_comprehension() {
           pass
         "#,
         indoc! {r#"
-          (module (pass_statement)* @xs) @root
+          (module (pass_statement)* @xs)
           {
             node node0
             attr (node0) val = { (source-text x) for x in @xs }
@@ -916,7 +916,7 @@ fn can_build_node() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             node node0
           }
@@ -951,7 +951,7 @@ fn can_build_edge() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             node node0
             node node1
@@ -971,7 +971,7 @@ fn can_build_edges() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             node node0
             node node1
@@ -997,7 +997,7 @@ fn can_set_mutable_local_variables() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             var node = #null
 
@@ -1063,7 +1063,7 @@ fn variables_can_be_scoped_in_arbitrary_expressions() {
           print(a.d.f)
         "#},
         indoc! {r#"
-          (call function:(_)@fun arguments: (argument_list (_)@arg)) {
+          (call function:(_) arguments: (argument_list (_)@arg)) {
           ; let @arg.no_object.lala = 3 ; error
             let @arg.object.lala = 3
             let @arg.object.object.lala = 12
@@ -1083,7 +1083,7 @@ fn can_mutate_inside_scan_no_branch_simple() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             node n
 
@@ -1110,7 +1110,7 @@ fn can_mutate_inside_scan_once_first_branch_simple() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             node n
 
@@ -1137,7 +1137,7 @@ fn can_mutate_inside_scan_once_first_branch() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             node n
 
@@ -1177,7 +1177,7 @@ fn can_mutate_inside_scan_once_second_branch() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             node n
 
@@ -1217,7 +1217,7 @@ fn can_mutate_inside_scan_once_no_branch() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             node n
 
@@ -1256,7 +1256,7 @@ fn can_mutate_inside_scan_multiple_times_simple() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             var x = 0
             var y = 0
@@ -1286,7 +1286,7 @@ fn can_mutate_inside_scan_multiple_times() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             var x = 0
             var y = 0
@@ -1322,7 +1322,7 @@ fn can_mutate_inside_nested_scan_multiple_times_simple() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             var x = 0
 
@@ -1353,7 +1353,7 @@ fn can_mutate_inside_nested_scan_multiple_times() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             var x = 0
             var y = 0
@@ -1394,7 +1394,7 @@ fn variable_let_executed_once() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             let x = (node)
             attr ((node)) ref = x
@@ -1416,7 +1416,7 @@ fn variable_set_executed_once() {
     check_execution(
         "pass",
         indoc! {r#"
-          (module) @root
+          (module)
           {
             var x = #null
             set x = (node)

@@ -197,6 +197,9 @@
 //! example stanza, whose query is `(identifier) @id`, `@id` would refer to the `identifier` syntax
 //! node that the stanza matched against.
 //!
+//! Unused query captures are considered errors, unless they start with an underscode. For example,
+//! a capture `@id` must be used within the stanza, but `@_id` does not.
+//!
 //! # Variables
 //!
 //! You can use variables to pass information between different stanzas and statements in a graph
