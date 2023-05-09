@@ -173,7 +173,10 @@ impl ast::Stanza {
 //-----------------------------------------------------------------------------
 // Statements
 
-type StatementResult = ();
+#[derive(Clone, Debug)]
+struct StatementResult {
+    used_captures: HashSet<Identifier>,
+}
 
 impl ast::Statement {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
@@ -196,24 +199,27 @@ impl ast::Statement {
 impl ast::DeclareImmutable {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
         let value = self.value.check(ctx)?;
+        let used_captures = value.used_captures.clone();
         self.variable.check_add(ctx, value, false)?;
-        Ok(())
+        Ok(StatementResult { used_captures })
     }
 }
 
 impl ast::DeclareMutable {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
         let value = self.value.check(ctx)?;
+        let used_captures = value.used_captures.clone();
         self.variable.check_add(ctx, value, true)?;
-        Ok(())
+        Ok(StatementResult { used_captures })
     }
 }
 
 impl ast::Assign {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
         let value = self.value.check(ctx)?;
+        let used_captures = value.used_captures.clone();
         self.variable.check_set(ctx, value)?;
-        Ok(())
+        Ok(StatementResult { used_captures })
     }
 }
 
@@ -228,45 +234,60 @@ impl ast::CreateGraphNode {
             },
             false,
         )?;
-        Ok(())
+        Ok(StatementResult {
+            used_captures: HashSet::default(),
+        })
     }
 }
 
 impl ast::AddGraphNodeAttribute {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
-        self.node.check(ctx)?;
+        let mut used_captures = HashSet::new();
+        let node_result = self.node.check(ctx)?;
+        used_captures.extend(node_result.used_captures);
         for attribute in &mut self.attributes {
-            attribute.check(ctx)?;
+            let attr_result = attribute.check(ctx)?;
+            used_captures.extend(attr_result.used_captures);
         }
-        Ok(())
+        Ok(StatementResult { used_captures })
     }
 }
 
 impl ast::CreateEdge {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
-        self.source.check(ctx)?;
-        self.sink.check(ctx)?;
-        Ok(())
+        let mut used_captures = HashSet::new();
+        let source_result = self.source.check(ctx)?;
+        used_captures.extend(source_result.used_captures);
+        let sink_result = self.sink.check(ctx)?;
+        used_captures.extend(sink_result.used_captures);
+        Ok(StatementResult { used_captures })
     }
 }
 
 impl ast::AddEdgeAttribute {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
-        self.source.check(ctx)?;
-        self.sink.check(ctx)?;
+        let mut used_captures = HashSet::new();
+        let source_result = self.source.check(ctx)?;
+        used_captures.extend(source_result.used_captures);
+        let sink_result = self.sink.check(ctx)?;
+        used_captures.extend(sink_result.used_captures);
         for attribute in &mut self.attributes {
-            attribute.check(ctx)?;
+            let attr_result = attribute.check(ctx)?;
+            used_captures.extend(attr_result.used_captures);
         }
-        Ok(())
+        Ok(StatementResult { used_captures })
     }
 }
 
 impl ast::Scan {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
+        let mut used_captures = HashSet::new();
+
         let value_result = self.value.check(ctx)?;
         if !value_result.is_local {
             return Err(CheckError::ExpectedLocalValue(self.location));
         }
+        used_captures.extend(value_result.used_captures);
 
         for arm in &mut self.arms {
             // Be aware that this check is not complete, as it does not rule out
@@ -291,27 +312,33 @@ impl ast::Scan {
             };
 
             for statement in &mut arm.statements {
-                statement.check(&mut arm_ctx)?;
+                let stmt_result = statement.check(&mut arm_ctx)?;
+                used_captures.extend(stmt_result.used_captures);
             }
         }
-        Ok(())
+        Ok(StatementResult { used_captures })
     }
 }
 
 impl ast::Print {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
+        let mut used_captures = HashSet::new();
         for value in &mut self.values {
-            value.check(ctx)?;
+            let value_result = value.check(ctx)?;
+            used_captures.extend(value_result.used_captures);
         }
-        Ok(())
+        Ok(StatementResult { used_captures })
     }
 }
 
 impl ast::If {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
+        let mut used_captures = HashSet::new();
+
         for arm in &mut self.arms {
             for condition in &mut arm.conditions {
-                condition.check(ctx)?;
+                let condition_result = condition.check(ctx)?;
+                used_captures.extend(condition_result.used_captures);
             }
 
             let mut arm_locals = VariableMap::nested(ctx.locals);
@@ -324,15 +351,17 @@ impl ast::If {
             };
 
             for statement in &mut arm.statements {
-                statement.check(&mut arm_ctx)?;
+                let stmt_result = statement.check(&mut arm_ctx)?;
+                used_captures.extend(stmt_result.used_captures);
             }
         }
-        Ok(())
+        Ok(StatementResult { used_captures })
     }
 }
 
 impl ast::Condition {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
+        let mut used_captures = HashSet::new();
         match self {
             Self::None { value, location } | Self::Some { value, location } => {
                 let value_result = value.check(ctx)?;
@@ -342,20 +371,24 @@ impl ast::Condition {
                 if value_result.quantifier != ZeroOrOne {
                     return Err(CheckError::ExpectedOptionalValue(*location));
                 }
+                used_captures.extend(value_result.used_captures);
             }
             Self::Bool { value, location } => {
                 let value_result = value.check(ctx)?;
                 if !value_result.is_local {
                     return Err(CheckError::ExpectedLocalValue(*location));
                 }
+                used_captures.extend(value_result.used_captures);
             }
         }
-        Ok(())
+        Ok(StatementResult { used_captures })
     }
 }
 
 impl ast::ForIn {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
+        let mut used_captures = HashSet::new();
+
         let value_result = self.value.check(ctx)?;
         if !value_result.is_local {
             return Err(CheckError::ExpectedLocalValue(self.location));
@@ -363,6 +396,7 @@ impl ast::ForIn {
         if value_result.quantifier != ZeroOrMore && value_result.quantifier != OneOrMore {
             return Err(CheckError::ExpectedListValue(self.location));
         }
+        used_captures.extend(value_result.used_captures.iter().cloned());
 
         let mut loop_locals = VariableMap::nested(ctx.locals);
         let mut loop_ctx = CheckContext {
@@ -375,9 +409,11 @@ impl ast::ForIn {
         self.variable
             .check_add(&mut loop_ctx, value_result, false)?;
         for statement in &mut self.statements {
-            statement.check(&mut loop_ctx)?;
+            let stmt_result = statement.check(&mut loop_ctx)?;
+            used_captures.extend(stmt_result.used_captures);
         }
-        Ok(())
+
+        Ok(StatementResult { used_captures })
     }
 }
 
@@ -724,9 +760,16 @@ impl ast::ScopedVariable {
 //-----------------------------------------------------------------------------
 // Attributes
 
+#[derive(Clone, Debug)]
+struct AttributeResult {
+    used_captures: HashSet<Identifier>,
+}
+
 impl ast::Attribute {
-    fn check(&mut self, ctx: &mut CheckContext) -> Result<(), CheckError> {
-        self.value.check(ctx)?;
-        Ok(())
+    fn check(&mut self, ctx: &mut CheckContext) -> Result<AttributeResult, CheckError> {
+        let value_result = self.value.check(ctx)?;
+        Ok(AttributeResult {
+            used_captures: value_result.used_captures,
+        })
     }
 }
