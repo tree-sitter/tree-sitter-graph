@@ -170,8 +170,10 @@ impl ast::Stanza {
 //-----------------------------------------------------------------------------
 // Statements
 
+type StatementResult = ();
+
 impl ast::Statement {
-    fn check(&mut self, ctx: &mut CheckContext) -> Result<(), CheckError> {
+    fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
         match self {
             Self::DeclareImmutable(stmt) => stmt.check(ctx),
             Self::DeclareMutable(stmt) => stmt.check(ctx),
@@ -189,7 +191,7 @@ impl ast::Statement {
 }
 
 impl ast::DeclareImmutable {
-    fn check(&mut self, ctx: &mut CheckContext) -> Result<(), CheckError> {
+    fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
         let value = self.value.check(ctx)?;
         self.variable.check_add(ctx, value, false)?;
         Ok(())
@@ -197,7 +199,7 @@ impl ast::DeclareImmutable {
 }
 
 impl ast::DeclareMutable {
-    fn check(&mut self, ctx: &mut CheckContext) -> Result<(), CheckError> {
+    fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
         let value = self.value.check(ctx)?;
         self.variable.check_add(ctx, value, true)?;
         Ok(())
@@ -205,7 +207,7 @@ impl ast::DeclareMutable {
 }
 
 impl ast::Assign {
-    fn check(&mut self, ctx: &mut CheckContext) -> Result<(), CheckError> {
+    fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
         let value = self.value.check(ctx)?;
         self.variable.check_set(ctx, value)?;
         Ok(())
@@ -213,7 +215,7 @@ impl ast::Assign {
 }
 
 impl ast::CreateGraphNode {
-    fn check(&mut self, ctx: &mut CheckContext) -> Result<(), CheckError> {
+    fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
         self.node.check_add(
             ctx,
             ExpressionResult {
@@ -227,7 +229,7 @@ impl ast::CreateGraphNode {
 }
 
 impl ast::AddGraphNodeAttribute {
-    fn check(&mut self, ctx: &mut CheckContext) -> Result<(), CheckError> {
+    fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
         self.node.check(ctx)?;
         for attribute in &mut self.attributes {
             attribute.check(ctx)?;
@@ -237,7 +239,7 @@ impl ast::AddGraphNodeAttribute {
 }
 
 impl ast::CreateEdge {
-    fn check(&mut self, ctx: &mut CheckContext) -> Result<(), CheckError> {
+    fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
         self.source.check(ctx)?;
         self.sink.check(ctx)?;
         Ok(())
@@ -245,7 +247,7 @@ impl ast::CreateEdge {
 }
 
 impl ast::AddEdgeAttribute {
-    fn check(&mut self, ctx: &mut CheckContext) -> Result<(), CheckError> {
+    fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
         self.source.check(ctx)?;
         self.sink.check(ctx)?;
         for attribute in &mut self.attributes {
@@ -256,7 +258,7 @@ impl ast::AddEdgeAttribute {
 }
 
 impl ast::Scan {
-    fn check(&mut self, ctx: &mut CheckContext) -> Result<(), CheckError> {
+    fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
         let value_result = self.value.check(ctx)?;
         if !value_result.is_local {
             return Err(CheckError::ExpectedLocalValue(self.location));
@@ -293,7 +295,7 @@ impl ast::Scan {
 }
 
 impl ast::Print {
-    fn check(&mut self, ctx: &mut CheckContext) -> Result<(), CheckError> {
+    fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
         for value in &mut self.values {
             value.check(ctx)?;
         }
@@ -302,7 +304,7 @@ impl ast::Print {
 }
 
 impl ast::If {
-    fn check(&mut self, ctx: &mut CheckContext) -> Result<(), CheckError> {
+    fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
         for arm in &mut self.arms {
             for condition in &mut arm.conditions {
                 condition.check(ctx)?;
@@ -326,7 +328,7 @@ impl ast::If {
 }
 
 impl ast::Condition {
-    fn check(&mut self, ctx: &mut CheckContext) -> Result<(), CheckError> {
+    fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
         match self {
             Self::None { value, location } | Self::Some { value, location } => {
                 let value_result = value.check(ctx)?;
@@ -349,7 +351,7 @@ impl ast::Condition {
 }
 
 impl ast::ForIn {
-    fn check(&mut self, ctx: &mut CheckContext) -> Result<(), CheckError> {
+    fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
         let value_result = self.value.check(ctx)?;
         if !value_result.is_local {
             return Err(CheckError::ExpectedLocalValue(self.location));
