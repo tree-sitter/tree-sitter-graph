@@ -105,11 +105,17 @@ impl std::fmt::Display for DisplayCheckErrorPretty<'_> {
 
 /// Checker context
 struct CheckContext<'a> {
-    globals: &'a dyn Variables<ExpressionResult>,
+    globals: &'a dyn Variables<VariableResult>,
     file_query: &'a Query,
     stanza_index: usize,
     stanza_query: &'a Query,
-    locals: &'a mut dyn MutVariables<ExpressionResult>,
+    locals: &'a mut dyn MutVariables<VariableResult>,
+}
+
+#[derive(Clone, Debug)]
+struct VariableResult {
+    is_local: bool,
+    quantifier: CaptureQuantifier,
 }
 
 //-----------------------------------------------------------------------------
@@ -122,10 +128,9 @@ impl ast::File {
             globals
                 .add(
                     global.name.clone(),
-                    ExpressionResult {
+                    VariableResult {
                         quantifier: global.quantifier,
                         is_local: true,
-                        used_captures: HashSet::new(),
                     },
                     false,
                 )
@@ -150,7 +155,7 @@ impl ast::File {
 impl ast::Stanza {
     fn check(
         &mut self,
-        globals: &dyn Variables<ExpressionResult>,
+        globals: &dyn Variables<VariableResult>,
         file_query: &Query,
         stanza_index: usize,
     ) -> Result<(), CheckError> {
@@ -232,7 +237,7 @@ impl ast::DeclareImmutable {
         let mut used_captures = HashSet::new();
         let value = self.value.check(ctx)?;
         used_captures.extend(value.used_captures.iter().cloned());
-        let var_result = self.variable.check_add(ctx, value, false)?;
+        let var_result = self.variable.check_add(ctx, value.into(), false)?;
         used_captures.extend(var_result.used_captures);
         Ok(StatementResult { used_captures })
     }
@@ -243,7 +248,7 @@ impl ast::DeclareMutable {
         let mut used_captures = HashSet::new();
         let value = self.value.check(ctx)?;
         used_captures.extend(value.used_captures.iter().cloned());
-        let var_result = self.variable.check_add(ctx, value, true)?;
+        let var_result = self.variable.check_add(ctx, value.into(), true)?;
         used_captures.extend(var_result.used_captures);
         Ok(StatementResult { used_captures })
     }
@@ -254,7 +259,7 @@ impl ast::Assign {
         let mut used_captures = HashSet::new();
         let value = self.value.check(ctx)?;
         used_captures.extend(value.used_captures.iter().cloned());
-        let var_result = self.variable.check_set(ctx, value)?;
+        let var_result = self.variable.check_set(ctx, value.into())?;
         used_captures.extend(var_result.used_captures);
         Ok(StatementResult { used_captures })
     }
@@ -264,10 +269,9 @@ impl ast::CreateGraphNode {
     fn check(&mut self, ctx: &mut CheckContext) -> Result<StatementResult, CheckError> {
         let node_result = self.node.check_add(
             ctx,
-            ExpressionResult {
+            VariableResult {
                 is_local: true,
                 quantifier: One,
-                used_captures: HashSet::new(),
             },
             false,
         )?;
@@ -445,7 +449,7 @@ impl ast::ForIn {
         };
         let var_result = self
             .variable
-            .check_add(&mut loop_ctx, value_result, false)?;
+            .check_add(&mut loop_ctx, value_result.into(), false)?;
         used_captures.extend(var_result.used_captures);
 
         for statement in &mut self.statements {
@@ -577,7 +581,7 @@ impl ast::ListComprehension {
         };
         let var_result = self
             .variable
-            .check_add(&mut loop_ctx, value_result, false)?;
+            .check_add(&mut loop_ctx, value_result.into(), false)?;
         used_captures.extend(var_result.used_captures);
 
         let element_result = self.element.check(&mut loop_ctx)?;
@@ -614,7 +618,7 @@ impl ast::SetComprehension {
         };
         let var_result = self
             .variable
-            .check_add(&mut loop_ctx, value_result, false)?;
+            .check_add(&mut loop_ctx, value_result.into(), false)?;
         used_captures.extend(var_result.used_captures);
 
         let element_result = self.element.check(&mut loop_ctx)?;
@@ -680,18 +684,13 @@ impl ast::RegexCapture {
 //-----------------------------------------------------------------------------
 // Variables
 
-#[derive(Clone, Debug)]
-struct VariableResult {
-    used_captures: HashSet<Identifier>,
-}
-
 impl ast::Variable {
     fn check_add(
         &mut self,
         ctx: &mut CheckContext,
-        value: ExpressionResult,
+        value: VariableResult,
         mutable: bool,
-    ) -> Result<VariableResult, CheckError> {
+    ) -> Result<StatementResult, CheckError> {
         match self {
             Self::Unscoped(v) => v.check_add(ctx, value, mutable),
             Self::Scoped(v) => v.check_add(ctx, value, mutable),
@@ -701,8 +700,8 @@ impl ast::Variable {
     fn check_set(
         &mut self,
         ctx: &mut CheckContext,
-        value: ExpressionResult,
-    ) -> Result<VariableResult, CheckError> {
+        value: VariableResult,
+    ) -> Result<StatementResult, CheckError> {
         match self {
             Self::Unscoped(v) => v.check_set(ctx, value),
             Self::Scoped(v) => v.check_set(ctx, value),
@@ -721,9 +720,9 @@ impl ast::UnscopedVariable {
     fn check_add(
         &mut self,
         ctx: &mut CheckContext,
-        value: ExpressionResult,
+        value: VariableResult,
         mutable: bool,
-    ) -> Result<VariableResult, CheckError> {
+    ) -> Result<StatementResult, CheckError> {
         if ctx.globals.get(&self.name).is_some() {
             return Err(CheckError::CannotHideGlobalVariable(
                 self.name.as_str().to_string(),
@@ -738,22 +737,19 @@ impl ast::UnscopedVariable {
         if mutable {
             value.is_local = false;
         }
-        let used_captures = value.used_captures.clone();
-        value.used_captures.clear(); // prevent used captures from escaping
-                                     // we may want to separate quantifier/is_local from
-                                     // the used_captures and only store the former in the
-                                     // future for a cleaner solution
         ctx.locals
             .add(self.name.clone(), value, mutable)
             .map_err(|e| CheckError::Variable(e, format!("{}", self.name), self.location))?;
-        Ok(VariableResult { used_captures })
+        Ok(StatementResult {
+            used_captures: HashSet::default(),
+        })
     }
 
     fn check_set(
         &mut self,
         ctx: &mut CheckContext,
-        value: ExpressionResult,
-    ) -> Result<VariableResult, CheckError> {
+        value: VariableResult,
+    ) -> Result<StatementResult, CheckError> {
         if ctx.globals.get(&self.name).is_some() {
             return Err(CheckError::CannotSetGlobalVariable(
                 self.name.as_str().to_string(),
@@ -766,15 +762,12 @@ impl ast::UnscopedVariable {
         // Since we process all statement in order, we don't have info on later
         // assignments, and can assume non-local to be sound.
         value.is_local = false;
-        let used_captures = value.used_captures.clone();
-        value.used_captures.clear(); // prevent used captures from escaping
-                                     // we may want to separate quantifier/is_local from
-                                     // the used_captures and only store the former in the
-                                     // future for a cleaner solution
         ctx.locals
             .set(self.name.clone(), value)
             .map_err(|e| CheckError::Variable(e, format!("{}", self.name), self.location))?;
-        Ok(VariableResult { used_captures })
+        Ok(StatementResult {
+            used_captures: HashSet::default(),
+        })
     }
 
     fn check_get(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
@@ -783,7 +776,7 @@ impl ast::UnscopedVariable {
         } else {
             ctx.locals.get(&self.name)
         }
-        .cloned()
+        .map(|value| value.into())
         .ok_or_else(|| CheckError::UndefinedVariable(self.name.as_str().to_string(), self.location))
     }
 }
@@ -792,24 +785,20 @@ impl ast::ScopedVariable {
     fn check_add(
         &mut self,
         ctx: &mut CheckContext,
-        _value: ExpressionResult,
+        _value: VariableResult,
         _mutable: bool,
-    ) -> Result<VariableResult, CheckError> {
+    ) -> Result<StatementResult, CheckError> {
         let scope_result = self.scope.check(ctx)?;
-        Ok(VariableResult {
-            used_captures: scope_result.used_captures,
-        })
+        Ok(scope_result.into())
     }
 
     fn check_set(
         &mut self,
         ctx: &mut CheckContext,
-        _value: ExpressionResult,
-    ) -> Result<VariableResult, CheckError> {
+        _value: VariableResult,
+    ) -> Result<StatementResult, CheckError> {
         let scope_result = self.scope.check(ctx)?;
-        Ok(VariableResult {
-            used_captures: scope_result.used_captures,
-        })
+        Ok(scope_result.into())
     }
 
     fn check_get(&mut self, ctx: &mut CheckContext) -> Result<ExpressionResult, CheckError> {
@@ -836,5 +825,35 @@ impl ast::Attribute {
         Ok(AttributeResult {
             used_captures: value_result.used_captures,
         })
+    }
+}
+
+//-----------------------------------------------------------------------------
+// Result Conversions
+
+impl Into<StatementResult> for ExpressionResult {
+    fn into(self) -> StatementResult {
+        StatementResult {
+            used_captures: self.used_captures,
+        }
+    }
+}
+
+impl Into<ExpressionResult> for &VariableResult {
+    fn into(self) -> ExpressionResult {
+        ExpressionResult {
+            is_local: self.is_local,
+            quantifier: self.quantifier,
+            used_captures: HashSet::default(),
+        }
+    }
+}
+
+impl Into<VariableResult> for ExpressionResult {
+    fn into(self) -> VariableResult {
+        VariableResult {
+            is_local: self.is_local,
+            quantifier: self.quantifier,
+        }
     }
 }
