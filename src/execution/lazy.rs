@@ -106,6 +106,7 @@ impl ast::File {
         // make sure any unforced values are now forced, to surface any problems
         // hidden by the fact that the values were unused
         store.evaluate_all(&mut exec)?;
+        scoped_store.evaluate_all(&mut exec)?;
 
         Ok(())
     }

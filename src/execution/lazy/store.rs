@@ -140,7 +140,7 @@ impl LazyScopedVariables {
         name: &Identifier,
         exec: &mut EvaluationContext,
     ) -> Result<LazyValue, ExecutionError> {
-        let values = match self.variables.get(name) {
+        let cell = match self.variables.get(name) {
             Some(v) => v,
             None => {
                 return Err(ExecutionError::UndefinedScopedVariable(format!(
@@ -149,7 +149,35 @@ impl LazyScopedVariables {
                 )));
             }
         };
-        match values.replace(ScopedValues::Forcing) {
+        let values = cell.replace(ScopedValues::Forcing);
+        let map = self.force(name, values, exec)?;
+        let result = map
+            .get(&scope)
+            .ok_or(ExecutionError::UndefinedScopedVariable(format!(
+                "{}.{}",
+                scope, name,
+            )))?
+            .clone();
+        cell.replace(ScopedValues::Forced(map));
+        Ok(result)
+    }
+
+    pub(super) fn evaluate_all(&self, exec: &mut EvaluationContext) -> Result<(), ExecutionError> {
+        for (name, cell) in &self.variables {
+            let values = cell.replace(ScopedValues::Forcing);
+            let map = self.force(name, values, exec)?;
+            cell.replace(ScopedValues::Forced(map));
+        }
+        Ok(())
+    }
+
+    fn force(
+        &self,
+        name: &Identifier,
+        values: ScopedValues,
+        exec: &mut EvaluationContext,
+    ) -> Result<HashMap<SyntaxNodeRef, LazyValue>, ExecutionError> {
+        match values {
             ScopedValues::Unforced(pairs) => {
                 let mut map = HashMap::new();
                 let mut debug_infos = HashMap::new();
@@ -170,30 +198,12 @@ impl LazyScopedVariables {
                         _ => {}
                     };
                 }
-                let result = map
-                    .get(&scope)
-                    .ok_or(ExecutionError::UndefinedScopedVariable(format!(
-                        "{}.{}",
-                        scope, name,
-                    )))?
-                    .clone();
-                values.replace(ScopedValues::Forced(map));
-                Ok(result)
+                Ok(map)
             }
             ScopedValues::Forcing => Err(ExecutionError::RecursivelyDefinedScopedVariable(
-                format!("_.{} requested on {}", name, scope),
+                format!("_.{}", name),
             )),
-            ScopedValues::Forced(map) => {
-                let result = map
-                    .get(&scope)
-                    .ok_or(ExecutionError::UndefinedScopedVariable(format!(
-                        "{}.{}",
-                        scope, name,
-                    )))?
-                    .clone();
-                values.replace(ScopedValues::Forced(map));
-                Ok(result)
-            }
+            ScopedValues::Forced(map) => Ok(map),
         }
     }
 }
