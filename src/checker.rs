@@ -478,17 +478,17 @@ impl ast::Expression {
             Self::FalseLiteral => Ok(ExpressionResult {
                 is_local: true,
                 quantifier: One,
-                used_captures: HashSet::new(),
+                used_captures: HashSet::default(),
             }),
             Self::NullLiteral => Ok(ExpressionResult {
                 is_local: true,
                 quantifier: One,
-                used_captures: HashSet::new(),
+                used_captures: HashSet::default(),
             }),
             Self::TrueLiteral => Ok(ExpressionResult {
                 is_local: true,
                 quantifier: One,
-                used_captures: HashSet::new(),
+                used_captures: HashSet::default(),
             }),
             Self::IntegerConstant(expr) => expr.check(ctx),
             Self::StringConstant(expr) => expr.check(ctx),
@@ -509,7 +509,7 @@ impl ast::IntegerConstant {
         Ok(ExpressionResult {
             is_local: true,
             quantifier: One,
-            used_captures: HashSet::new(),
+            used_captures: HashSet::default(),
         })
     }
 }
@@ -519,7 +519,7 @@ impl ast::StringConstant {
         Ok(ExpressionResult {
             is_local: true,
             quantifier: One,
-            used_captures: HashSet::new(),
+            used_captures: HashSet::default(),
         })
     }
 }
@@ -676,7 +676,7 @@ impl ast::RegexCapture {
         Ok(ExpressionResult {
             is_local: true,
             quantifier: One,
-            used_captures: HashSet::new(),
+            used_captures: HashSet::default(),
         })
     }
 }
