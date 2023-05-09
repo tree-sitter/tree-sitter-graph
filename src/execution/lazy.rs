@@ -90,18 +90,22 @@ impl ast::File {
             )?;
         }
 
+        let mut exec = EvaluationContext {
+            source,
+            graph,
+            functions: config.functions,
+            store: &store,
+            scoped_store: &scoped_store,
+            function_parameters: &mut function_parameters,
+            prev_element_debug_info: &mut prev_element_debug_info,
+            cancellation_flag,
+        };
         for graph_stmt in &lazy_graph {
-            graph_stmt.evaluate(&mut EvaluationContext {
-                source,
-                graph,
-                functions: config.functions,
-                store: &mut store,
-                scoped_store: &mut scoped_store,
-                function_parameters: &mut function_parameters,
-                prev_element_debug_info: &mut prev_element_debug_info,
-                cancellation_flag,
-            })?;
+            graph_stmt.evaluate(&mut exec)?;
         }
+        // make sure any unforced values are now forced, to surface any problems
+        // hidden by the fact that the values were unused
+        store.evaluate_all(&mut exec)?;
 
         Ok(())
     }

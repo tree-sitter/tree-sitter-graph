@@ -82,6 +82,13 @@ impl LazyStore {
         let value = variable.force(exec).with_context(|| debug_info.0.into())?;
         Ok(value)
     }
+
+    pub(super) fn evaluate_all(&self, exec: &mut EvaluationContext) -> Result<(), ExecutionError> {
+        for variable in &self.elements {
+            variable.force(exec)?;
+        }
+        Ok(())
+    }
 }
 
 /// Data structure to hold scoped variables with lazy keys and values
