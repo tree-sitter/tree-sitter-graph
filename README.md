@@ -20,7 +20,7 @@ To use it as a library, add the following to your `Cargo.toml`:
 
 ``` toml
 [dependencies]
-tree-sitter-graph = "0.9"
+tree-sitter-graph = "0.10"
 ```
 
 To use it as a program, install it via `cargo install`:

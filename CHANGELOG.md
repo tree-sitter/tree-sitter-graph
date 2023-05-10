@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.10.0 -- 2023-05-10
+
+### DSL
+
+#### Changed
+
+- Unused captures in patterns are now considered errors, unless they start with an underscore.
+
+### Library
+
+#### Fixed
+
+- Some execution errors were not always reported in lazy execution mode, depending on whether variables were used or not. This has been fixed to behave more consistently, so that errors are always reported regardless of variable use.
+
+### CLI
+
+#### Added
+
+- Errors from setting a scoped variable twice on the same node are now reported with source snippets for both statements involved.
+
 ## v0.9.2 -- 2023-04-14
 
 ### Library
