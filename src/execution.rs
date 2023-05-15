@@ -12,6 +12,7 @@ use tree_sitter::QueryMatch;
 use tree_sitter::Tree;
 
 use crate::ast::File;
+use crate::ast::Stanza;
 use crate::execution::error::ExecutionError;
 use crate::functions::Functions;
 use crate::graph::Graph;
@@ -93,6 +94,23 @@ impl File {
         }
 
         Ok(())
+    }
+
+    pub fn try_visit_matches<'a, 'tree, E, F>(
+        &self,
+        tree: &'tree Tree,
+        source: &'tree str,
+        lazy: bool,
+        visit: F,
+    ) -> Result<(), E>
+    where
+        F: FnMut(&Stanza, QueryMatch<'_, 'tree>) -> Result<(), E>,
+    {
+        if lazy {
+            self.try_visit_matches_lazy(tree, source, visit)
+        } else {
+            self.try_visit_matches_strict(tree, source, visit)
+        }
     }
 }
 
