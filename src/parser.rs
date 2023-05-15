@@ -7,7 +7,6 @@
 
 use std::fmt::Display;
 use std::iter::Peekable;
-use std::ops::Range;
 use std::path::Path;
 use std::str::Chars;
 
@@ -161,7 +160,7 @@ impl Location {
         }
     }
 
-    pub(crate) fn to_column_range(&self) -> Range<usize> {
+    pub(crate) fn to_column_range(&self) -> std::ops::Range<usize> {
         self.column..self.column + 1
     }
 }
@@ -169,6 +168,22 @@ impl Location {
 impl Display for Location {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "({}, {})", self.row + 1, self.column + 1)
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Range
+
+/// The range of a graph DSL entity within its file
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct Range {
+    pub start: Location,
+    pub end: Location,
+}
+
+impl Display for Range {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{} - {}", self.start, self.end)
     }
 }
 
@@ -350,16 +365,18 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_stanza(&mut self, language: Language) -> Result<ast::Stanza, ParseError> {
-        let location = self.location;
+        let start = self.location;
         let (query, full_match_stanza_capture_index) = self.parse_query(language)?;
         self.consume_whitespace();
         let statements = self.parse_statements()?;
+        let end = self.location;
+        let range = Range { start, end };
         Ok(ast::Stanza {
             query,
             statements,
             full_match_stanza_capture_index,
             full_match_file_capture_index: usize::MAX, // set in checker
-            location,
+            range,
         })
     }
 

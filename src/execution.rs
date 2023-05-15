@@ -126,7 +126,7 @@ impl File {
                     mat,
                     full_capture_index: stanza.full_match_file_capture_index as u32,
                     named_captures,
-                    query_location: stanza.location,
+                    query_location: stanza.range.start,
                 })
             })
         } else {
@@ -148,7 +148,7 @@ impl File {
                     mat,
                     full_capture_index: stanza.full_match_stanza_capture_index as u32,
                     named_captures,
-                    query_location: stanza.location,
+                    query_location: stanza.range.start,
                 })
             })
         }
@@ -183,7 +183,7 @@ impl Stanza {
                 mat,
                 full_capture_index: self.full_match_stanza_capture_index as u32,
                 named_captures,
-                query_location: self.location,
+                query_location: self.range.start,
             })
         })
     }

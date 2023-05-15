@@ -185,7 +185,7 @@ impl ast::Stanza {
             .nodes_for_capture_index(self.full_match_file_capture_index as u32)
             .next()
             .expect("missing capture for full match");
-        debug!("match {:?} at {}", node, self.location);
+        debug!("match {:?} at {}", node, self.range.start);
         trace!("{{");
         for statement in &self.statements {
             let error_context = { StatementContext::new(&statement, &self, &node) };

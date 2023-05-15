@@ -198,7 +198,7 @@ impl ast::Stanza {
         if !unused_captures.is_empty() {
             return Err(CheckError::UnusedCaptures(
                 unused_captures.join(" "),
-                self.location,
+                self.range.start,
             ));
         }
 

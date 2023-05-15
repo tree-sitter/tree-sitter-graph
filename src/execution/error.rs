@@ -95,7 +95,7 @@ impl StatementContext {
         Self {
             statement: format!("{}", stmt),
             statement_location: stmt.location(),
-            stanza_location: stanza.location,
+            stanza_location: stanza.range.start,
             source_location: Location::from(source_node.range().start_point),
             node_kind: source_node.kind().to_string(),
         }
