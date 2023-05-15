@@ -118,7 +118,8 @@ impl File {
                         let index = file_query
                             .capture_index_for_name(name)
                             .expect("missing index for capture");
-                        let quantifier = file_query.capture_quantifiers(0)[index as usize];
+                        let quantifier =
+                            file_query.capture_quantifiers(mat.pattern_index)[index as usize];
                         (name, quantifier, index)
                     })
                     .filter(|c| c.2 != stanza.full_match_file_capture_index as u32)
