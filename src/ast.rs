@@ -14,6 +14,7 @@ use tree_sitter::CaptureQuantifier;
 use tree_sitter::Language;
 use tree_sitter::Query;
 
+use crate::parser::Range;
 use crate::Identifier;
 use crate::Location;
 
@@ -66,7 +67,7 @@ pub struct Stanza {
     pub full_match_stanza_capture_index: usize,
     /// Capture index of the full match in the file query
     pub full_match_file_capture_index: usize,
-    pub location: Location,
+    pub range: Range,
 }
 
 /// A statement that can appear in a graph DSL stanza

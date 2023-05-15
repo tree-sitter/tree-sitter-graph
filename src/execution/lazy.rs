@@ -13,7 +13,6 @@ use log::{debug, trace};
 
 use std::collections::HashMap;
 
-use tree_sitter::CaptureQuantifier::One;
 use tree_sitter::QueryCursor;
 use tree_sitter::QueryMatch;
 use tree_sitter::Tree;
@@ -22,11 +21,11 @@ use crate::ast;
 use crate::execution::error::ExecutionError;
 use crate::execution::error::ResultWithExecutionError;
 use crate::execution::error::StatementContext;
-use crate::execution::query_capture_value;
 use crate::execution::ExecutionConfig;
 use crate::functions::Functions;
 use crate::graph;
 use crate::graph::Graph;
+use crate::graph::Value;
 use crate::variables::Globals;
 use crate::variables::MutVariables;
 use crate::variables::VariableMap;
@@ -62,18 +61,14 @@ impl ast::File {
         };
 
         let mut locals = VariableMap::new();
-        let mut cursor = QueryCursor::new();
         let mut store = LazyStore::new();
         let mut scoped_store = LazyScopedVariables::new();
         let mut lazy_graph = Vec::new();
         let mut function_parameters = Vec::new();
         let mut prev_element_debug_info = HashMap::new();
 
-        let query = &self.query.as_ref().unwrap();
-        let matches = cursor.matches(query, tree.root_node(), source.as_bytes());
-        for mat in matches {
+        self.try_visit_matches_lazy(tree, source, |stanza, mat| {
             cancellation_flag.check("processing matches")?;
-            let stanza = &self.stanzas[mat.pattern_index];
             stanza.execute_lazy(
                 source,
                 &mat,
@@ -87,8 +82,8 @@ impl ast::File {
                 &mut prev_element_debug_info,
                 &self.shorthands,
                 cancellation_flag,
-            )?;
-        }
+            )
+        })?;
 
         let mut exec = EvaluationContext {
             source,
@@ -108,6 +103,25 @@ impl ast::File {
         store.evaluate_all(&mut exec)?;
         scoped_store.evaluate_all(&mut exec)?;
 
+        Ok(())
+    }
+
+    pub(super) fn try_visit_matches_lazy<'tree, E, F>(
+        &self,
+        tree: &'tree Tree,
+        source: &'tree str,
+        mut visit: F,
+    ) -> Result<(), E>
+    where
+        F: FnMut(&ast::Stanza, QueryMatch<'_, 'tree>) -> Result<(), E>,
+    {
+        let mut cursor = QueryCursor::new();
+        let query = self.query.as_ref().unwrap();
+        let matches = cursor.matches(query, tree.root_node(), source.as_bytes());
+        for mat in matches {
+            let stanza = &self.stanzas[mat.pattern_index];
+            visit(stanza, mat)?;
+        }
         Ok(())
     }
 }
@@ -167,19 +181,14 @@ impl ast::Stanza {
     ) -> Result<(), ExecutionError> {
         let current_regex_captures = vec![];
         locals.clear();
-        let node = query_capture_value(self.full_match_file_capture_index, One, &mat, graph);
-        debug!("match {} at {}", node, self.location);
+        let node = mat
+            .nodes_for_capture_index(self.full_match_file_capture_index as u32)
+            .next()
+            .expect("missing capture for full match");
+        debug!("match {:?} at {}", node, self.range.start);
         trace!("{{");
         for statement in &self.statements {
-            let error_context = {
-                let node = mat
-                    .captures
-                    .iter()
-                    .find(|c| c.index as usize == self.full_match_file_capture_index)
-                    .expect("missing capture for full match")
-                    .node;
-                StatementContext::new(&statement, &self, &node)
-            };
+            let error_context = { StatementContext::new(&statement, &self, &node) };
             let mut exec = ExecutionContext {
                 source,
                 graph,
@@ -613,11 +622,11 @@ impl ast::SetComprehension {
 
 impl ast::Capture {
     fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<LazyValue, ExecutionError> {
-        Ok(query_capture_value(
-            self.file_capture_index,
-            self.quantifier,
-            exec.mat,
+        Ok(Value::from_nodes(
             exec.graph,
+            exec.mat
+                .nodes_for_capture_index(self.file_capture_index as u32),
+            self.quantifier,
         )
         .into())
     }

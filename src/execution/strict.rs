@@ -44,7 +44,7 @@ use crate::ast::UnscopedVariable;
 use crate::ast::Variable;
 use crate::execution::error::ExecutionError;
 use crate::execution::error::ResultWithExecutionError;
-use crate::execution::query_capture_value;
+use crate::execution::error::StatementContext;
 use crate::execution::CancellationFlag;
 use crate::execution::ExecutionConfig;
 use crate::graph::Attributes;
@@ -57,8 +57,6 @@ use crate::variables::VariableMap;
 use crate::variables::Variables;
 use crate::Identifier;
 use crate::Location;
-
-use super::error::StatementContext;
 
 impl File {
     /// Executes this graph DSL file against a source file, saving the results into an existing
@@ -88,22 +86,36 @@ impl File {
         let mut scoped = ScopedVariables::new();
         let current_regex_captures = Vec::new();
         let mut function_parameters = Vec::new();
-        let mut cursor = QueryCursor::new();
-        for stanza in &self.stanzas {
-            cancellation_flag.check("executing stanza")?;
+
+        self.try_visit_matches_strict(tree, source, |stanza, mat| {
             stanza.execute(
-                tree,
                 source,
+                &mat,
                 graph,
                 &mut config,
                 &mut locals,
                 &mut scoped,
                 &current_regex_captures,
                 &mut function_parameters,
-                &mut cursor,
                 &self.shorthands,
                 cancellation_flag,
-            )?;
+            )
+        })?;
+
+        Ok(())
+    }
+
+    pub(super) fn try_visit_matches_strict<'tree, E, F>(
+        &self,
+        tree: &'tree Tree,
+        source: &'tree str,
+        mut visit: F,
+    ) -> Result<(), E>
+    where
+        F: FnMut(&Stanza, QueryMatch<'_, 'tree>) -> Result<(), E>,
+    {
+        for stanza in &self.stanzas {
+            stanza.try_visit_matches_strict(tree, source, |mat| visit(stanza, mat))?;
         }
         Ok(())
     }
@@ -143,49 +155,59 @@ impl<'a> ScopedVariables<'a> {
 impl Stanza {
     fn execute<'a, 'g, 'l, 's, 'tree>(
         &self,
-        tree: &'tree Tree,
         source: &'tree str,
+        mat: &QueryMatch<'_, 'tree>,
         graph: &mut Graph<'tree>,
         config: &ExecutionConfig<'_, 'g>,
         locals: &mut VariableMap<'l, Value>,
         scoped: &mut ScopedVariables<'s>,
         current_regex_captures: &Vec<String>,
         function_parameters: &mut Vec<Value>,
-        cursor: &mut QueryCursor,
         shorthands: &AttributeShorthands,
         cancellation_flag: &dyn CancellationFlag,
     ) -> Result<(), ExecutionError> {
+        locals.clear();
+        for statement in &self.statements {
+            let error_context = {
+                let node = mat
+                    .nodes_for_capture_index(self.full_match_stanza_capture_index as u32)
+                    .next()
+                    .expect("missing full capture");
+                StatementContext::new(&statement, &self, &node)
+            };
+            let mut exec = ExecutionContext {
+                source,
+                graph,
+                config,
+                locals,
+                scoped,
+                current_regex_captures,
+                function_parameters,
+                mat: &mat,
+                error_context,
+                shorthands,
+                cancellation_flag,
+            };
+            statement
+                .execute(&mut exec)
+                .with_context(|| exec.error_context.into())?;
+        }
+        Ok(())
+    }
+
+    pub(super) fn try_visit_matches_strict<'tree, E, F>(
+        &self,
+        tree: &'tree Tree,
+        source: &'tree str,
+        mut visit: F,
+    ) -> Result<(), E>
+    where
+        F: FnMut(QueryMatch<'_, 'tree>) -> Result<(), E>,
+    {
+        let mut cursor = QueryCursor::new();
         let matches = cursor.matches(&self.query, tree.root_node(), source.as_bytes());
         for mat in matches {
-            cancellation_flag.check("processing matches")?;
-            locals.clear();
-            for statement in &self.statements {
-                let error_context = {
-                    let node = mat
-                        .captures
-                        .iter()
-                        .find(|c| c.index as usize == self.full_match_stanza_capture_index)
-                        .expect("missing capture for full match")
-                        .node;
-                    StatementContext::new(&statement, &self, &node)
-                };
-                let mut exec = ExecutionContext {
-                    source,
-                    graph,
-                    config,
-                    locals,
-                    scoped,
-                    current_regex_captures,
-                    function_parameters,
-                    mat: &mat,
-                    error_context,
-                    shorthands,
-                    cancellation_flag,
-                };
-                statement
-                    .execute(&mut exec)
-                    .with_context(|| exec.error_context.into())?;
-            }
+            visit(mat)?;
         }
         Ok(())
     }
@@ -600,12 +622,13 @@ impl SetComprehension {
 
 impl Capture {
     fn evaluate(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
-        Ok(query_capture_value(
-            self.stanza_capture_index,
-            self.quantifier,
-            exec.mat,
+        Ok(Value::from_nodes(
             exec.graph,
-        ))
+            exec.mat
+                .nodes_for_capture_index(self.stanza_capture_index as u32),
+            self.quantifier,
+        )
+        .into())
     }
 }
 
