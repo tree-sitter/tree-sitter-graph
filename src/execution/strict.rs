@@ -105,7 +105,7 @@ impl File {
         Ok(())
     }
 
-    pub(super) fn try_visit_matches_strict<'a, 'tree, E, F>(
+    pub(super) fn try_visit_matches_strict<'tree, E, F>(
         &self,
         tree: &'tree Tree,
         source: &'tree str,
@@ -114,12 +114,8 @@ impl File {
     where
         F: FnMut(&Stanza, QueryMatch<'_, 'tree>) -> Result<(), E>,
     {
-        let mut cursor = QueryCursor::new();
         for stanza in &self.stanzas {
-            let matches = cursor.matches(&stanza.query, tree.root_node(), source.as_bytes());
-            for mat in matches {
-                visit(stanza, mat)?;
-            }
+            stanza.try_visit_matches_strict(tree, source, |mat| visit(stanza, mat))?;
         }
         Ok(())
     }
@@ -173,10 +169,10 @@ impl Stanza {
         locals.clear();
         for statement in &self.statements {
             let error_context = {
-                let node = self
-                    .full_capture_from_stanza_match(mat)
+                let node = mat
+                    .nodes_for_capture_index(self.full_match_stanza_capture_index as u32)
                     .next()
-                    .expect("missing capture for full match");
+                    .expect("missing full capture");
                 StatementContext::new(&statement, &self, &node)
             };
             let mut exec = ExecutionContext {
@@ -195,6 +191,23 @@ impl Stanza {
             statement
                 .execute(&mut exec)
                 .with_context(|| exec.error_context.into())?;
+        }
+        Ok(())
+    }
+
+    pub(super) fn try_visit_matches_strict<'tree, E, F>(
+        &self,
+        tree: &'tree Tree,
+        source: &'tree str,
+        mut visit: F,
+    ) -> Result<(), E>
+    where
+        F: FnMut(QueryMatch<'_, 'tree>) -> Result<(), E>,
+    {
+        let mut cursor = QueryCursor::new();
+        let matches = cursor.matches(&self.query, tree.root_node(), source.as_bytes());
+        for mat in matches {
+            visit(mat)?;
         }
         Ok(())
     }

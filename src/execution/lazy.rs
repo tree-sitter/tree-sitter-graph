@@ -13,7 +13,6 @@ use log::{debug, trace};
 
 use std::collections::HashMap;
 
-use tree_sitter::CaptureQuantifier::One;
 use tree_sitter::QueryCursor;
 use tree_sitter::QueryMatch;
 use tree_sitter::Tree;
@@ -107,7 +106,7 @@ impl ast::File {
         Ok(())
     }
 
-    pub(super) fn try_visit_matches_lazy<'a, 'tree, E, F>(
+    pub(super) fn try_visit_matches_lazy<'tree, E, F>(
         &self,
         tree: &'tree Tree,
         source: &'tree str,
@@ -182,17 +181,14 @@ impl ast::Stanza {
     ) -> Result<(), ExecutionError> {
         let current_regex_captures = vec![];
         locals.clear();
-        let node = Value::from_nodes(graph, self.full_capture_from_file_match(mat), One);
-        debug!("match {} at {}", node, self.location);
+        let node = mat
+            .nodes_for_capture_index(self.full_match_file_capture_index as u32)
+            .next()
+            .expect("missing capture for full match");
+        debug!("match {:?} at {}", node, self.location);
         trace!("{{");
         for statement in &self.statements {
-            let error_context = {
-                let node = self
-                    .full_capture_from_file_match(mat)
-                    .next()
-                    .expect("missing capture for full match");
-                StatementContext::new(&statement, &self, &node)
-            };
+            let error_context = { StatementContext::new(&statement, &self, &node) };
             let mut exec = ExecutionContext {
                 source,
                 graph,

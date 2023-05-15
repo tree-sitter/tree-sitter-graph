@@ -41,6 +41,7 @@ pub use execution::error::ExecutionError;
 pub use execution::CancellationError;
 pub use execution::CancellationFlag;
 pub use execution::ExecutionConfig;
+pub use execution::Match;
 pub use execution::NoCancellation;
 pub use parser::Location;
 pub use parser::ParseError;

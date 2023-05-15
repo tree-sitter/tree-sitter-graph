@@ -19,6 +19,7 @@ use crate::graph::Graph;
 use crate::graph::Value;
 use crate::variables::Globals;
 use crate::Identifier;
+use crate::Location;
 
 pub(crate) mod error;
 mod lazy;
@@ -96,21 +97,142 @@ impl File {
         Ok(())
     }
 
-    pub fn try_visit_matches<'a, 'tree, E, F>(
+    pub fn try_visit_matches<'tree, E, F>(
         &self,
         tree: &'tree Tree,
         source: &'tree str,
         lazy: bool,
-        visit: F,
+        mut visit: F,
     ) -> Result<(), E>
     where
-        F: FnMut(&Stanza, QueryMatch<'_, 'tree>) -> Result<(), E>,
+        F: FnMut(Match<'_, 'tree>) -> Result<(), E>,
     {
         if lazy {
-            self.try_visit_matches_lazy(tree, source, visit)
+            let file_query = self.query.as_ref().expect("missing file query");
+            self.try_visit_matches_lazy(tree, source, |stanza, mat| {
+                let named_captures = stanza
+                    .query
+                    .capture_names()
+                    .iter()
+                    .map(|name| {
+                        let index = file_query
+                            .capture_index_for_name(name)
+                            .expect("missing index for capture");
+                        (name, index)
+                    })
+                    .filter(|c| c.1 != stanza.full_match_file_capture_index as u32)
+                    .collect();
+                visit(Match {
+                    mat,
+                    full_capture_index: stanza.full_match_file_capture_index as u32,
+                    named_captures,
+                    query_location: stanza.location,
+                })
+            })
         } else {
-            self.try_visit_matches_strict(tree, source, visit)
+            self.try_visit_matches_strict(tree, source, |stanza, mat| {
+                let named_captures = stanza
+                    .query
+                    .capture_names()
+                    .iter()
+                    .map(|name| {
+                        let index = stanza
+                            .query
+                            .capture_index_for_name(name)
+                            .expect("missing index for capture");
+                        (name, index)
+                    })
+                    .filter(|c| c.1 != stanza.full_match_stanza_capture_index as u32)
+                    .collect();
+                visit(Match {
+                    mat,
+                    full_capture_index: stanza.full_match_stanza_capture_index as u32,
+                    named_captures,
+                    query_location: stanza.location,
+                })
+            })
         }
+    }
+}
+
+impl Stanza {
+    pub fn try_visit_matches<'tree, E, F>(
+        &self,
+        tree: &'tree Tree,
+        source: &'tree str,
+        mut visit: F,
+    ) -> Result<(), E>
+    where
+        F: FnMut(Match<'_, 'tree>) -> Result<(), E>,
+    {
+        self.try_visit_matches_strict(tree, source, |mat| {
+            let named_captures = self
+                .query
+                .capture_names()
+                .iter()
+                .map(|name| {
+                    let index = self
+                        .query
+                        .capture_index_for_name(name)
+                        .expect("missing index for capture");
+                    (name, index)
+                })
+                .filter(|c| c.1 != self.full_match_stanza_capture_index as u32)
+                .collect();
+            visit(Match {
+                mat,
+                full_capture_index: self.full_match_stanza_capture_index as u32,
+                named_captures,
+                query_location: self.location,
+            })
+        })
+    }
+}
+
+pub struct Match<'a, 'tree> {
+    mat: QueryMatch<'a, 'tree>,
+    full_capture_index: u32,
+    named_captures: Vec<(&'a String, u32)>,
+    query_location: Location,
+}
+
+impl<'a, 'tree> Match<'a, 'tree> {
+    /// Return the top-level matched node.
+    pub fn full_capture(&self) -> Node<'tree> {
+        self.mat
+            .nodes_for_capture_index(self.full_capture_index)
+            .next()
+            .expect("missing full capture")
+    }
+
+    /// Return the matched nodes for a named capture.
+    pub fn named_captures<'s: 'a + 'tree>(
+        &'s self,
+    ) -> impl Iterator<Item = (&String, impl Iterator<Item = Node<'tree>> + 's)> {
+        self.named_captures
+            .iter()
+            .map(move |c| (c.0, self.mat.nodes_for_capture_index(c.1)))
+    }
+
+    /// Return the matched nodes for a named capture.
+    pub fn named_capture<'s: 'a + 'tree>(
+        &'s self,
+        name: &str,
+    ) -> Option<impl Iterator<Item = Node<'tree>> + 's> {
+        self.named_captures
+            .iter()
+            .find(|c| c.0 == name)
+            .map(|c| self.mat.nodes_for_capture_index(c.1))
+    }
+
+    /// Return an iterator over all capture names.
+    pub fn capture_names(&self) -> impl Iterator<Item = &String> {
+        self.named_captures.iter().map(|c| c.0)
+    }
+
+    /// Return the query location.
+    pub fn query_location(&self) -> &Location {
+        &self.query_location
     }
 }
 
@@ -174,24 +296,6 @@ impl CancellationFlag for NoCancellation {
 #[derive(Debug, Error)]
 #[error("Cancelled at \"{0}\"")]
 pub struct CancellationError(pub &'static str);
-
-impl crate::ast::Stanza {
-    /// Return the top-level matched node from a file query match result.
-    pub fn full_capture_from_file_match<'a, 'cursor: 'a, 'tree: 'a>(
-        &self,
-        mat: &'a QueryMatch<'cursor, 'tree>,
-    ) -> impl Iterator<Item = Node<'tree>> + 'a {
-        mat.nodes_for_capture_index(self.full_match_file_capture_index as u32)
-    }
-
-    /// Return the top-level matched node from a stanza query match result.
-    pub fn full_capture_from_stanza_match<'a, 'cursor: 'a, 'tree: 'a>(
-        &self,
-        mat: &'a QueryMatch<'cursor, 'tree>,
-    ) -> impl Iterator<Item = Node<'tree>> + 'a {
-        mat.nodes_for_capture_index(self.full_match_stanza_capture_index as u32)
-    }
-}
 
 impl Value {
     pub fn from_nodes<'tree, NI: IntoIterator<Item = Node<'tree>>>(
