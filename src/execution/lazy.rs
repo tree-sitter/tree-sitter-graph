@@ -62,18 +62,14 @@ impl ast::File {
         };
 
         let mut locals = VariableMap::new();
-        let mut cursor = QueryCursor::new();
         let mut store = LazyStore::new();
         let mut scoped_store = LazyScopedVariables::new();
         let mut lazy_graph = Vec::new();
         let mut function_parameters = Vec::new();
         let mut prev_element_debug_info = HashMap::new();
 
-        let query = &self.query.as_ref().unwrap();
-        let matches = cursor.matches(query, tree.root_node(), source.as_bytes());
-        for mat in matches {
+        self.try_visit_matches_lazy(tree, source, |stanza, mat| {
             cancellation_flag.check("processing matches")?;
-            let stanza = &self.stanzas[mat.pattern_index];
             stanza.execute_lazy(
                 source,
                 &mat,
@@ -87,8 +83,8 @@ impl ast::File {
                 &mut prev_element_debug_info,
                 &self.shorthands,
                 cancellation_flag,
-            )?;
-        }
+            )
+        })?;
 
         let mut exec = EvaluationContext {
             source,
@@ -108,6 +104,25 @@ impl ast::File {
         store.evaluate_all(&mut exec)?;
         scoped_store.evaluate_all(&mut exec)?;
 
+        Ok(())
+    }
+
+    pub(super) fn try_visit_matches_lazy<'a, 'tree, E, F>(
+        &self,
+        tree: &'tree Tree,
+        source: &'tree str,
+        mut visit: F,
+    ) -> Result<(), E>
+    where
+        F: FnMut(&ast::Stanza, QueryMatch<'_, 'tree>) -> Result<(), E>,
+    {
+        let mut cursor = QueryCursor::new();
+        let query = self.query.as_ref().unwrap();
+        let matches = cursor.matches(query, tree.root_node(), source.as_bytes());
+        for mat in matches {
+            let stanza = &self.stanzas[mat.pattern_index];
+            visit(stanza, mat)?;
+        }
         Ok(())
     }
 }
