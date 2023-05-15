@@ -86,22 +86,40 @@ impl File {
         let mut scoped = ScopedVariables::new();
         let current_regex_captures = Vec::new();
         let mut function_parameters = Vec::new();
-        let mut cursor = QueryCursor::new();
-        for stanza in &self.stanzas {
-            cancellation_flag.check("executing stanza")?;
+
+        self.try_visit_matches_strict(tree, source, |stanza, mat| {
             stanza.execute(
-                tree,
                 source,
+                &mat,
                 graph,
                 &mut config,
                 &mut locals,
                 &mut scoped,
                 &current_regex_captures,
                 &mut function_parameters,
-                &mut cursor,
                 &self.shorthands,
                 cancellation_flag,
-            )?;
+            )
+        })?;
+
+        Ok(())
+    }
+
+    pub(super) fn try_visit_matches_strict<'a, 'tree, E, F>(
+        &self,
+        tree: &'tree Tree,
+        source: &'tree str,
+        mut visit: F,
+    ) -> Result<(), E>
+    where
+        F: FnMut(&Stanza, QueryMatch<'_, 'tree>) -> Result<(), E>,
+    {
+        let mut cursor = QueryCursor::new();
+        for stanza in &self.stanzas {
+            let matches = cursor.matches(&stanza.query, tree.root_node(), source.as_bytes());
+            for mat in matches {
+                visit(stanza, mat)?;
+            }
         }
         Ok(())
     }
@@ -141,49 +159,42 @@ impl<'a> ScopedVariables<'a> {
 impl Stanza {
     fn execute<'a, 'g, 'l, 's, 'tree>(
         &self,
-        tree: &'tree Tree,
         source: &'tree str,
+        mat: &QueryMatch<'_, 'tree>,
         graph: &mut Graph<'tree>,
         config: &ExecutionConfig<'_, 'g>,
         locals: &mut VariableMap<'l, Value>,
         scoped: &mut ScopedVariables<'s>,
         current_regex_captures: &Vec<String>,
         function_parameters: &mut Vec<Value>,
-        cursor: &mut QueryCursor,
         shorthands: &AttributeShorthands,
         cancellation_flag: &dyn CancellationFlag,
     ) -> Result<(), ExecutionError> {
-        let matches = cursor.matches(&self.query, tree.root_node(), source.as_bytes());
-        for mat in matches {
-            cancellation_flag.check("processing matches")?;
-            locals.clear();
-            for statement in &self.statements {
-                let error_context = {
-                    let node = mat
-                        .captures
-                        .iter()
-                        .find(|c| c.index as usize == self.full_match_stanza_capture_index)
-                        .expect("missing capture for full match")
-                        .node;
-                    StatementContext::new(&statement, &self, &node)
-                };
-                let mut exec = ExecutionContext {
-                    source,
-                    graph,
-                    config,
-                    locals,
-                    scoped,
-                    current_regex_captures,
-                    function_parameters,
-                    mat: &mat,
-                    error_context,
-                    shorthands,
-                    cancellation_flag,
-                };
-                statement
-                    .execute(&mut exec)
-                    .with_context(|| exec.error_context.into())?;
-            }
+        locals.clear();
+        for statement in &self.statements {
+            let error_context = {
+                let node = self
+                    .full_capture_from_stanza_match(mat)
+                    .next()
+                    .expect("missing capture for full match");
+                StatementContext::new(&statement, &self, &node)
+            };
+            let mut exec = ExecutionContext {
+                source,
+                graph,
+                config,
+                locals,
+                scoped,
+                current_regex_captures,
+                function_parameters,
+                mat: &mat,
+                error_context,
+                shorthands,
+                cancellation_flag,
+            };
+            statement
+                .execute(&mut exec)
+                .with_context(|| exec.error_context.into())?;
         }
         Ok(())
     }

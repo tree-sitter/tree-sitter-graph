@@ -187,12 +187,10 @@ impl ast::Stanza {
         trace!("{{");
         for statement in &self.statements {
             let error_context = {
-                let node = mat
-                    .captures
-                    .iter()
-                    .find(|c| c.index as usize == self.full_match_file_capture_index)
-                    .expect("missing capture for full match")
-                    .node;
+                let node = self
+                    .full_capture_from_file_match(mat)
+                    .next()
+                    .expect("missing capture for full match");
                 StatementContext::new(&statement, &self, &node)
             };
             let mut exec = ExecutionContext {
