@@ -44,7 +44,7 @@ use crate::ast::UnscopedVariable;
 use crate::ast::Variable;
 use crate::execution::error::ExecutionError;
 use crate::execution::error::ResultWithExecutionError;
-use crate::execution::query_capture_value;
+use crate::execution::error::StatementContext;
 use crate::execution::CancellationFlag;
 use crate::execution::ExecutionConfig;
 use crate::graph::Attributes;
@@ -57,8 +57,6 @@ use crate::variables::VariableMap;
 use crate::variables::Variables;
 use crate::Identifier;
 use crate::Location;
-
-use super::error::StatementContext;
 
 impl File {
     /// Executes this graph DSL file against a source file, saving the results into an existing
@@ -600,12 +598,13 @@ impl SetComprehension {
 
 impl Capture {
     fn evaluate(&self, exec: &mut ExecutionContext) -> Result<Value, ExecutionError> {
-        Ok(query_capture_value(
-            self.stanza_capture_index,
-            self.quantifier,
-            exec.mat,
+        Ok(Value::from_nodes(
             exec.graph,
-        ))
+            exec.mat
+                .nodes_for_capture_index(self.stanza_capture_index as u32),
+            self.quantifier,
+        )
+        .into())
     }
 }
 

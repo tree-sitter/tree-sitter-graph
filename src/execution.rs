@@ -7,6 +7,7 @@
 
 use thiserror::Error;
 use tree_sitter::CaptureQuantifier;
+use tree_sitter::Node;
 use tree_sitter::QueryMatch;
 use tree_sitter::Tree;
 
@@ -156,36 +157,50 @@ impl CancellationFlag for NoCancellation {
 #[error("Cancelled at \"{0}\"")]
 pub struct CancellationError(pub &'static str);
 
-/// Get the value for the given capture, considering the suffix
-pub(self) fn query_capture_value<'tree>(
-    index: usize,
-    quantifier: CaptureQuantifier,
-    mat: &QueryMatch<'_, 'tree>,
-    graph: &mut Graph<'tree>,
-) -> Value {
-    let mut nodes = mat
-        .captures
-        .iter()
-        .filter(|c| c.index as usize == index)
-        .map(|c| c.node);
-    match quantifier {
-        CaptureQuantifier::Zero => unreachable!(),
-        CaptureQuantifier::One => {
-            let syntax_node = graph.add_syntax_node(nodes.next().expect("missing capture"));
-            syntax_node.into()
-        }
-        CaptureQuantifier::ZeroOrMore | CaptureQuantifier::OneOrMore => {
-            let syntax_nodes = nodes
-                .map(|n| graph.add_syntax_node(n.clone()).into())
-                .collect::<Vec<Value>>();
-            syntax_nodes.into()
-        }
-        CaptureQuantifier::ZeroOrOne => match nodes.next() {
-            None => Value::Null.into(),
-            Some(node) => {
-                let syntax_node = graph.add_syntax_node(node);
+impl crate::ast::Stanza {
+    /// Return the top-level matched node from a file query match result.
+    pub fn full_capture_from_file_match<'a, 'cursor: 'a, 'tree: 'a>(
+        &self,
+        mat: &'a QueryMatch<'cursor, 'tree>,
+    ) -> impl Iterator<Item = Node<'tree>> + 'a {
+        mat.nodes_for_capture_index(self.full_match_file_capture_index as u32)
+    }
+
+    /// Return the top-level matched node from a stanza query match result.
+    pub fn full_capture_from_stanza_match<'a, 'cursor: 'a, 'tree: 'a>(
+        &self,
+        mat: &'a QueryMatch<'cursor, 'tree>,
+    ) -> impl Iterator<Item = Node<'tree>> + 'a {
+        mat.nodes_for_capture_index(self.full_match_stanza_capture_index as u32)
+    }
+}
+
+impl Value {
+    pub fn from_nodes<'tree, NI: IntoIterator<Item = Node<'tree>>>(
+        graph: &mut Graph<'tree>,
+        nodes: NI,
+        quantifier: CaptureQuantifier,
+    ) -> Value {
+        let mut nodes = nodes.into_iter();
+        match quantifier {
+            CaptureQuantifier::Zero => unreachable!(),
+            CaptureQuantifier::One => {
+                let syntax_node = graph.add_syntax_node(nodes.next().expect("missing capture"));
                 syntax_node.into()
             }
-        },
+            CaptureQuantifier::ZeroOrMore | CaptureQuantifier::OneOrMore => {
+                let syntax_nodes = nodes
+                    .map(|n| graph.add_syntax_node(n.clone()).into())
+                    .collect::<Vec<Value>>();
+                syntax_nodes.into()
+            }
+            CaptureQuantifier::ZeroOrOne => match nodes.next() {
+                None => Value::Null.into(),
+                Some(node) => {
+                    let syntax_node = graph.add_syntax_node(node);
+                    syntax_node.into()
+                }
+            },
+        }
     }
 }

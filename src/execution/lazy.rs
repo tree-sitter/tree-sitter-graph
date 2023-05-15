@@ -22,11 +22,11 @@ use crate::ast;
 use crate::execution::error::ExecutionError;
 use crate::execution::error::ResultWithExecutionError;
 use crate::execution::error::StatementContext;
-use crate::execution::query_capture_value;
 use crate::execution::ExecutionConfig;
 use crate::functions::Functions;
 use crate::graph;
 use crate::graph::Graph;
+use crate::graph::Value;
 use crate::variables::Globals;
 use crate::variables::MutVariables;
 use crate::variables::VariableMap;
@@ -167,7 +167,7 @@ impl ast::Stanza {
     ) -> Result<(), ExecutionError> {
         let current_regex_captures = vec![];
         locals.clear();
-        let node = query_capture_value(self.full_match_file_capture_index, One, &mat, graph);
+        let node = Value::from_nodes(graph, self.full_capture_from_file_match(mat), One);
         debug!("match {} at {}", node, self.location);
         trace!("{{");
         for statement in &self.statements {
@@ -613,11 +613,11 @@ impl ast::SetComprehension {
 
 impl ast::Capture {
     fn evaluate_lazy(&self, exec: &mut ExecutionContext) -> Result<LazyValue, ExecutionError> {
-        Ok(query_capture_value(
-            self.file_capture_index,
-            self.quantifier,
-            exec.mat,
+        Ok(Value::from_nodes(
             exec.graph,
+            exec.mat
+                .nodes_for_capture_index(self.file_capture_index as u32),
+            self.quantifier,
         )
         .into())
     }
