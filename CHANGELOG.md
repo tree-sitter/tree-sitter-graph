@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.10.2 -- 2023-05-25
+
+### Library
+
+#### Added
+
+- Edge debug information now contains the TSG location of the `edge` statement if `ExecutionConfig::location_attr` is set.
+
+#### Changed
+
+- The TSG location in the debug information is formatted more explicitly as `line XX column YY` instead of `(XX, YY)`.
+
 ## v0.10.1 -- 2023-05-15
 
 ### Library
