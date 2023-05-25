@@ -348,7 +348,14 @@ impl CreateEdge {
     ) -> Result<(), ExecutionError> {
         if let Some(location_attr) = &config.location_attr {
             attributes
-                .add(location_attr.clone(), format!("{}", self.location))
+                .add(
+                    location_attr.clone(),
+                    format!(
+                        "line {} column {}",
+                        self.location.row + 1,
+                        self.location.column + 1
+                    ),
+                )
                 .map_err(|_| ExecutionError::DuplicateAttribute(location_attr.as_str().into()))?;
         }
         Ok(())
@@ -373,7 +380,10 @@ impl Variable {
                 Variable::Unscoped(v) => v.location,
             };
             attributes
-                .add(location_attr.clone(), format!("{}", location))
+                .add(
+                    location_attr.clone(),
+                    format!("line {} column {}", location.row + 1, location.column + 1),
+                )
                 .map_err(|_| ExecutionError::DuplicateAttribute(location_attr.as_str().into()))?;
         }
         Ok(())
