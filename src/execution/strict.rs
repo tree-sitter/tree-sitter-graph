@@ -47,7 +47,6 @@ use crate::execution::error::ResultWithExecutionError;
 use crate::execution::error::StatementContext;
 use crate::execution::CancellationFlag;
 use crate::execution::ExecutionConfig;
-use crate::graph::Attributes;
 use crate::graph::Graph;
 use crate::graph::SyntaxNodeRef;
 use crate::graph::Value;
@@ -304,12 +303,16 @@ impl CreateEdge {
     fn execute(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
         let source = self.source.evaluate(exec)?.into_graph_node_ref()?;
         let sink = self.sink.evaluate(exec)?.into_graph_node_ref()?;
-        if let Err(_) = exec.graph[source].add_edge(sink) {
-            Err(ExecutionError::DuplicateEdge(format!(
-                "({} -> {}) in {}",
-                source, sink, self,
-            )))?;
-        }
+        let edge = match exec.graph[source].add_edge(sink) {
+            Ok(edge) => edge,
+            Err(_) => {
+                return Err(ExecutionError::DuplicateEdge(format!(
+                    "({} -> {}) in {}",
+                    source, sink, self,
+                )))?
+            }
+        };
+        self.add_debug_attrs(&mut edge.attributes, exec.config)?;
         Ok(())
     }
 }
@@ -798,32 +801,6 @@ impl UnscopedVariable {
                 ExecutionError::UndefinedVariable(format!("{}", self))
             }
         })
-    }
-}
-
-impl Variable {
-    pub(crate) fn add_debug_attrs(
-        &self,
-        attributes: &mut Attributes,
-        config: &ExecutionConfig,
-    ) -> Result<(), ExecutionError> {
-        if let Some(variable_name_attr) = &config.variable_name_attr {
-            attributes
-                .add(variable_name_attr.clone(), format!("{}", self))
-                .map_err(|_| {
-                    ExecutionError::DuplicateAttribute(variable_name_attr.as_str().into())
-                })?;
-        }
-        if let Some(location_attr) = &config.location_attr {
-            let location = match &self {
-                Variable::Scoped(v) => v.location,
-                Variable::Unscoped(v) => v.location,
-            };
-            attributes
-                .add(location_attr.clone(), format!("{}", location))
-                .map_err(|_| ExecutionError::DuplicateAttribute(location_attr.as_str().into()))?;
-        }
-        Ok(())
     }
 }
 

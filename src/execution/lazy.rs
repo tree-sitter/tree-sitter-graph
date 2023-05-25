@@ -24,6 +24,7 @@ use crate::execution::error::StatementContext;
 use crate::execution::ExecutionConfig;
 use crate::functions::Functions;
 use crate::graph;
+use crate::graph::Attributes;
 use crate::graph::Graph;
 use crate::graph::Value;
 use crate::variables::Globals;
@@ -282,7 +283,9 @@ impl ast::CreateEdge {
     fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
         let source = self.source.evaluate_lazy(exec)?;
         let sink = self.sink.evaluate_lazy(exec)?;
-        let stmt = LazyCreateEdge::new(source, sink, exec.error_context.clone().into());
+        let mut attributes = Attributes::new();
+        self.add_debug_attrs(&mut attributes, exec.config)?;
+        let stmt = LazyCreateEdge::new(source, sink, attributes, exec.error_context.clone().into());
         exec.lazy_graph.push(stmt.into());
         Ok(())
     }

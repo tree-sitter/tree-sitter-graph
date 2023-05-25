@@ -11,10 +11,13 @@ use tree_sitter::Node;
 use tree_sitter::QueryMatch;
 use tree_sitter::Tree;
 
+use crate::ast::CreateEdge;
 use crate::ast::File;
 use crate::ast::Stanza;
+use crate::ast::Variable;
 use crate::execution::error::ExecutionError;
 use crate::functions::Functions;
+use crate::graph::Attributes;
 use crate::graph::Graph;
 use crate::graph::Value;
 use crate::variables::Globals;
@@ -334,5 +337,45 @@ impl Value {
                 }
             },
         }
+    }
+}
+
+impl CreateEdge {
+    pub(crate) fn add_debug_attrs(
+        &self,
+        attributes: &mut Attributes,
+        config: &ExecutionConfig,
+    ) -> Result<(), ExecutionError> {
+        if let Some(location_attr) = &config.location_attr {
+            attributes
+                .add(location_attr.clone(), format!("{}", self.location))
+                .map_err(|_| ExecutionError::DuplicateAttribute(location_attr.as_str().into()))?;
+        }
+        Ok(())
+    }
+}
+impl Variable {
+    pub(crate) fn add_debug_attrs(
+        &self,
+        attributes: &mut Attributes,
+        config: &ExecutionConfig,
+    ) -> Result<(), ExecutionError> {
+        if let Some(variable_name_attr) = &config.variable_name_attr {
+            attributes
+                .add(variable_name_attr.clone(), format!("{}", self))
+                .map_err(|_| {
+                    ExecutionError::DuplicateAttribute(variable_name_attr.as_str().into())
+                })?;
+        }
+        if let Some(location_attr) = &config.location_attr {
+            let location = match &self {
+                Variable::Scoped(v) => v.location,
+                Variable::Unscoped(v) => v.location,
+            };
+            attributes
+                .add(location_attr.clone(), format!("{}", location))
+                .map_err(|_| ExecutionError::DuplicateAttribute(location_attr.as_str().into()))?;
+        }
+        Ok(())
     }
 }

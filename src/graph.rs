@@ -260,6 +260,7 @@ impl Edge {
 }
 
 /// A set of attributes associated with a graph node or edge
+#[derive(Clone, Debug)]
 pub struct Attributes {
     values: HashMap<Identifier, Value>,
 }
