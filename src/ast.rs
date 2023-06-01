@@ -9,6 +9,7 @@
 
 use regex::Regex;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fmt;
 use tree_sitter::CaptureQuantifier;
 use tree_sitter::Language;
@@ -24,6 +25,8 @@ pub struct File {
     pub language: Language,
     /// The expected global variables used in this file
     pub globals: Vec<Global>,
+    /// The scoped variables that are inherited by child nodes
+    pub inherited_variables: HashSet<Identifier>,
     /// The combined query of all stanzas in the file
     pub query: Option<Query>,
     /// The list of stanzas in the file
@@ -37,6 +40,7 @@ impl File {
         File {
             language,
             globals: Vec::new(),
+            inherited_variables: HashSet::new(),
             query: None,
             stanzas: Vec::new(),
             shorthands: AttributeShorthands::new(),

@@ -20,6 +20,7 @@ use crate::execution::error::ExecutionError;
 use crate::execution::error::ResultWithExecutionError;
 use crate::execution::error::StatementContext;
 use crate::graph;
+use crate::graph::SyntaxNodeID;
 use crate::graph::SyntaxNodeRef;
 use crate::Identifier;
 
@@ -151,15 +152,28 @@ impl LazyScopedVariables {
         };
         let values = cell.replace(ScopedValues::Forcing);
         let map = self.force(name, values, exec)?;
-        let result = map
-            .get(&scope)
-            .ok_or(ExecutionError::UndefinedScopedVariable(format!(
-                "{}.{}",
-                scope, name,
-            )))?
-            .clone();
+
+        let mut result = None;
+
+        if let Some(value) = map.get(&scope.index) {
+            result = Some(value.clone());
+        } else if exec.inherited_variables.contains(name) {
+            let mut parent = exec
+                .graph
+                .syntax_nodes
+                .get(&scope.index)
+                .and_then(|n| n.parent());
+            while let Some(scope) = parent {
+                if let Some(value) = map.get(&(scope.id() as u32)) {
+                    result = Some(value.clone());
+                    break;
+                }
+                parent = scope.parent();
+            }
+        }
+
         cell.replace(ScopedValues::Forced(map));
-        Ok(result)
+        result.ok_or_else(|| ExecutionError::UndefinedScopedVariable(format!("{}.{}", scope, name)))
     }
 
     pub(super) fn evaluate_all(&self, exec: &mut EvaluationContext) -> Result<(), ExecutionError> {
@@ -176,7 +190,7 @@ impl LazyScopedVariables {
         name: &Identifier,
         values: ScopedValues,
         exec: &mut EvaluationContext,
-    ) -> Result<HashMap<SyntaxNodeRef, LazyValue>, ExecutionError> {
+    ) -> Result<HashMap<SyntaxNodeID, LazyValue>, ExecutionError> {
         match values {
             ScopedValues::Unforced(pairs) => {
                 let mut map = HashMap::new();
@@ -187,7 +201,7 @@ impl LazyScopedVariables {
                         .with_context(|| format!("Evaluating scope of variable _.{}", name,).into())
                         .with_context(|| debug_info.0.clone().into())?;
                     let prev_debug_info = debug_infos.insert(node, debug_info.clone());
-                    match map.insert(node, value.clone()) {
+                    match map.insert(node.index, value.clone()) {
                         Some(_) => {
                             return Err(ExecutionError::DuplicateVariable(format!(
                                 "{}.{}",
@@ -211,7 +225,7 @@ impl LazyScopedVariables {
 enum ScopedValues {
     Unforced(Vec<(LazyValue, LazyValue, DebugInfo)>),
     Forcing,
-    Forced(HashMap<SyntaxNodeRef, LazyValue>),
+    Forced(HashMap<SyntaxNodeID, LazyValue>),
 }
 
 impl ScopedValues {

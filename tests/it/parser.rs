@@ -1599,3 +1599,12 @@ fn can_parse_explicitly_unused_capture() {
     "#;
     File::from_str(tree_sitter_python::language(), source).expect("parse to succeed");
 }
+
+#[test]
+fn can_parse_inherit_directives() {
+    let source = r#"
+        inherit .scope
+    "#;
+    let file = File::from_str(tree_sitter_python::language(), source).expect("parse to succeed");
+    assert!(file.inherited_variables.contains("scope".into()));
+}

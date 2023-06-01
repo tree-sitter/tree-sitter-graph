@@ -291,14 +291,19 @@ impl<'a> Parser<'a> {
     fn parse_into_file(&mut self, file: &mut ast::File) -> Result<(), ParseError> {
         self.consume_whitespace();
         while self.try_peek().is_some() {
-            if let Ok(_) = self.consume_token("global") {
-                self.consume_whitespace();
-                let global = self.parse_global()?;
-                file.globals.push(global);
-            } else if let Ok(_) = self.consume_token("attribute") {
+            if let Ok(_) = self.consume_token("attribute") {
                 self.consume_whitespace();
                 let shorthand = self.parse_shorthand()?;
                 file.shorthands.add(shorthand);
+            } else if let Ok(_) = self.consume_token("global") {
+                self.consume_whitespace();
+                let global = self.parse_global()?;
+                file.globals.push(global);
+            } else if let Ok(_) = self.consume_token("inherit") {
+                self.consume_whitespace();
+                self.consume_token(".")?;
+                let name = self.parse_identifier("inherit")?;
+                file.inherited_variables.insert(name);
             } else {
                 let stanza = self.parse_stanza(file.language)?;
                 file.stanzas.push(stanza);

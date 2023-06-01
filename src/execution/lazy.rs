@@ -12,6 +12,7 @@ mod values;
 use log::{debug, trace};
 
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 use tree_sitter::QueryCursor;
 use tree_sitter::QueryMatch;
@@ -81,6 +82,7 @@ impl ast::File {
                 &mut lazy_graph,
                 &mut function_parameters,
                 &mut prev_element_debug_info,
+                &self.inherited_variables,
                 &self.shorthands,
                 cancellation_flag,
             )
@@ -92,6 +94,7 @@ impl ast::File {
             functions: config.functions,
             store: &store,
             scoped_store: &scoped_store,
+            inherited_variables: &self.inherited_variables,
             function_parameters: &mut function_parameters,
             prev_element_debug_info: &mut prev_element_debug_info,
             cancellation_flag,
@@ -141,6 +144,7 @@ struct ExecutionContext<'a, 'c, 'g, 'tree> {
     function_parameters: &'a mut Vec<graph::Value>, // re-usable buffer to reduce memory allocations
     prev_element_debug_info: &'a mut HashMap<GraphElementKey, DebugInfo>,
     error_context: StatementContext,
+    inherited_variables: &'a HashSet<Identifier>,
     shorthands: &'a ast::AttributeShorthands,
     cancellation_flag: &'a dyn CancellationFlag,
 }
@@ -152,6 +156,7 @@ pub(self) struct EvaluationContext<'a, 'tree> {
     pub functions: &'a Functions,
     pub store: &'a LazyStore,
     pub scoped_store: &'a LazyScopedVariables,
+    pub inherited_variables: &'a HashSet<Identifier>,
     pub function_parameters: &'a mut Vec<graph::Value>, // re-usable buffer to reduce memory allocations
     pub prev_element_debug_info: &'a mut HashMap<GraphElementKey, DebugInfo>,
     pub cancellation_flag: &'a dyn CancellationFlag,
@@ -177,6 +182,7 @@ impl ast::Stanza {
         lazy_graph: &mut Vec<LazyStatement>,
         function_parameters: &mut Vec<graph::Value>,
         prev_element_debug_info: &mut HashMap<GraphElementKey, DebugInfo>,
+        inherited_variables: &HashSet<Identifier>,
         shorthands: &ast::AttributeShorthands,
         cancellation_flag: &dyn CancellationFlag,
     ) -> Result<(), ExecutionError> {
@@ -203,6 +209,7 @@ impl ast::Stanza {
                 function_parameters,
                 prev_element_debug_info,
                 error_context,
+                inherited_variables,
                 shorthands,
                 cancellation_flag,
             };
@@ -366,6 +373,7 @@ impl ast::Scan {
                 function_parameters: exec.function_parameters,
                 prev_element_debug_info: exec.prev_element_debug_info,
                 error_context: exec.error_context.clone(),
+                inherited_variables: exec.inherited_variables,
                 shorthands: exec.shorthands,
                 cancellation_flag: exec.cancellation_flag,
             };
@@ -431,6 +439,7 @@ impl ast::If {
                     function_parameters: exec.function_parameters,
                     prev_element_debug_info: exec.prev_element_debug_info,
                     error_context: exec.error_context.clone(),
+                    inherited_variables: exec.inherited_variables,
                     shorthands: exec.shorthands,
                     cancellation_flag: exec.cancellation_flag,
                 };
@@ -477,6 +486,7 @@ impl ast::ForIn {
                 function_parameters: exec.function_parameters,
                 prev_element_debug_info: exec.prev_element_debug_info,
                 error_context: exec.error_context.clone(),
+                inherited_variables: exec.inherited_variables,
                 shorthands: exec.shorthands,
                 cancellation_flag: exec.cancellation_flag,
             };
@@ -520,6 +530,7 @@ impl ast::Expression {
             functions: exec.config.functions,
             store: exec.store,
             scoped_store: exec.scoped_store,
+            inherited_variables: exec.inherited_variables,
             function_parameters: exec.function_parameters,
             prev_element_debug_info: exec.prev_element_debug_info,
             cancellation_flag: exec.cancellation_flag,
@@ -569,6 +580,7 @@ impl ast::ListComprehension {
                 function_parameters: exec.function_parameters,
                 prev_element_debug_info: exec.prev_element_debug_info,
                 error_context: exec.error_context.clone(),
+                inherited_variables: exec.inherited_variables,
                 shorthands: exec.shorthands,
                 cancellation_flag: exec.cancellation_flag,
             };
@@ -611,6 +623,7 @@ impl ast::SetComprehension {
                 function_parameters: exec.function_parameters,
                 prev_element_debug_info: exec.prev_element_debug_info,
                 error_context: exec.error_context.clone(),
+                inherited_variables: exec.inherited_variables,
                 shorthands: exec.shorthands,
                 cancellation_flag: exec.cancellation_flag,
             };
@@ -825,6 +838,7 @@ impl ast::AttributeShorthand {
             function_parameters: exec.function_parameters,
             prev_element_debug_info: exec.prev_element_debug_info,
             error_context: exec.error_context.clone(),
+            inherited_variables: exec.inherited_variables,
             shorthands: exec.shorthands,
             cancellation_flag: exec.cancellation_flag,
         };
