@@ -7,6 +7,7 @@
 
 use std::collections::BTreeSet;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use tree_sitter::QueryCursor;
 use tree_sitter::QueryMatch;
 use tree_sitter::Tree;
@@ -48,6 +49,7 @@ use crate::execution::error::StatementContext;
 use crate::execution::CancellationFlag;
 use crate::execution::ExecutionConfig;
 use crate::graph::Graph;
+use crate::graph::SyntaxNodeID;
 use crate::graph::SyntaxNodeRef;
 use crate::graph::Value;
 use crate::variables::Globals;
@@ -96,6 +98,7 @@ impl File {
                 &mut scoped,
                 &current_regex_captures,
                 &mut function_parameters,
+                &self.inherited_variables,
                 &self.shorthands,
                 cancellation_flag,
             )
@@ -131,12 +134,13 @@ struct ExecutionContext<'a, 'c, 'g, 's, 'tree> {
     function_parameters: &'a mut Vec<Value>,
     mat: &'a QueryMatch<'a, 'tree>,
     error_context: StatementContext,
+    inherited_variables: &'a HashSet<Identifier>,
     shorthands: &'a AttributeShorthands,
     cancellation_flag: &'a dyn CancellationFlag,
 }
 
 struct ScopedVariables<'a> {
-    scopes: HashMap<SyntaxNodeRef, VariableMap<'a, Value>>,
+    scopes: HashMap<SyntaxNodeID, VariableMap<'a, Value>>,
 }
 
 impl<'a> ScopedVariables<'a> {
@@ -146,8 +150,12 @@ impl<'a> ScopedVariables<'a> {
         }
     }
 
-    fn get(&mut self, scope: SyntaxNodeRef) -> &mut VariableMap<'a, Value> {
-        self.scopes.entry(scope).or_insert(VariableMap::new())
+    fn get_mut(&mut self, scope: SyntaxNodeRef) -> &mut VariableMap<'a, Value> {
+        self.scopes.entry(scope.index).or_insert(VariableMap::new())
+    }
+
+    fn try_get(&self, index: SyntaxNodeID) -> Option<&VariableMap<'a, Value>> {
+        self.scopes.get(&index)
     }
 }
 
@@ -162,6 +170,7 @@ impl Stanza {
         scoped: &mut ScopedVariables<'s>,
         current_regex_captures: &Vec<String>,
         function_parameters: &mut Vec<Value>,
+        inherited_variables: &HashSet<Identifier>,
         shorthands: &AttributeShorthands,
         cancellation_flag: &dyn CancellationFlag,
     ) -> Result<(), ExecutionError> {
@@ -184,6 +193,7 @@ impl Stanza {
                 function_parameters,
                 mat: &mat,
                 error_context,
+                inherited_variables,
                 shorthands,
                 cancellation_flag,
             };
@@ -399,6 +409,7 @@ impl Scan {
                 function_parameters: exec.function_parameters,
                 mat: exec.mat,
                 error_context: exec.error_context.clone(),
+                inherited_variables: exec.inherited_variables,
                 shorthands: exec.shorthands,
                 cancellation_flag: exec.cancellation_flag,
             };
@@ -458,6 +469,7 @@ impl If {
                     function_parameters: exec.function_parameters,
                     mat: exec.mat,
                     error_context: exec.error_context.clone(),
+                    inherited_variables: exec.inherited_variables,
                     shorthands: exec.shorthands,
                     cancellation_flag: exec.cancellation_flag,
                 };
@@ -499,6 +511,7 @@ impl ForIn {
                 function_parameters: exec.function_parameters,
                 mat: exec.mat,
                 error_context: exec.error_context.clone(),
+                inherited_variables: exec.inherited_variables,
                 shorthands: exec.shorthands,
                 cancellation_flag: exec.cancellation_flag,
             };
@@ -573,6 +586,7 @@ impl ListComprehension {
                 function_parameters: exec.function_parameters,
                 mat: exec.mat,
                 error_context: exec.error_context.clone(),
+                inherited_variables: exec.inherited_variables,
                 shorthands: exec.shorthands,
                 cancellation_flag: exec.cancellation_flag,
             };
@@ -612,6 +626,7 @@ impl SetComprehension {
                 function_parameters: exec.function_parameters,
                 mat: exec.mat,
                 error_context: exec.error_context.clone(),
+                inherited_variables: exec.inherited_variables,
                 shorthands: exec.shorthands,
                 cancellation_flag: exec.cancellation_flag,
             };
@@ -709,15 +724,39 @@ impl ScopedVariable {
                 )))
             }
         };
-        let variables = exec.scoped.get(scope);
-        if let Some(value) = variables.get(&self.name) {
-            Ok(value)
-        } else {
-            Err(ExecutionError::UndefinedVariable(format!(
-                "{} on node {}",
-                self, scope
-            )))
+
+        // search this node
+        if let Some(value) = exec
+            .scoped
+            .try_get(scope.index)
+            .and_then(|v| v.get(&self.name))
+        {
+            return Ok(value);
         }
+
+        // search parent nodes
+        if exec.inherited_variables.contains(&self.name) {
+            let mut parent = exec
+                .graph
+                .syntax_nodes
+                .get(&scope.index)
+                .and_then(|n| n.parent());
+            while let Some(scope) = parent {
+                if let Some(value) = exec
+                    .scoped
+                    .try_get(scope.id() as u32)
+                    .and_then(|v| v.get(&self.name))
+                {
+                    return Ok(value);
+                }
+                parent = scope.parent();
+            }
+        }
+
+        Err(ExecutionError::UndefinedVariable(format!(
+            "{} on node {}",
+            self, scope
+        )))
     }
 
     fn add(
@@ -736,7 +775,7 @@ impl ScopedVariable {
                 )))
             }
         };
-        let variables = exec.scoped.get(scope);
+        let variables = exec.scoped.get_mut(scope);
         variables
             .add(self.name.clone(), value, mutable)
             .map_err(|_| ExecutionError::DuplicateVariable(format!("{}", self)))
@@ -753,7 +792,7 @@ impl ScopedVariable {
                 )))
             }
         };
-        let variables = exec.scoped.get(scope);
+        let variables = exec.scoped.get_mut(scope);
         variables
             .set(self.name.clone(), value)
             .map_err(|_| ExecutionError::DuplicateVariable(format!("{}", self)))
@@ -844,6 +883,7 @@ impl AttributeShorthand {
             function_parameters: exec.function_parameters,
             mat: exec.mat,
             error_context: exec.error_context.clone(),
+            inherited_variables: exec.inherited_variables,
             shorthands: exec.shorthands,
             cancellation_flag: exec.cancellation_flag,
         };

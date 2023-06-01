@@ -36,11 +36,11 @@ use crate::Location;
 /// that they don't outlive the tree-sitter syntax tree that they are generated from.
 #[derive(Default)]
 pub struct Graph<'tree> {
-    syntax_nodes: HashMap<SyntaxNodeID, Node<'tree>>,
+    pub(crate) syntax_nodes: HashMap<SyntaxNodeID, Node<'tree>>,
     graph_nodes: Vec<GraphNode>,
 }
 
-type SyntaxNodeID = u32;
+pub(crate) type SyntaxNodeID = u32;
 type GraphNodeID = u32;
 
 impl<'tree> Graph<'tree> {
@@ -635,7 +635,7 @@ impl Serialize for Value {
 /// A reference to a syntax node in a graph
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct SyntaxNodeRef {
-    index: SyntaxNodeID,
+    pub(crate) index: SyntaxNodeID,
     kind: &'static str,
     position: tree_sitter::Point,
 }

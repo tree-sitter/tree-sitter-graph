@@ -1455,3 +1455,75 @@ fn can_execute_shorthand() {
         "#},
     );
 }
+
+#[test]
+fn can_access_inherited_attribute() {
+    check_execution(
+        indoc! { r#"
+          def get_f():
+            pass
+        "#},
+        indoc! {r#"
+            inherit .test
+            (function_definition)@def {
+              node @def.test
+              attr (@def.test) in_def
+            }
+            (pass_statement)@pass {
+              attr (@pass.test) in_pass
+            }
+        "#},
+        indoc! {r#"
+          node 0
+            in_def: #true
+            in_pass: #true
+        "#},
+    );
+}
+
+#[test]
+fn can_overwrite_inherited_attribute() {
+    check_execution(
+        indoc! { r#"
+          def get_f():
+            pass
+        "#},
+        indoc! {r#"
+            inherit .test
+            (function_definition)@def {
+              node @def.test
+              attr (@def.test) in_def
+            }
+            (pass_statement)@pass {
+              node @pass.test
+            }
+            (pass_statement)@pass {
+              attr (@pass.test) in_pass
+            }
+        "#},
+        indoc! {r#"
+          node 0
+            in_def: #true
+          node 1
+            in_pass: #true
+        "#},
+    );
+}
+
+#[test]
+fn cannot_access_non_inherited_variable() {
+    fail_execution(
+        indoc! { r#"
+          def get_f():
+            pass
+        "#},
+        indoc! {r#"
+            (function_definition)@def {
+              node @def.test
+            }
+            (pass_statement)@pass {
+              attr (@pass.test) in_pass
+            }
+        "#},
+    );
+}
