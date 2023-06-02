@@ -22,6 +22,46 @@ use super::values::*;
 use super::EvaluationContext;
 use super::GraphElementKey;
 
+/// Lazy graph
+#[derive(Debug)]
+pub(super) struct LazyGraph {
+    edge_statements: Vec<LazyStatement>,
+    attr_statements: Vec<LazyStatement>,
+    print_statements: Vec<LazyStatement>,
+}
+
+impl LazyGraph {
+    pub(super) fn new() -> Self {
+        LazyGraph {
+            edge_statements: Vec::new(),
+            attr_statements: Vec::new(),
+            print_statements: Vec::new(),
+        }
+    }
+
+    pub(super) fn push(&mut self, stmt: LazyStatement) {
+        match stmt {
+            LazyStatement::AddGraphNodeAttribute(_) => self.attr_statements.push(stmt),
+            LazyStatement::CreateEdge(_) => self.edge_statements.push(stmt),
+            LazyStatement::AddEdgeAttribute(_) => self.attr_statements.push(stmt),
+            LazyStatement::Print(_) => self.print_statements.push(stmt),
+        }
+    }
+
+    pub(super) fn evaluate(&self, exec: &mut EvaluationContext) -> Result<(), ExecutionError> {
+        for stmt in &self.edge_statements {
+            stmt.evaluate(exec)?;
+        }
+        for stmt in &self.attr_statements {
+            stmt.evaluate(exec)?;
+        }
+        for stmt in &self.print_statements {
+            stmt.evaluate(exec)?;
+        }
+        Ok(())
+    }
+}
+
 /// Lazy graph statements
 #[derive(Debug)]
 pub(super) enum LazyStatement {
@@ -112,25 +152,32 @@ impl LazyAddGraphNodeAttribute {
     }
 
     pub(super) fn evaluate(&self, exec: &mut EvaluationContext) -> Result<(), ExecutionError> {
-        let node = self.node.evaluate_as_graph_node(exec)?;
+        let node = self
+            .node
+            .evaluate_as_graph_node(exec)
+            .with_context(|| "Evaluating target node".to_string().into())?;
         for attribute in &self.attributes {
             let value = attribute.value.evaluate(exec)?;
             let prev_debug_info = exec.prev_element_debug_info.insert(
                 GraphElementKey::NodeAttribute(node, attribute.name.clone()),
                 self.debug_info.clone(),
             );
-            exec.graph[node]
+            if let Err(_) = exec.graph[node]
                 .attributes
                 .add(attribute.name.clone(), value)
-                .map_err(|_| {
-                    ExecutionError::DuplicateAttribute(format!(
-                        "{} on {} at {} and {}",
-                        attribute.name,
-                        node,
-                        prev_debug_info.unwrap(),
-                        self.debug_info,
-                    ))
-                })?;
+            {
+                return Err(ExecutionError::DuplicateAttribute(format!(
+                    "{} on {}",
+                    attribute.name, node,
+                )))
+                .with_context(|| {
+                    (
+                        prev_debug_info.unwrap().into(),
+                        self.debug_info.clone().into(),
+                    )
+                        .into()
+                });
+            };
         }
         Ok(())
     }
@@ -171,8 +218,14 @@ impl LazyCreateEdge {
     }
 
     pub(super) fn evaluate(&self, exec: &mut EvaluationContext) -> Result<(), ExecutionError> {
-        let source = self.source.evaluate_as_graph_node(exec)?;
-        let sink = self.sink.evaluate_as_graph_node(exec)?;
+        let source = self
+            .source
+            .evaluate_as_graph_node(exec)
+            .with_context(|| "Evaluating edge source".to_string().into())?;
+        let sink = self
+            .sink
+            .evaluate_as_graph_node(exec)
+            .with_context(|| "Evaluating edge sink".to_string().into())?;
         let prev_debug_info = exec
             .prev_element_debug_info
             .insert(GraphElementKey::Edge(source, sink), self.debug_info.clone());
@@ -180,12 +233,16 @@ impl LazyCreateEdge {
             Ok(edge) => edge,
             Err(_) => {
                 return Err(ExecutionError::DuplicateEdge(format!(
-                    "({} -> {}) at {} and {}",
-                    source,
-                    sink,
-                    prev_debug_info.unwrap(),
-                    self.debug_info,
-                )))?
+                    "({} -> {})",
+                    source, sink,
+                )))
+                .with_context(|| {
+                    (
+                        prev_debug_info.unwrap().into(),
+                        self.debug_info.clone().into(),
+                    )
+                        .into()
+                });
             }
         };
         edge.attributes = self.attributes.clone();
@@ -228,8 +285,14 @@ impl LazyAddEdgeAttribute {
     }
 
     pub(super) fn evaluate(&self, exec: &mut EvaluationContext) -> Result<(), ExecutionError> {
-        let source = self.source.evaluate_as_graph_node(exec)?;
-        let sink = self.sink.evaluate_as_graph_node(exec)?;
+        let source = self
+            .source
+            .evaluate_as_graph_node(exec)
+            .with_context(|| "Evaluating edge source".to_string().into())?;
+        let sink = self
+            .sink
+            .evaluate_as_graph_node(exec)
+            .with_context(|| "Evaluating edge sink".to_string().into())?;
         for attribute in &self.attributes {
             let value = attribute.value.evaluate(exec)?;
             let edge = match exec.graph[source].get_edge_mut(sink) {
@@ -243,18 +306,19 @@ impl LazyAddEdgeAttribute {
                 GraphElementKey::EdgeAttribute(source, sink, attribute.name.clone()),
                 self.debug_info.clone(),
             );
-            edge.attributes
-                .add(attribute.name.clone(), value)
-                .map_err(|_| {
-                    ExecutionError::DuplicateAttribute(format!(
-                        "{} on edge ({} -> {}) at {} and {}",
-                        attribute.name,
-                        source,
-                        sink,
-                        prev_debug_info.unwrap(),
-                        self.debug_info,
-                    ))
-                })?;
+            if let Err(_) = edge.attributes.add(attribute.name.clone(), value) {
+                return Err(ExecutionError::DuplicateAttribute(format!(
+                    "{} on edge ({} -> {})",
+                    attribute.name, source, sink,
+                )))
+                .with_context(|| {
+                    (
+                        prev_debug_info.unwrap().into(),
+                        self.debug_info.clone().into(),
+                    )
+                        .into()
+                });
+            }
         }
         Ok(())
     }

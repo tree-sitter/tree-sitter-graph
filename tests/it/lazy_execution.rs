@@ -116,10 +116,10 @@ fn can_scan_strings() {
         "#},
         indoc! {r#"
           node 0
-            name: "alpha"
-          edge 0 -> 2
+          edge 0 -> 1
           node 1
-          edge 1 -> 0
+            name: "alpha"
+          edge 1 -> 2
           node 2
             name: "beta"
           edge 2 -> 3
