@@ -65,7 +65,7 @@ impl ast::File {
         let mut locals = VariableMap::new();
         let mut store = LazyStore::new();
         let mut scoped_store = LazyScopedVariables::new();
-        let mut lazy_graph = Vec::new();
+        let mut lazy_graph = LazyGraph::new();
         let mut function_parameters = Vec::new();
         let mut prev_element_debug_info = HashMap::new();
 
@@ -99,9 +99,7 @@ impl ast::File {
             prev_element_debug_info: &mut prev_element_debug_info,
             cancellation_flag,
         };
-        for graph_stmt in &lazy_graph {
-            graph_stmt.evaluate(&mut exec)?;
-        }
+        lazy_graph.evaluate(&mut exec)?;
         // make sure any unforced values are now forced, to surface any problems
         // hidden by the fact that the values were unused
         store.evaluate_all(&mut exec)?;
@@ -140,7 +138,7 @@ struct ExecutionContext<'a, 'c, 'g, 'tree> {
     mat: &'a QueryMatch<'a, 'tree>,
     store: &'a mut LazyStore,
     scoped_store: &'a mut LazyScopedVariables,
-    lazy_graph: &'a mut Vec<LazyStatement>,
+    lazy_graph: &'a mut LazyGraph,
     function_parameters: &'a mut Vec<graph::Value>, // re-usable buffer to reduce memory allocations
     prev_element_debug_info: &'a mut HashMap<GraphElementKey, DebugInfo>,
     error_context: StatementContext,
@@ -179,7 +177,7 @@ impl ast::Stanza {
         locals: &mut VariableMap<'l, LazyValue>,
         store: &mut LazyStore,
         scoped_store: &mut LazyScopedVariables,
-        lazy_graph: &mut Vec<LazyStatement>,
+        lazy_graph: &mut LazyGraph,
         function_parameters: &mut Vec<graph::Value>,
         prev_element_debug_info: &mut HashMap<GraphElementKey, DebugInfo>,
         inherited_variables: &HashSet<Identifier>,

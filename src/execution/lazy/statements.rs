@@ -22,6 +22,46 @@ use super::values::*;
 use super::EvaluationContext;
 use super::GraphElementKey;
 
+/// Lazy graph
+#[derive(Debug)]
+pub(super) struct LazyGraph {
+    edge_statements: Vec<LazyStatement>,
+    attr_statements: Vec<LazyStatement>,
+    print_statements: Vec<LazyStatement>,
+}
+
+impl LazyGraph {
+    pub(super) fn new() -> Self {
+        LazyGraph {
+            edge_statements: Vec::new(),
+            attr_statements: Vec::new(),
+            print_statements: Vec::new(),
+        }
+    }
+
+    pub(super) fn push(&mut self, stmt: LazyStatement) {
+        match stmt {
+            LazyStatement::AddGraphNodeAttribute(_) => self.attr_statements.push(stmt),
+            LazyStatement::CreateEdge(_) => self.edge_statements.push(stmt),
+            LazyStatement::AddEdgeAttribute(_) => self.attr_statements.push(stmt),
+            LazyStatement::Print(_) => self.print_statements.push(stmt),
+        }
+    }
+
+    pub(super) fn evaluate(&self, exec: &mut EvaluationContext) -> Result<(), ExecutionError> {
+        for stmt in &self.edge_statements {
+            stmt.evaluate(exec)?;
+        }
+        for stmt in &self.attr_statements {
+            stmt.evaluate(exec)?;
+        }
+        for stmt in &self.print_statements {
+            stmt.evaluate(exec)?;
+        }
+        Ok(())
+    }
+}
+
 /// Lazy graph statements
 #[derive(Debug)]
 pub(super) enum LazyStatement {
