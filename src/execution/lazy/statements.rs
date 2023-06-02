@@ -112,7 +112,10 @@ impl LazyAddGraphNodeAttribute {
     }
 
     pub(super) fn evaluate(&self, exec: &mut EvaluationContext) -> Result<(), ExecutionError> {
-        let node = self.node.evaluate_as_graph_node(exec)?;
+        let node = self
+            .node
+            .evaluate_as_graph_node(exec)
+            .with_context(|| "Evaluating target node".to_string().into())?;
         for attribute in &self.attributes {
             let value = attribute.value.evaluate(exec)?;
             let prev_debug_info = exec.prev_element_debug_info.insert(
@@ -175,8 +178,14 @@ impl LazyCreateEdge {
     }
 
     pub(super) fn evaluate(&self, exec: &mut EvaluationContext) -> Result<(), ExecutionError> {
-        let source = self.source.evaluate_as_graph_node(exec)?;
-        let sink = self.sink.evaluate_as_graph_node(exec)?;
+        let source = self
+            .source
+            .evaluate_as_graph_node(exec)
+            .with_context(|| "Evaluating edge source".to_string().into())?;
+        let sink = self
+            .sink
+            .evaluate_as_graph_node(exec)
+            .with_context(|| "Evaluating edge sink".to_string().into())?;
         let prev_debug_info = exec
             .prev_element_debug_info
             .insert(GraphElementKey::Edge(source, sink), self.debug_info.clone());
@@ -236,8 +245,14 @@ impl LazyAddEdgeAttribute {
     }
 
     pub(super) fn evaluate(&self, exec: &mut EvaluationContext) -> Result<(), ExecutionError> {
-        let source = self.source.evaluate_as_graph_node(exec)?;
-        let sink = self.sink.evaluate_as_graph_node(exec)?;
+        let source = self
+            .source
+            .evaluate_as_graph_node(exec)
+            .with_context(|| "Evaluating edge source".to_string().into())?;
+        let sink = self
+            .sink
+            .evaluate_as_graph_node(exec)
+            .with_context(|| "Evaluating edge sink".to_string().into())?;
         for attribute in &self.attributes {
             let value = attribute.value.evaluate(exec)?;
             let edge = match exec.graph[source].get_edge_mut(sink) {

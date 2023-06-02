@@ -13,6 +13,7 @@ use std::convert::From;
 use std::fmt;
 
 use crate::execution::error::ExecutionError;
+use crate::execution::error::ResultWithExecutionError;
 use crate::graph::GraphNodeRef;
 use crate::graph::SyntaxNodeRef;
 use crate::graph::Value;
@@ -184,7 +185,11 @@ impl LazyScopedVariable {
     }
 
     fn resolve<'a>(&self, exec: &'a mut EvaluationContext) -> Result<LazyValue, ExecutionError> {
-        let scope = self.scope.as_ref().evaluate_as_syntax_node(exec)?;
+        let scope = self
+            .scope
+            .as_ref()
+            .evaluate_as_syntax_node(exec)
+            .with_context(|| format!("Evaluating scope of variable _.{}", self.name).into())?;
         let scoped_store = &exec.scoped_store;
         scoped_store.evaluate(&scope, &self.name, exec)
     }
