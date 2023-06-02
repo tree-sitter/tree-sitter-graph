@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.10.4 -- 2023-06-02
+
+### Library
+
+#### Added
+
+- Several errors include more context in the error message: Duplicate errors report both statements using source snippets. Edge statements report which argument (the source or the sink) triggered an evluation error.
+
+#### Fixed
+
+- Ensure that edge attribute statements are executed after edges are created, to prevent non-deterministic ordering bugs in lazy execution mode.
+
 ## v0.10.3 -- 2023-06-01
 
 ### DSL
