@@ -119,18 +119,22 @@ impl LazyAddGraphNodeAttribute {
                 GraphElementKey::NodeAttribute(node, attribute.name.clone()),
                 self.debug_info.clone(),
             );
-            exec.graph[node]
+            if let Err(_) = exec.graph[node]
                 .attributes
                 .add(attribute.name.clone(), value)
-                .map_err(|_| {
-                    ExecutionError::DuplicateAttribute(format!(
-                        "{} on {} at {} and {}",
-                        attribute.name,
-                        node,
-                        prev_debug_info.unwrap(),
-                        self.debug_info,
-                    ))
-                })?;
+            {
+                return Err(ExecutionError::DuplicateAttribute(format!(
+                    "{} on {}",
+                    attribute.name, node,
+                )))
+                .with_context(|| {
+                    (
+                        prev_debug_info.unwrap().into(),
+                        self.debug_info.clone().into(),
+                    )
+                        .into()
+                });
+            };
         }
         Ok(())
     }
@@ -180,12 +184,16 @@ impl LazyCreateEdge {
             Ok(edge) => edge,
             Err(_) => {
                 return Err(ExecutionError::DuplicateEdge(format!(
-                    "({} -> {}) at {} and {}",
-                    source,
-                    sink,
-                    prev_debug_info.unwrap(),
-                    self.debug_info,
-                )))?
+                    "({} -> {})",
+                    source, sink,
+                )))
+                .with_context(|| {
+                    (
+                        prev_debug_info.unwrap().into(),
+                        self.debug_info.clone().into(),
+                    )
+                        .into()
+                });
             }
         };
         edge.attributes = self.attributes.clone();
@@ -243,18 +251,19 @@ impl LazyAddEdgeAttribute {
                 GraphElementKey::EdgeAttribute(source, sink, attribute.name.clone()),
                 self.debug_info.clone(),
             );
-            edge.attributes
-                .add(attribute.name.clone(), value)
-                .map_err(|_| {
-                    ExecutionError::DuplicateAttribute(format!(
-                        "{} on edge ({} -> {}) at {} and {}",
-                        attribute.name,
-                        source,
-                        sink,
-                        prev_debug_info.unwrap(),
-                        self.debug_info,
-                    ))
-                })?;
+            if let Err(_) = edge.attributes.add(attribute.name.clone(), value) {
+                return Err(ExecutionError::DuplicateAttribute(format!(
+                    "{} on edge ({} -> {})",
+                    attribute.name, source, sink,
+                )))
+                .with_context(|| {
+                    (
+                        prev_debug_info.unwrap().into(),
+                        self.debug_info.clone().into(),
+                    )
+                        .into()
+                });
+            }
         }
         Ok(())
     }
