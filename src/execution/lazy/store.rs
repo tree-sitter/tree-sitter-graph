@@ -193,26 +193,34 @@ impl LazyScopedVariables {
     ) -> Result<HashMap<SyntaxNodeID, LazyValue>, ExecutionError> {
         match values {
             ScopedValues::Unforced(pairs) => {
-                let mut map = HashMap::new();
+                let mut values = HashMap::new();
                 let mut debug_infos = HashMap::new();
                 for (scope, value, debug_info) in pairs.into_iter() {
                     let node = scope
                         .evaluate_as_syntax_node(exec)
                         .with_context(|| format!("Evaluating scope of variable _.{}", name,).into())
                         .with_context(|| debug_info.0.clone().into())?;
-                    let prev_debug_info = debug_infos.insert(node, debug_info.clone());
-                    match map.insert(node.index, value.clone()) {
-                        Some(_) => {
+                    match (
+                        values.insert(node.index, value.clone()),
+                        debug_infos.insert(node.index, debug_info.clone()),
+                    ) {
+                        (Some(_), Some(prev_debug_info)) => {
                             return Err(ExecutionError::DuplicateVariable(format!(
                                 "{}.{}",
                                 node, name,
                             )))
-                            .with_context(|| (prev_debug_info.unwrap().0, debug_info.0).into());
+                            .with_context(|| (prev_debug_info.0, debug_info.0).into());
+                        }
+                        (Some(_), None) => {
+                            unreachable!(
+                                "previous value for syntax node {} without previous debug info",
+                                node
+                            )
                         }
                         _ => {}
                     };
                 }
-                Ok(map)
+                Ok(values)
             }
             ScopedValues::Forcing => Err(ExecutionError::RecursivelyDefinedScopedVariable(
                 format!("_.{}", name),
