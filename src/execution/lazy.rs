@@ -58,6 +58,7 @@ impl ast::File {
             functions: config.functions,
             globals: &globals,
             lazy: config.lazy,
+            include_unused_nodes: config.include_unused_nodes,
             location_attr: config.location_attr.clone(),
             variable_name_attr: config.variable_name_attr.clone(),
         };
@@ -103,7 +104,7 @@ impl ast::File {
         // Make sure any unforced values are now forced, to surface any problems
         // hidden by the fact that the values were unused. Unused nodes are not
         // created to avoid clutter in the graph.
-        store.force_all(&mut exec, false)?;
+        store.force_all(&mut exec, config.include_unused_nodes)?;
         scoped_store.force_all(&mut exec)?;
 
         Ok(())

@@ -254,6 +254,7 @@ pub struct ExecutionConfig<'a, 'g> {
     pub(crate) functions: &'a Functions,
     pub(crate) globals: &'a Globals<'g>,
     pub(crate) lazy: bool,
+    pub(crate) include_unused_nodes: bool,
     pub(crate) location_attr: Option<Identifier>,
     pub(crate) variable_name_attr: Option<Identifier>,
 }
@@ -264,6 +265,7 @@ impl<'a, 'g> ExecutionConfig<'a, 'g> {
             functions,
             globals,
             lazy: false,
+            include_unused_nodes: false,
             location_attr: None,
             variable_name_attr: None,
         }
@@ -278,16 +280,32 @@ impl<'a, 'g> ExecutionConfig<'a, 'g> {
             functions: self.functions,
             globals: self.globals,
             lazy: self.lazy,
+            include_unused_nodes: self.include_unused_nodes,
             location_attr: location_attr.into(),
             variable_name_attr: variable_name_attr.into(),
         }
     }
 
+    /// Use lazy execution strategy. By default eager execution is used.
     pub fn lazy(self, lazy: bool) -> Self {
         Self {
             functions: self.functions,
             globals: self.globals,
             lazy,
+            include_unused_nodes: self.include_unused_nodes,
+            location_attr: self.location_attr,
+            variable_name_attr: self.variable_name_attr,
+        }
+    }
+
+    /// Include unused nodes in the graph when using lazy execution. By default,
+    /// unused nodes are not included.
+    pub fn include_unused_nodes(self, include_unused_nodes: bool) -> Self {
+        Self {
+            functions: self.functions,
+            globals: self.globals,
+            lazy: self.lazy,
+            include_unused_nodes,
             location_attr: self.location_attr,
             variable_name_attr: self.variable_name_attr,
         }

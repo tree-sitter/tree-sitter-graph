@@ -79,6 +79,7 @@ impl File {
             functions: config.functions,
             globals: &globals,
             lazy: config.lazy,
+            include_unused_nodes: config.include_unused_nodes,
             location_attr: config.location_attr.clone(),
             variable_name_attr: config.variable_name_attr.clone(),
         };
