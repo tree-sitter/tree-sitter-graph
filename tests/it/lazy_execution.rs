@@ -25,7 +25,11 @@ fn init_log() {
         .try_init(); // try, because earlier test may have already initialized it
 }
 
-fn execute(python_source: &str, dsl_source: &str) -> Result<String, ExecutionError> {
+fn execute(
+    python_source: &str,
+    dsl_source: &str,
+    include_unused_nodes: bool,
+) -> Result<String, ExecutionError> {
     init_log();
     let mut parser = Parser::new();
     parser.set_language(tree_sitter_python::language()).unwrap();
@@ -37,21 +41,23 @@ fn execute(python_source: &str, dsl_source: &str) -> Result<String, ExecutionErr
     globals
         .add("filename".into(), "test.py".into())
         .map_err(|_| ExecutionError::DuplicateVariable("filename".into()))?;
-    let mut config = ExecutionConfig::new(&functions, &globals).lazy(true);
+    let mut config = ExecutionConfig::new(&functions, &globals)
+        .lazy(true)
+        .include_unused_nodes(include_unused_nodes);
     let graph = file.execute(&tree, python_source, &mut config, &NoCancellation)?;
     let result = graph.pretty_print().to_string();
     Ok(result)
 }
 
 fn check_execution(python_source: &str, dsl_source: &str, expected_graph: &str) {
-    match execute(python_source, dsl_source) {
+    match execute(python_source, dsl_source, true) {
         Ok(actual_graph) => assert_eq!(actual_graph, expected_graph),
         Err(e) => panic!("Could not execute file: {}", e),
     }
 }
 
 fn fail_execution(python_source: &str, dsl_source: &str) {
-    if let Ok(_) = execute(python_source, dsl_source) {
+    if let Ok(_) = execute(python_source, dsl_source, true) {
         panic!("Execution succeeded unexpectedly");
     }
 }
@@ -583,7 +589,6 @@ fn skip_if_without_true_conditions() {
           (module (import_statement)? @x (import_statement)? @y)
           {
             node node0
-            attr (node0) exists
             if some @x {
               attr (node0) val = 0
             } elif some @y {
@@ -593,7 +598,6 @@ fn skip_if_without_true_conditions() {
         "#},
         indoc! {r#"
           node 0
-            exists: #true
         "#},
     );
 }
@@ -923,12 +927,10 @@ fn can_build_node() {
           (module)
           {
             node node0
-            attr (node0) exists
           }
         "#},
         indoc! {r#"
           node 0
-            exists: #true
         "#},
     );
 }
@@ -1535,21 +1537,6 @@ fn cannot_access_non_inherited_variable() {
 }
 
 #[test]
-fn unused_node_is_not_added() {
-    check_execution(
-        indoc! { r#"
-          pass
-        "#},
-        indoc! {r#"
-          (module) {
-            node unused
-          }
-        "#},
-        "",
-    );
-}
-
-#[test]
 fn error_in_unused_variable_detected() {
     fail_execution(
         indoc! { r#"
@@ -1575,4 +1562,22 @@ fn error_in_unused_scoped_variable_detected() {
           }
         "#},
     );
+}
+
+#[test]
+fn unused_node_is_not_added() {
+    match execute(
+        indoc! { r#"
+          pass
+        "#},
+        indoc! {r#"
+          (module) {
+            node unused
+          }
+        "#},
+        false,
+    ) {
+        Ok(actual_graph) => assert_eq!(actual_graph, ""),
+        Err(e) => panic!("Could not execute file: {}", e),
+    }
 }
