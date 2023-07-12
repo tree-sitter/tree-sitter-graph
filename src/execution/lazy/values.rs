@@ -14,6 +14,7 @@ use std::fmt;
 
 use crate::execution::error::ExecutionError;
 use crate::execution::error::ResultWithExecutionError;
+use crate::graph::Attributes;
 use crate::graph::GraphNodeRef;
 use crate::graph::SyntaxNodeRef;
 use crate::graph::Value;
@@ -31,6 +32,7 @@ pub(super) enum LazyValue {
     Variable(LazyVariable),
     ScopedVariable(LazyScopedVariable),
     Call(LazyCall),
+    GraphNode(LazyGraphNode),
 }
 
 impl From<Value> for LazyValue {
@@ -117,6 +119,12 @@ impl From<LazyCall> for LazyValue {
     }
 }
 
+impl From<LazyGraphNode> for LazyValue {
+    fn from(value: LazyGraphNode) -> Self {
+        LazyValue::GraphNode(value)
+    }
+}
+
 impl LazyValue {
     pub(super) fn evaluate(&self, exec: &mut EvaluationContext) -> Result<Value, ExecutionError> {
         exec.cancellation_flag.check("evaluating value")?;
@@ -128,6 +136,7 @@ impl LazyValue {
             Self::Variable(expr) => expr.evaluate(exec),
             Self::ScopedVariable(expr) => expr.evaluate(exec),
             Self::Call(expr) => expr.evaluate(exec),
+            Self::GraphNode(expr) => expr.evaluate(exec),
         }?;
         trace!("}} = {}", ret);
         Ok(ret)
@@ -165,6 +174,7 @@ impl fmt::Display for LazyValue {
             Self::Variable(expr) => expr.fmt(f),
             Self::ScopedVariable(expr) => expr.fmt(f),
             Self::Call(expr) => expr.fmt(f),
+            Self::GraphNode(expr) => expr.fmt(f),
         }
     }
 }
@@ -319,5 +329,37 @@ impl fmt::Display for LazyCall {
             write!(f, " {}", arg)?;
         }
         write!(f, ")")
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct LazyGraphNode {
+    pub(super) debug_attributes: Attributes,
+}
+
+impl LazyGraphNode {
+    pub(super) fn new() -> Self {
+        Self {
+            debug_attributes: Attributes::new(),
+        }
+    }
+
+    pub(super) fn evaluate(&self, exec: &mut EvaluationContext) -> Result<Value, ExecutionError> {
+        let graph_node = exec.graph.add_graph_node();
+        for (name, value) in self.debug_attributes.iter() {
+            exec.graph[graph_node]
+                .attributes
+                .add(name.clone(), value.clone())
+                .map_err(|_| {
+                    ExecutionError::DuplicateAttribute(format!("{} on {}", name, graph_node))
+                })?;
+        }
+        Ok(graph_node.into())
+    }
+}
+
+impl fmt::Display for LazyGraphNode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "(node)")
     }
 }

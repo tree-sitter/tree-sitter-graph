@@ -6,7 +6,9 @@
 // ------------------------------------------------------------------------------------------------
 
 use indoc::indoc;
+use pretty_assertions::assert_eq;
 use tree_sitter::Parser;
+
 use tree_sitter_graph::ast::File;
 use tree_sitter_graph::functions::Functions;
 use tree_sitter_graph::ExecutionConfig;
@@ -75,13 +77,13 @@ fn can_build_simple_graph() {
           node 0
             name: "node0"
             source: [syntax node module (1, 1)]
-          edge 0 -> 2
+          edge 0 -> 1
             precedence: 14
           node 1
-            name: "node2"
-            parent: [graph node 2]
-          node 2
             name: "node1"
+          node 2
+            name: "node2"
+            parent: [graph node 1]
         "#},
     );
 }
@@ -163,18 +165,18 @@ fn variables_in_scan_arms_are_local() {
         "#},
         indoc! {r#"
           node 0
-            name: "alpha"
           edge 0 -> 1
           node 1
-            name: "beta"
+            name: "alpha"
           edge 1 -> 2
           node 2
-            name: "gamma"
+            name: "beta"
           edge 2 -> 3
           node 3
-            name: "delta"
+            name: "gamma"
+          edge 3 -> 4
           node 4
-          edge 4 -> 0
+            name: "delta"
         "#},
     );
 }
@@ -581,6 +583,7 @@ fn skip_if_without_true_conditions() {
           (module (import_statement)? @x (import_statement)? @y)
           {
             node node0
+            attr (node0) exists
             if some @x {
               attr (node0) val = 0
             } elif some @y {
@@ -590,6 +593,7 @@ fn skip_if_without_true_conditions() {
         "#},
         indoc! {r#"
           node 0
+            exists: #true
         "#},
     );
 }
@@ -919,10 +923,12 @@ fn can_build_node() {
           (module)
           {
             node node0
+            attr (node0) exists
           }
         "#},
         indoc! {r#"
           node 0
+            exists: #true
         "#},
     );
 }
@@ -1524,6 +1530,49 @@ fn cannot_access_non_inherited_variable() {
             (pass_statement)@pass {
               attr (@pass.test) in_pass
             }
+        "#},
+    );
+}
+
+#[test]
+fn unused_node_is_not_added() {
+    check_execution(
+        indoc! { r#"
+          pass
+        "#},
+        indoc! {r#"
+          (module) {
+            node unused
+          }
+        "#},
+        "",
+    );
+}
+
+#[test]
+fn error_in_unused_variable_detected() {
+    fail_execution(
+        indoc! { r#"
+          pass
+        "#},
+        indoc! {r#"
+          (module) {
+            let unused = (does_not_exist)
+          }
+        "#},
+    );
+}
+
+#[test]
+fn error_in_unused_scoped_variable_detected() {
+    fail_execution(
+        indoc! { r#"
+          pass
+        "#},
+        indoc! {r#"
+          (module)@mod {
+            let @mod.unused = (does_not_exist)
+          }
         "#},
     );
 }

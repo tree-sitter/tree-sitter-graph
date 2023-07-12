@@ -84,8 +84,15 @@ impl LazyStore {
         Ok(value)
     }
 
-    pub(super) fn evaluate_all(&self, exec: &mut EvaluationContext) -> Result<(), ExecutionError> {
+    pub(super) fn force_all(
+        &self,
+        exec: &mut EvaluationContext,
+        include_nodes: bool,
+    ) -> Result<(), ExecutionError> {
         for variable in &self.elements {
+            if !include_nodes && variable.is_graph_node() {
+                continue;
+            }
             let debug_info = variable.debug_info.clone();
             variable.force(exec).with_context(|| debug_info.0.into())?;
         }
@@ -176,7 +183,7 @@ impl LazyScopedVariables {
         result.ok_or_else(|| ExecutionError::UndefinedScopedVariable(format!("{}.{}", scope, name)))
     }
 
-    pub(super) fn evaluate_all(&self, exec: &mut EvaluationContext) -> Result<(), ExecutionError> {
+    pub(super) fn force_all(&self, exec: &mut EvaluationContext) -> Result<(), ExecutionError> {
         for (name, cell) in &self.variables {
             let values = cell.replace(ScopedValues::Forcing);
             let map = self.force(name, values, exec)?;
@@ -270,6 +277,13 @@ impl Thunk {
             state: Rc::new(RefCell::new(ThunkState::Unforced(value))),
             debug_info,
         }
+    }
+
+    fn is_graph_node(&self) -> bool {
+        if let ThunkState::Unforced(LazyValue::GraphNode(_)) = *self.state.borrow() {
+            return true;
+        }
+        return false;
     }
 
     fn force(&self, exec: &mut EvaluationContext) -> Result<graph::Value, ExecutionError> {

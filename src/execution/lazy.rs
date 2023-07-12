@@ -100,10 +100,11 @@ impl ast::File {
             cancellation_flag,
         };
         lazy_graph.evaluate(&mut exec)?;
-        // make sure any unforced values are now forced, to surface any problems
-        // hidden by the fact that the values were unused
-        store.evaluate_all(&mut exec)?;
-        scoped_store.evaluate_all(&mut exec)?;
+        // Make sure any unforced values are now forced, to surface any problems
+        // hidden by the fact that the values were unused. Unused nodes are not
+        // created to avoid clutter in the graph.
+        store.force_all(&mut exec, false)?;
+        scoped_store.force_all(&mut exec)?;
 
         Ok(())
     }
@@ -262,10 +263,10 @@ impl ast::Assign {
 
 impl ast::CreateGraphNode {
     fn execute_lazy(&self, exec: &mut ExecutionContext) -> Result<(), ExecutionError> {
-        let graph_node = exec.graph.add_graph_node();
+        let mut value = LazyGraphNode::new();
         self.node
-            .add_debug_attrs(&mut exec.graph[graph_node].attributes, exec.config)?;
-        self.node.add_lazy(exec, graph_node.into(), false)
+            .add_debug_attrs(&mut value.debug_attributes, exec.config)?;
+        self.node.add_lazy(exec, value.into(), false)
     }
 }
 

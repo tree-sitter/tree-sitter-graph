@@ -5,6 +5,7 @@
 // Please see the LICENSE-APACHE or LICENSE-MIT files in this distribution for license details.
 // ------------------------------------------------------------------------------------------------
 
+use pretty_assertions::assert_eq;
 use tree_sitter::CaptureQuantifier::*;
 
 use tree_sitter_graph::ast::*;

@@ -6,9 +6,11 @@
 // ------------------------------------------------------------------------------------------------
 
 use indoc::indoc;
+use pretty_assertions::assert_eq;
 use tree_sitter::Parser;
 use tree_sitter::Point;
 use tree_sitter::Tree;
+
 use tree_sitter_graph::parse_error::ParseError;
 
 fn init_log() {

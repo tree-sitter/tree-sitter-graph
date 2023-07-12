@@ -6,7 +6,9 @@
 // ------------------------------------------------------------------------------------------------
 
 use indoc::indoc;
+use pretty_assertions::assert_eq;
 use tree_sitter::Parser;
+
 use tree_sitter_graph::graph::Graph;
 use tree_sitter_graph::graph::Value;
 use tree_sitter_graph::Identifier;
