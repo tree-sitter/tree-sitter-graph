@@ -81,6 +81,7 @@ impl File {
             lazy: config.lazy,
             location_attr: config.location_attr.clone(),
             variable_name_attr: config.variable_name_attr.clone(),
+            match_node_attr: config.match_node_attr.clone(),
         };
 
         let mut locals = VariableMap::new();
@@ -133,6 +134,7 @@ struct ExecutionContext<'a, 'c, 'g, 's, 'tree> {
     current_regex_captures: &'a Vec<String>,
     function_parameters: &'a mut Vec<Value>,
     mat: &'a QueryMatch<'a, 'tree>,
+    full_match_stanza_capture_index: usize,
     error_context: StatementContext,
     inherited_variables: &'a HashSet<Identifier>,
     shorthands: &'a AttributeShorthands,
@@ -192,6 +194,7 @@ impl Stanza {
                 current_regex_captures,
                 function_parameters,
                 mat: &mat,
+                full_match_stanza_capture_index: self.full_match_stanza_capture_index,
                 error_context,
                 inherited_variables,
                 shorthands,
@@ -283,6 +286,23 @@ impl CreateGraphNode {
         let graph_node = exec.graph.add_graph_node();
         self.node
             .add_debug_attrs(&mut exec.graph[graph_node].attributes, exec.config)?;
+        if let Some(match_node_attr) = &exec.config.match_node_attr {
+            let match_node = exec
+                .mat
+                .nodes_for_capture_index(exec.full_match_stanza_capture_index as u32)
+                .next()
+                .expect("missing capture for full match");
+            let syn_node = exec.graph.add_syntax_node(match_node);
+            exec.graph[graph_node]
+                .attributes
+                .add(match_node_attr.clone(), syn_node)
+                .map_err(|_| {
+                    ExecutionError::DuplicateAttribute(format!(
+                        " {} on graph node ({}) in {}",
+                        match_node_attr, graph_node, self,
+                    ))
+                })?;
+        }
         let value = Value::GraphNode(graph_node);
         self.node.add(exec, value, false)
     }
@@ -408,6 +428,7 @@ impl Scan {
                 current_regex_captures: &current_regex_captures,
                 function_parameters: exec.function_parameters,
                 mat: exec.mat,
+                full_match_stanza_capture_index: exec.full_match_stanza_capture_index,
                 error_context: exec.error_context.clone(),
                 inherited_variables: exec.inherited_variables,
                 shorthands: exec.shorthands,
@@ -468,6 +489,7 @@ impl If {
                     current_regex_captures: exec.current_regex_captures,
                     function_parameters: exec.function_parameters,
                     mat: exec.mat,
+                    full_match_stanza_capture_index: exec.full_match_stanza_capture_index,
                     error_context: exec.error_context.clone(),
                     inherited_variables: exec.inherited_variables,
                     shorthands: exec.shorthands,
@@ -510,6 +532,7 @@ impl ForIn {
                 current_regex_captures: exec.current_regex_captures,
                 function_parameters: exec.function_parameters,
                 mat: exec.mat,
+                full_match_stanza_capture_index: exec.full_match_stanza_capture_index,
                 error_context: exec.error_context.clone(),
                 inherited_variables: exec.inherited_variables,
                 shorthands: exec.shorthands,
@@ -585,6 +608,7 @@ impl ListComprehension {
                 current_regex_captures: exec.current_regex_captures,
                 function_parameters: exec.function_parameters,
                 mat: exec.mat,
+                full_match_stanza_capture_index: exec.full_match_stanza_capture_index,
                 error_context: exec.error_context.clone(),
                 inherited_variables: exec.inherited_variables,
                 shorthands: exec.shorthands,
@@ -625,6 +649,7 @@ impl SetComprehension {
                 current_regex_captures: exec.current_regex_captures,
                 function_parameters: exec.function_parameters,
                 mat: exec.mat,
+                full_match_stanza_capture_index: exec.full_match_stanza_capture_index,
                 error_context: exec.error_context.clone(),
                 inherited_variables: exec.inherited_variables,
                 shorthands: exec.shorthands,
@@ -882,6 +907,7 @@ impl AttributeShorthand {
             current_regex_captures: exec.current_regex_captures,
             function_parameters: exec.function_parameters,
             mat: exec.mat,
+            full_match_stanza_capture_index: exec.full_match_stanza_capture_index,
             error_context: exec.error_context.clone(),
             inherited_variables: exec.inherited_variables,
             shorthands: exec.shorthands,
