@@ -60,6 +60,7 @@ impl ast::File {
             lazy: config.lazy,
             location_attr: config.location_attr.clone(),
             variable_name_attr: config.variable_name_attr.clone(),
+            match_node_attr: config.match_node_attr.clone(),
         };
 
         let mut locals = VariableMap::new();
@@ -136,6 +137,7 @@ struct ExecutionContext<'a, 'c, 'g, 'tree> {
     locals: &'a mut dyn MutVariables<LazyValue>,
     current_regex_captures: &'a Vec<String>,
     mat: &'a QueryMatch<'a, 'tree>,
+    full_match_file_capture_index: usize,
     store: &'a mut LazyStore,
     scoped_store: &'a mut LazyScopedVariables,
     lazy_graph: &'a mut LazyGraph,
@@ -201,6 +203,7 @@ impl ast::Stanza {
                 locals,
                 current_regex_captures: &current_regex_captures,
                 mat,
+                full_match_file_capture_index: self.full_match_file_capture_index,
                 store,
                 scoped_store,
                 lazy_graph,
@@ -265,6 +268,23 @@ impl ast::CreateGraphNode {
         let graph_node = exec.graph.add_graph_node();
         self.node
             .add_debug_attrs(&mut exec.graph[graph_node].attributes, exec.config)?;
+        if let Some(match_node_attr) = &exec.config.match_node_attr {
+            let match_node = exec
+                .mat
+                .nodes_for_capture_index(exec.full_match_file_capture_index as u32)
+                .next()
+                .expect("missing capture for full match");
+            let syn_node = exec.graph.add_syntax_node(match_node);
+            exec.graph[graph_node]
+                .attributes
+                .add(match_node_attr.clone(), syn_node)
+                .map_err(|_| {
+                    ExecutionError::DuplicateAttribute(format!(
+                        " {} on graph node ({}) in {}",
+                        match_node_attr, graph_node, self,
+                    ))
+                })?;
+        }
         self.node.add_lazy(exec, graph_node.into(), false)
     }
 }
@@ -365,6 +385,7 @@ impl ast::Scan {
                 locals: &mut arm_locals,
                 current_regex_captures: &current_regex_captures,
                 mat: exec.mat,
+                full_match_file_capture_index: exec.full_match_file_capture_index,
                 store: exec.store,
                 scoped_store: exec.scoped_store,
                 lazy_graph: exec.lazy_graph,
@@ -431,6 +452,7 @@ impl ast::If {
                     locals: &mut arm_locals,
                     current_regex_captures: exec.current_regex_captures,
                     mat: exec.mat,
+                    full_match_file_capture_index: exec.full_match_file_capture_index,
                     store: exec.store,
                     scoped_store: exec.scoped_store,
                     lazy_graph: exec.lazy_graph,
@@ -478,6 +500,7 @@ impl ast::ForIn {
                 locals: &mut loop_locals,
                 current_regex_captures: exec.current_regex_captures,
                 mat: exec.mat,
+                full_match_file_capture_index: exec.full_match_file_capture_index,
                 store: exec.store,
                 scoped_store: exec.scoped_store,
                 lazy_graph: exec.lazy_graph,
@@ -572,6 +595,7 @@ impl ast::ListComprehension {
                 locals: &mut loop_locals,
                 current_regex_captures: exec.current_regex_captures,
                 mat: exec.mat,
+                full_match_file_capture_index: exec.full_match_file_capture_index,
                 store: exec.store,
                 scoped_store: exec.scoped_store,
                 lazy_graph: exec.lazy_graph,
@@ -615,6 +639,7 @@ impl ast::SetComprehension {
                 locals: &mut loop_locals,
                 current_regex_captures: exec.current_regex_captures,
                 mat: exec.mat,
+                full_match_file_capture_index: exec.full_match_file_capture_index,
                 store: exec.store,
                 scoped_store: exec.scoped_store,
                 lazy_graph: exec.lazy_graph,
@@ -830,6 +855,7 @@ impl ast::AttributeShorthand {
             locals: &mut shorthand_locals,
             current_regex_captures: exec.current_regex_captures,
             mat: exec.mat,
+            full_match_file_capture_index: exec.full_match_file_capture_index,
             store: exec.store,
             scoped_store: exec.scoped_store,
             lazy_graph: exec.lazy_graph,

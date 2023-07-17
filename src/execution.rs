@@ -256,6 +256,7 @@ pub struct ExecutionConfig<'a, 'g> {
     pub(crate) lazy: bool,
     pub(crate) location_attr: Option<Identifier>,
     pub(crate) variable_name_attr: Option<Identifier>,
+    pub(crate) match_node_attr: Option<Identifier>,
 }
 
 impl<'a, 'g> ExecutionConfig<'a, 'g> {
@@ -266,6 +267,7 @@ impl<'a, 'g> ExecutionConfig<'a, 'g> {
             lazy: false,
             location_attr: None,
             variable_name_attr: None,
+            match_node_attr: None,
         }
     }
 
@@ -273,6 +275,7 @@ impl<'a, 'g> ExecutionConfig<'a, 'g> {
         self,
         location_attr: Identifier,
         variable_name_attr: Identifier,
+        match_node_attr: Identifier,
     ) -> Self {
         Self {
             functions: self.functions,
@@ -280,6 +283,7 @@ impl<'a, 'g> ExecutionConfig<'a, 'g> {
             lazy: self.lazy,
             location_attr: location_attr.into(),
             variable_name_attr: variable_name_attr.into(),
+            match_node_attr: match_node_attr.into(),
         }
     }
 
@@ -290,6 +294,7 @@ impl<'a, 'g> ExecutionConfig<'a, 'g> {
             lazy,
             location_attr: self.location_attr,
             variable_name_attr: self.variable_name_attr,
+            match_node_attr: self.match_node_attr,
         }
     }
 }
