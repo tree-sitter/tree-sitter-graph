@@ -116,7 +116,8 @@ impl File {
                 let named_captures = stanza
                     .query
                     .capture_names()
-                    .iter()
+                    .into_iter()
+                    .copied() // turn &&str into &str
                     .map(|name| {
                         let index = file_query
                             .capture_index_for_name(name)
@@ -139,7 +140,8 @@ impl File {
                 let named_captures = stanza
                     .query
                     .capture_names()
-                    .iter()
+                    .into_iter()
+                    .copied() // turn &&str into &str
                     .map(|name| {
                         let index = stanza
                             .query
@@ -175,7 +177,8 @@ impl Stanza {
             let named_captures = self
                 .query
                 .capture_names()
-                .iter()
+                .into_iter()
+                .copied() // turn &&str into &str
                 .map(|name| {
                     let index = self
                         .query
@@ -199,7 +202,7 @@ impl Stanza {
 pub struct Match<'a, 'tree> {
     mat: QueryMatch<'a, 'tree>,
     full_capture_index: u32,
-    named_captures: Vec<(&'a String, CaptureQuantifier, u32)>,
+    named_captures: Vec<(&'a str, CaptureQuantifier, u32)>,
     query_location: Location,
 }
 
@@ -217,7 +220,7 @@ impl<'a, 'tree> Match<'a, 'tree> {
         &'s self,
     ) -> impl Iterator<
         Item = (
-            &String,
+            &str,
             CaptureQuantifier,
             impl Iterator<Item = Node<'tree>> + 's,
         ),
@@ -239,7 +242,7 @@ impl<'a, 'tree> Match<'a, 'tree> {
     }
 
     /// Return an iterator over all capture names.
-    pub fn capture_names(&self) -> impl Iterator<Item = &String> {
+    pub fn capture_names(&self) -> impl Iterator<Item = &str> {
         self.named_captures.iter().map(|c| c.0)
     }
 

@@ -11,6 +11,11 @@ authors = [
 ]
 edition = "2018"
 
+[patch.crates-io]
+# TODO: Revert to a regular versioned dependency once tree-sitter#2773 has been
+# merged.
+tree-sitter = { git="https://github.com/dcreager/tree-sitter", branch="rust-linking" }
+
 [lib]
 # All of our tests are in the tests/it "integration" test executable.
 test = false

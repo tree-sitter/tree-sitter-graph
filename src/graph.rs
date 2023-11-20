@@ -294,7 +294,7 @@ impl Attributes {
         Q: ?Sized + Eq + Hash,
         Identifier: Borrow<Q>,
     {
-        self.values.get(name.borrow())
+        self.values.get(name)
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&Identifier, &Value)> {
