@@ -575,7 +575,7 @@ pub mod stdlib {
                 let replacement = parameters.param()?.into_string()?;
                 parameters.finish()?;
                 Ok(Value::String(
-                    pattern.replace_all(&text, replacement).to_string(),
+                    pattern.replace_all(&text, replacement.as_str()).to_string(),
                 ))
             }
         }
