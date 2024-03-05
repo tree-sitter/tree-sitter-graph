@@ -16,9 +16,12 @@ jobs:
 
     steps:
       - name: Install Rust environment
+        uses: hecrj/setup-rust-action@v1
+        with:
+          rust-version: ${{ matrix.rust }}
+      - name: Install Cargo plugins
         run: |
-          rustup toolchain install stable nightly
-          rustup default stable
+          rustup toolchain install nightly
           cargo install cargo-hack cargo-minimal-versions
       - name: Checkout code
         uses: actions/checkout@v2
