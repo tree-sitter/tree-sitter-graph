@@ -104,7 +104,7 @@ impl<V> MutVariables<V> for VariableMap<'_, V> {
                     v.into_key().to_string(),
                 ))),
             Occupied(mut o) => {
-                let mut variable = o.get_mut();
+                let variable = o.get_mut();
                 if variable.mutable {
                     variable.value = value;
                     Ok(())
