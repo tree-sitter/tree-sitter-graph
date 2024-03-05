@@ -34,10 +34,6 @@ jobs:
           key: ${{ runner.OS }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.OS }}-cargo-
-      - name: Build library (default features)
-        run: cargo build
-      - name: Test library (default features)
-        run: cargo test
       - name: Build library (all feature combinations)
         run: cargo hack --feature-powerset --no-dev-deps build
       - name: Test library (all feature combinations)
