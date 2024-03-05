@@ -16,9 +16,10 @@ jobs:
 
     steps:
       - name: Install Rust environment
-        uses: hecrj/setup-rust-action@v1
-        with:
-          rust-version: ${{ matrix.rust }}
+        run: |
+          rustup toolchain install stable nightly
+          rustup default stable
+          cargo install cargo-hack cargo-minimal-versions
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Check formatting
@@ -37,9 +38,9 @@ jobs:
         run: cargo build
       - name: Test library (default features)
         run: cargo test
-      - name: Build library (all features)
-        run: cargo build --all-features
-      - name: Test library (all features)
-        run: cargo test --all-features
-      - name: Build program
-        run: cargo build --bin tree-sitter-graph --features=cli
+      - name: Build library (all feature combinations)
+        run: cargo hack --feature-powerset --no-dev-deps build
+      - name: Test library (all feature combinations)
+        run: cargo hack --feature-powerset test
+      - name: Build library (minimal versions)
+        run: cargo minimal-versions build
