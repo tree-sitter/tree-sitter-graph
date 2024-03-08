@@ -226,24 +226,8 @@ impl LazyCreateEdge {
             .sink
             .evaluate_as_graph_node(exec)
             .with_context(|| "Evaluating edge sink".to_string().into())?;
-        let prev_debug_info = exec
-            .prev_element_debug_info
-            .insert(GraphElementKey::Edge(source, sink), self.debug_info.clone());
         let edge = match exec.graph[source].add_edge(sink) {
-            Ok(edge) => edge,
-            Err(_) => {
-                return Err(ExecutionError::DuplicateEdge(format!(
-                    "({} -> {})",
-                    source, sink,
-                )))
-                .with_context(|| {
-                    (
-                        prev_debug_info.unwrap().into(),
-                        self.debug_info.clone().into(),
-                    )
-                        .into()
-                });
-            }
+            Ok(edge) | Err(edge) => edge,
         };
         edge.attributes = self.attributes.clone();
         Ok(())

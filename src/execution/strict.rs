@@ -334,13 +334,7 @@ impl CreateEdge {
         let source = self.source.evaluate(exec)?.into_graph_node_ref()?;
         let sink = self.sink.evaluate(exec)?.into_graph_node_ref()?;
         let edge = match exec.graph[source].add_edge(sink) {
-            Ok(edge) => edge,
-            Err(_) => {
-                return Err(ExecutionError::DuplicateEdge(format!(
-                    "({} -> {}) in {}",
-                    source, sink, self,
-                )))?
-            }
+            Ok(edge) | Err(edge) => edge,
         };
         self.add_debug_attrs(&mut edge.attributes, exec.config)?;
         Ok(())

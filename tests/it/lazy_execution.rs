@@ -1527,3 +1527,67 @@ fn cannot_access_non_inherited_variable() {
         "#},
     );
 }
+
+#[test]
+fn can_add_edge_twice() {
+    check_execution(
+        indoc! { r#"
+            pass
+        "#},
+        indoc! {r#"
+            (module) {
+              node n1;
+              node n2;
+              edge n1 -> n2;
+              edge n1 -> n2;
+            }
+        "#},
+        indoc! {r#"
+          node 0
+          edge 0 -> 1
+          node 1
+        "#},
+    );
+}
+
+#[test]
+fn can_set_node_attribute_value_twice() {
+    check_execution(
+        indoc! { r#"
+            pass
+        "#},
+        indoc! {r#"
+            (module) {
+              node n;
+              attr (n) foo = #true;
+            }
+        "#},
+        indoc! {r#"
+          node 0
+            foo: #true
+        "#},
+    );
+}
+
+#[test]
+fn cannot_change_attribute_value() {
+    check_execution(
+        indoc! { r#"
+            pass
+        "#},
+        indoc! {r#"
+            (module) {
+              node n1;
+              node n2;
+              edge n1 -> n2;
+              attr (n1 -> n2) foo = #true;
+            }
+        "#},
+        indoc! {r#"
+          node 0
+          edge 0 -> 1
+            foo: #true
+          node 1
+        "#},
+    );
+}
