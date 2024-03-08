@@ -275,11 +275,15 @@ impl Attributes {
 
     /// Adds an attribute to this attribute set.  If there was already an attribute with the same
     /// name, replaces its value and returns `Err`.
-    pub fn add<V: Into<Value>>(&mut self, name: Identifier, value: V) -> Result<(), ()> {
+    pub fn add<V: Into<Value>>(&mut self, name: Identifier, value: V) -> Result<(), Value> {
         match self.values.entry(name) {
             Entry::Occupied(mut o) => {
-                o.insert(value.into());
-                Err(())
+                let value = value.into();
+                if o.get() != &value {
+                    Err(o.insert(value.into()))
+                } else {
+                    Ok(())
+                }
             }
             Entry::Vacant(v) => {
                 v.insert(value.into());

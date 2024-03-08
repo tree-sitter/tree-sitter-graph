@@ -165,7 +165,6 @@ pub(self) struct EvaluationContext<'a, 'tree> {
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub(super) enum GraphElementKey {
     NodeAttribute(graph::GraphNodeRef, Identifier),
-    Edge(graph::GraphNodeRef, graph::GraphNodeRef),
     EdgeAttribute(graph::GraphNodeRef, graph::GraphNodeRef, Identifier),
 }
 
