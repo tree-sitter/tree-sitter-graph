@@ -305,7 +305,7 @@ impl<'a> Parser<'a> {
                 let name = self.parse_identifier("inherit")?;
                 file.inherited_variables.insert(name);
             } else {
-                let stanza = self.parse_stanza(file.language)?;
+                let stanza = self.parse_stanza(file.language.clone())?;
                 file.stanzas.push(stanza);
             }
             self.consume_whitespace();
