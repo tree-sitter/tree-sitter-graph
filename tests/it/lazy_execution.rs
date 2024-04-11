@@ -26,7 +26,7 @@ fn init_log() {
 fn execute(python_source: &str, dsl_source: &str) -> Result<String, ExecutionError> {
     init_log();
     let mut parser = Parser::new();
-    parser.set_language(tree_sitter_python::language()).unwrap();
+    parser.set_language(&tree_sitter_python::language()).unwrap();
     let tree = parser.parse(python_source, None).unwrap();
     let file =
         File::from_str(tree_sitter_python::language(), dsl_source).expect("Cannot parse file");

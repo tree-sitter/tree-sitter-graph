@@ -23,7 +23,7 @@ fn init_log() {
 fn parse(python_source: &str) -> Tree {
     init_log();
     let mut parser = Parser::new();
-    parser.set_language(tree_sitter_python::language()).unwrap();
+    parser.set_language(&tree_sitter_python::language()).unwrap();
     parser.parse(python_source, None).unwrap()
 }
 

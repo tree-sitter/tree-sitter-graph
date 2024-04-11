@@ -42,4 +42,4 @@ tree-sitter-loader = { version = "0.20", optional = true }
 [dev-dependencies]
 env_logger = "0.9"
 indoc = "1.0"
-tree-sitter-python = "0.20"
+tree-sitter-python =  "0.21.0"
