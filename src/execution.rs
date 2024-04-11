@@ -176,14 +176,15 @@ impl Stanza {
                 .query
                 .capture_names()
                 .iter()
-                .map(|name| {
-                    let index = self
-                        .query
-                        .capture_index_for_name(name)
-                        .expect("missing index for capture");
-                    let quantifier = self.query.capture_quantifiers(0)[index as usize];
-                    (name.to_string(), quantifier, index)
+                .flat_map(|name| {
+                    if let Some(index) = self.query.capture_index_for_name(name) {
+                        let quantifier = self.query.capture_quantifiers(0)[index as usize];
+                        Some ((name,quantifier,index))
+                    } else {
+                        None
+                    }
                 })
+                .map(|(name,quantifier,index)| (&name.to_string(), quantifier, index))
                 .filter(|c| c.2 != self.full_match_stanza_capture_index as u32)
                 .collect();
             visit(Match {
