@@ -146,7 +146,7 @@ impl File {
                             .capture_index_for_name(name)
                             .expect("missing index for capture");
                         let quantifier = stanza.query.capture_quantifiers(0)[index as usize];
-                        (name, quantifier, index)
+                        (name.to_string(), quantifier, index)
                     })
                     .filter(|c| c.2 != stanza.full_match_stanza_capture_index as u32)
                     .collect();
@@ -182,7 +182,7 @@ impl Stanza {
                         .capture_index_for_name(name)
                         .expect("missing index for capture");
                     let quantifier = self.query.capture_quantifiers(0)[index as usize];
-                    (name, quantifier, index)
+                    (name.to_string(), quantifier, index)
                 })
                 .filter(|c| c.2 != self.full_match_stanza_capture_index as u32)
                 .collect();
