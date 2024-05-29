@@ -396,9 +396,9 @@ impl<'a> std::fmt::Display for Excerpt<'a> {
             f,
             "{}{}:{}:{}:",
             " ".repeat(self.indent),
-            white_bold(&self.path.to_string_lossy()),
-            white_bold(&format!("{}", self.row + 1)),
-            white_bold(&format!("{}", self.columns.start + 1)),
+            header_style(&self.path.to_string_lossy()),
+            header_style(&format!("{}", self.row + 1)),
+            header_style(&format!("{}", self.columns.start + 1)),
         )?;
         if let Some(source) = self.source {
             // first line: line number & source
@@ -406,8 +406,8 @@ impl<'a> std::fmt::Display for Excerpt<'a> {
                 f,
                 "{}{}{}{}",
                 " ".repeat(self.indent),
-                blue(&format!("{}", self.row + 1)),
-                blue(" | "),
+                prefix_style(&format!("{}", self.row + 1)),
+                prefix_style(" | "),
                 source,
             )?;
             // second line: caret
@@ -416,9 +416,9 @@ impl<'a> std::fmt::Display for Excerpt<'a> {
                 "{}{}{}{}{}",
                 " ".repeat(self.indent),
                 " ".repeat(self.gutter_width()),
-                blue(" | "),
+                prefix_style(" | "),
                 " ".repeat(self.columns.start),
-                green_bold(&"^".repeat(self.columns.len()))
+                underline_style(&"^".repeat(self.columns.len())),
             )?;
         } else {
             writeln!(f, "{}{}", " ".repeat(self.indent), "<missing source>",)?;
@@ -430,28 +430,28 @@ impl<'a> std::fmt::Display for Excerpt<'a> {
 // coloring functions
 
 #[cfg(feature = "term-colors")]
-fn blue(str: &str) -> impl std::fmt::Display {
-    str.blue()
+fn header_style(str: &str) -> impl std::fmt::Display {
+    str.bold()
 }
 #[cfg(not(feature = "term-colors"))]
-fn blue<'a>(str: &'a str) -> impl std::fmt::Display + 'a {
+fn header_style<'a>(str: &'a str) -> impl std::fmt::Display + 'a {
     str
 }
 
 #[cfg(feature = "term-colors")]
-fn green_bold(str: &str) -> impl std::fmt::Display {
-    str.green().bold()
+fn prefix_style(str: &str) -> impl std::fmt::Display {
+    str.dimmed()
 }
 #[cfg(not(feature = "term-colors"))]
-fn green_bold<'a>(str: &'a str) -> impl std::fmt::Display + 'a {
+fn prefix_style<'a>(str: &'a str) -> impl std::fmt::Display + 'a {
     str
 }
 
 #[cfg(feature = "term-colors")]
-fn white_bold(str: &str) -> impl std::fmt::Display {
-    str.white().bold()
+fn underline_style(str: &str) -> impl std::fmt::Display {
+    str.green()
 }
 #[cfg(not(feature = "term-colors"))]
-fn white_bold<'a>(str: &'a str) -> impl std::fmt::Display + 'a {
+fn underline_style<'a>(str: &'a str) -> impl std::fmt::Display + 'a {
     str
 }
