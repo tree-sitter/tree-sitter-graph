@@ -51,7 +51,7 @@ fn can_iterate_graph_edges() {
 fn can_display_graph() {
     let python_source = "pass";
     let mut parser = Parser::new();
-    parser.set_language(tree_sitter_python::language()).unwrap();
+    parser.set_language(&tree_sitter_python::language()).unwrap();
     let tree = parser.parse(python_source, None).unwrap();
 
     let mut graph = Graph::new();

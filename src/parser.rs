@@ -305,13 +305,13 @@ impl<'a> Parser<'a> {
                 let name = self.parse_identifier("inherit")?;
                 file.inherited_variables.insert(name);
             } else {
-                let stanza = self.parse_stanza(file.language)?;
+                let stanza = self.parse_stanza(file.language.clone())?;
                 file.stanzas.push(stanza);
             }
             self.consume_whitespace();
         }
         // we can unwrap here because all queries have already been parsed before
-        file.query = Some(Query::new(file.language, &self.query_source).unwrap());
+        file.query = Some(Query::new(&file.language, &self.query_source).unwrap());
         Ok(())
     }
 
@@ -395,7 +395,7 @@ impl<'a> Parser<'a> {
         // the global query_source.
         self.query_source += &query_source;
         self.query_source += "\n";
-        let query = Query::new(language, &query_source).map_err(|mut e| {
+        let query = Query::new(&language, &query_source).map_err(|mut e| {
             // the column of the first row of a query pattern must be shifted by the whitespace
             // that was already consumed
             if e.row == 0 {
