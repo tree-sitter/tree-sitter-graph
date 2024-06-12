@@ -68,9 +68,17 @@ impl File {
         for global in &self.globals {
             match globals.get(&global.name) {
                 None => {
-                    if let Some(default) = &global.default {
+                    let default_or_null = global
+                        .default
+                        .as_ref()
+                        .map(|default| default.to_string().into())
+                        .or_else(|| {
+                            (global.quantifier == CaptureQuantifier::ZeroOrOne)
+                                .then_some(Value::Null)
+                        });
+                    if let Some(default_or_null) = default_or_null {
                         globals
-                            .add(global.name.clone(), default.to_string().into())
+                            .add(global.name.clone(), default_or_null)
                             .map_err(|_| {
                                 ExecutionError::DuplicateVariable(format!(
                                     "global variable {} already defined",

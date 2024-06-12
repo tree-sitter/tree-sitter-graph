@@ -292,6 +292,28 @@ fn can_omit_global_variable_with_default() {
 }
 
 #[test]
+fn can_omit_optional_global_variable() {
+    check_execution(
+        "pass",
+        indoc! {r#"
+          global pkgname?
+
+          (module)
+          {
+            node n
+            if (is-null pkgname) {
+              attr (n) pkgname = "fallback"
+            }
+          }
+        "#},
+        indoc! {r#"
+          node 0
+            pkgname: "fallback"
+    "#},
+    );
+}
+
+#[test]
 fn cannot_omit_global_variable() {
     fail_execution(
         "pass",
