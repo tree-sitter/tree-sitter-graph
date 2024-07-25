@@ -28,9 +28,9 @@ use crate::Identifier;
 
 pub const FULL_MATCH: &str = "__tsg__full_match";
 
-impl ast::File {
+impl <'a> ast::File<'a> {
     /// Parses a graph DSL file, returning a new `File` instance.
-    pub fn from_str(language: Language, source: &str) -> Result<Self, ParseError> {
+    pub fn from_str(language: &'a Language, source: &str) -> Result<Self, ParseError> {
         let mut file = ast::File::new(language);
         #[allow(deprecated)]
         file.parse(source)?;
@@ -305,13 +305,13 @@ impl<'a> Parser<'a> {
                 let name = self.parse_identifier("inherit")?;
                 file.inherited_variables.insert(name);
             } else {
-                let stanza = self.parse_stanza(file.language)?;
+                let stanza = self.parse_stanza(&file.language)?;
                 file.stanzas.push(stanza);
             }
             self.consume_whitespace();
         }
         // we can unwrap here because all queries have already been parsed before
-        file.query = Some(Query::new(file.language, &self.query_source).unwrap());
+        file.query = Some(Query::new(&file.language, &self.query_source).unwrap());
         Ok(())
     }
 
@@ -369,7 +369,7 @@ impl<'a> Parser<'a> {
         Ok(quantifier)
     }
 
-    fn parse_stanza(&mut self, language: Language) -> Result<ast::Stanza, ParseError> {
+    fn parse_stanza(&mut self, language: &Language) -> Result<ast::Stanza, ParseError> {
         let start = self.location;
         let (query, full_match_stanza_capture_index) = self.parse_query(language)?;
         self.consume_whitespace();
@@ -385,7 +385,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_query(&mut self, language: Language) -> Result<(Query, usize), ParseError> {
+    fn parse_query(&mut self, language: &Language) -> Result<(Query, usize), ParseError> {
         let location = self.location;
         let query_start = self.offset;
         self.skip_query()?;

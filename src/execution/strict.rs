@@ -59,7 +59,7 @@ use crate::variables::Variables;
 use crate::Identifier;
 use crate::Location;
 
-impl File {
+impl File<'_> {
     /// Executes this graph DSL file against a source file, saving the results into an existing
     /// `Graph` instance.  You must provide the parsed syntax tree (`tree`) as well as the source
     /// text that it was parsed from (`source`).  You also provide the set of functions and global
