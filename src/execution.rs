@@ -28,7 +28,7 @@ pub(crate) mod error;
 mod lazy;
 mod strict;
 
-impl File {
+impl File<'_> {
     /// Executes this graph DSL file against a source file.  You must provide the parsed syntax
     /// tree (`tree`) as well as the source text that it was parsed from (`source`).  You also
     /// provide the set of functions and global variables that are available during execution.
@@ -123,7 +123,7 @@ impl File {
                             .expect("missing index for capture");
                         let quantifier =
                             file_query.capture_quantifiers(mat.pattern_index)[index as usize];
-                        (name, quantifier, index)
+                        (*name, quantifier, index)
                     })
                     .filter(|c| c.2 != stanza.full_match_file_capture_index as u32)
                     .collect();
@@ -146,7 +146,7 @@ impl File {
                             .capture_index_for_name(name)
                             .expect("missing index for capture");
                         let quantifier = stanza.query.capture_quantifiers(0)[index as usize];
-                        (name, quantifier, index)
+                        (*name, quantifier, index)
                     })
                     .filter(|c| c.2 != stanza.full_match_stanza_capture_index as u32)
                     .collect();
@@ -182,7 +182,7 @@ impl Stanza {
                         .capture_index_for_name(name)
                         .expect("missing index for capture");
                     let quantifier = self.query.capture_quantifiers(0)[index as usize];
-                    (name, quantifier, index)
+                    (*name, quantifier, index)
                 })
                 .filter(|c| c.2 != self.full_match_stanza_capture_index as u32)
                 .collect();
@@ -199,7 +199,7 @@ impl Stanza {
 pub struct Match<'a, 'tree> {
     mat: QueryMatch<'a, 'tree>,
     full_capture_index: u32,
-    named_captures: Vec<(&'a String, CaptureQuantifier, u32)>,
+    named_captures: Vec<(&'a str, CaptureQuantifier, u32)>,
     query_location: Location,
 }
 
@@ -217,7 +217,7 @@ impl<'a, 'tree> Match<'a, 'tree> {
         &'s self,
     ) -> impl Iterator<
         Item = (
-            &String,
+            &str,
             CaptureQuantifier,
             impl Iterator<Item = Node<'tree>> + 's,
         ),
@@ -239,7 +239,7 @@ impl<'a, 'tree> Match<'a, 'tree> {
     }
 
     /// Return an iterator over all capture names.
-    pub fn capture_names(&self) -> impl Iterator<Item = &String> {
+    pub fn capture_names(&self) -> impl Iterator<Item = &str> {
         self.named_captures.iter().map(|c| c.0)
     }
 

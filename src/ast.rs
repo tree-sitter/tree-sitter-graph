@@ -21,8 +21,8 @@ use crate::Location;
 
 /// A graph DSL file
 #[derive(Debug)]
-pub struct File {
-    pub language: Language,
+pub struct File<'a> {
+    pub language: &'a Language,
     /// The expected global variables used in this file
     pub globals: Vec<Global>,
     /// The scoped variables that are inherited by child nodes
@@ -35,8 +35,8 @@ pub struct File {
     pub shorthands: AttributeShorthands,
 }
 
-impl File {
-    pub fn new(language: Language) -> File {
+impl<'a> File<'a> {
+    pub fn new(language: &'a Language) -> File {
         File {
             language,
             globals: Vec::new(),
