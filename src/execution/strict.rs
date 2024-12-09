@@ -8,6 +8,7 @@
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use streaming_iterator::StreamingIterator;
 use tree_sitter::QueryCursor;
 use tree_sitter::QueryMatch;
 use tree_sitter::Tree;
@@ -115,7 +116,7 @@ impl File {
         mut visit: F,
     ) -> Result<(), E>
     where
-        F: FnMut(&Stanza, QueryMatch<'_, 'tree>) -> Result<(), E>,
+        F: FnMut(&Stanza, &QueryMatch<'_, 'tree>) -> Result<(), E>,
     {
         for stanza in &self.stanzas {
             stanza.try_visit_matches_strict(tree, source, |mat| visit(stanza, mat))?;
@@ -214,11 +215,11 @@ impl Stanza {
         mut visit: F,
     ) -> Result<(), E>
     where
-        F: FnMut(QueryMatch<'_, 'tree>) -> Result<(), E>,
+        F: FnMut(&QueryMatch<'_, 'tree>) -> Result<(), E>,
     {
         let mut cursor = QueryCursor::new();
-        let matches = cursor.matches(&self.query, tree.root_node(), source.as_bytes());
-        for mat in matches {
+        let mut matches = cursor.matches(&self.query, tree.root_node(), source.as_bytes());
+        while let Some(mat) = matches.next() {
             visit(mat)?;
         }
         Ok(())

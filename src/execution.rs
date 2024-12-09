@@ -119,11 +119,11 @@ impl File {
                     .iter()
                     .map(|name| {
                         let index = file_query
-                            .capture_index_for_name(name)
+                            .capture_index_for_name(*name)
                             .expect("missing index for capture");
                         let quantifier =
                             file_query.capture_quantifiers(mat.pattern_index)[index as usize];
-                        (name, quantifier, index)
+                        (*name, quantifier, index)
                     })
                     .filter(|c| c.2 != stanza.full_match_file_capture_index as u32)
                     .collect();
@@ -143,10 +143,10 @@ impl File {
                     .map(|name| {
                         let index = stanza
                             .query
-                            .capture_index_for_name(name)
+                            .capture_index_for_name(*name)
                             .expect("missing index for capture");
                         let quantifier = stanza.query.capture_quantifiers(0)[index as usize];
-                        (name, quantifier, index)
+                        (*name, quantifier, index)
                     })
                     .filter(|c| c.2 != stanza.full_match_stanza_capture_index as u32)
                     .collect();
@@ -179,10 +179,10 @@ impl Stanza {
                 .map(|name| {
                     let index = self
                         .query
-                        .capture_index_for_name(name)
+                        .capture_index_for_name(*name)
                         .expect("missing index for capture");
                     let quantifier = self.query.capture_quantifiers(0)[index as usize];
-                    (name, quantifier, index)
+                    (*name, quantifier, index)
                 })
                 .filter(|c| c.2 != self.full_match_stanza_capture_index as u32)
                 .collect();
@@ -197,9 +197,9 @@ impl Stanza {
 }
 
 pub struct Match<'a, 'tree> {
-    mat: QueryMatch<'a, 'tree>,
+    mat: &'a QueryMatch<'a, 'tree>,
     full_capture_index: u32,
-    named_captures: Vec<(&'a String, CaptureQuantifier, u32)>,
+    named_captures: Vec<(&'a str, CaptureQuantifier, u32)>,
     query_location: Location,
 }
 
@@ -217,7 +217,7 @@ impl<'a, 'tree> Match<'a, 'tree> {
         &'s self,
     ) -> impl Iterator<
         Item = (
-            &String,
+            &'a str,
             CaptureQuantifier,
             impl Iterator<Item = Node<'tree>> + 's,
         ),
@@ -239,7 +239,7 @@ impl<'a, 'tree> Match<'a, 'tree> {
     }
 
     /// Return an iterator over all capture names.
-    pub fn capture_names(&self) -> impl Iterator<Item = &String> {
+    pub fn capture_names(&self) -> impl Iterator<Item = &str> {
         self.named_captures.iter().map(|c| c.0)
     }
 

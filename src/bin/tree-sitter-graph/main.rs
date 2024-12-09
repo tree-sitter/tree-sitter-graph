@@ -89,7 +89,7 @@ fn main() -> Result<()> {
         )?;
     }
 
-    let config = Config::load()?;
+    let config = Config::load(None)?;
     let mut loader = Loader::new()?;
     let loader_config = config.get()?;
     loader.find_all_languages(&loader_config)?;
@@ -98,7 +98,7 @@ fn main() -> Result<()> {
     let tsg = std::fs::read(tsg_path)
         .with_context(|| format!("Cannot read TSG file {}", tsg_path.display()))?;
     let tsg = String::from_utf8(tsg)?;
-    let file = match File::from_str(language, &tsg) {
+    let file = match File::from_str(language.clone(), &tsg) {
         Ok(file) => file,
         Err(err) => {
             eprintln!("{}", err.display_pretty(tsg_path, &tsg));
@@ -110,7 +110,7 @@ fn main() -> Result<()> {
         .with_context(|| format!("Cannot read source file {}", source_path.display()))?;
     let source = String::from_utf8(source)?;
     let mut parser = Parser::new();
-    parser.set_language(language)?;
+    parser.set_language(&language)?;
     let tree = parser
         .parse(&source, None)
         .ok_or_else(|| anyhow!("Cannot parse {}", source_path.display()))?;
