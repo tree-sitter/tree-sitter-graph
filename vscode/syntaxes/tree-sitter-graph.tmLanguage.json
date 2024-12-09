@@ -16,7 +16,7 @@
 		"keywords": {
 			"patterns": [{
 				"name": "keyword.control.tsg",
-				"match": "^\\s*(attr|attribute|edge|for|global|if|else|inherit|let|node|none|print|scan|set|some|var)\\b"
+				"match": "^\\s*(attr|attribute|edge|else|for|global|if|inherit|let|node|none|print|scan|set|some|var)\\b"
 			}]
 		},
 		"functions": {
