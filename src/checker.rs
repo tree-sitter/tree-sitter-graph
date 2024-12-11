@@ -188,7 +188,7 @@ impl ast::Stanza {
                     .expect("capture should have index")
                     != self.full_match_stanza_capture_index as u32
             })
-            .map(|cn| Identifier::from(cn.as_str()))
+            .map(|cn| Identifier::from(*cn))
             .collect::<HashSet<_>>();
         let unused_captures = all_captures
             .difference(&used_captures)

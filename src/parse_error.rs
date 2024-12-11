@@ -39,7 +39,7 @@ impl<'tree> ParseError<'tree> {
     }
 
     /// Return all parse errors in the given tree.
-    pub fn all(tree: &'tree Tree) -> Vec<ParseError> {
+    pub fn all(tree: &'tree Tree) -> Vec<ParseError<'tree>> {
         let mut errors = Vec::new();
         find_errors(tree, &mut errors, false);
         errors
